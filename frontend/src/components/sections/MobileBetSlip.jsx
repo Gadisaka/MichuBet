@@ -31,17 +31,17 @@ const modalBackdrop =
   "fixed inset-0 flex items-center justify-center bg-black/55 p-4 backdrop-blur-sm";
 
 const modalPanel =
-  "relative max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-[1.25rem] bg-gradient-to-br from-[#1f2038]/96 via-[#18182a]/98 to-[#12121f]/96 px-5 pb-5 pt-10 text-white ring-1 ring-[#3d3f5c]/50 shadow-[0_24px_60px_-12px_rgba(0,0,0,0.65)]";
+  "relative max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-[1.25rem] bg-gradient-to-br from-[#111111]/96 via-[#111111]/98 to-[#000000]/96 px-5 pb-5 pt-10 text-[#ffffff]  shadow-[0_24px_60px_-12px_rgba(0,0,0,0.65)]";
 
 const modalPanelMd =
-  "relative max-h-[90vh] w-full max-w-md overflow-y-auto rounded-[1.25rem] bg-gradient-to-br from-[#1f2038]/96 via-[#18182a]/98 to-[#12121f]/96 text-white ring-1 ring-[#3d3f5c]/50 shadow-[0_24px_60px_-12px_rgba(0,0,0,0.65)]";
+  "relative max-h-[90vh] w-full max-w-md overflow-y-auto rounded-[1.25rem] bg-gradient-to-br from-[#111111]/96 via-[#111111]/98 to-[#000000]/96 text-[#ffffff]  shadow-[0_24px_60px_-12px_rgba(0,0,0,0.65)]";
 
 function ModalClose({ onClick, label = "Close" }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className="absolute right-3 top-3 flex h-9 w-9 cursor-pointer items-center justify-center rounded-xl border border-[#3d4f6c]/45 bg-[#101020]/60 text-lg text-[#b8bfd6] transition-all hover:bg-[#1a2440] hover:ring-1 hover:ring-(--sb-accent-fill)/25"
+      className="absolute right-3 top-3 flex h-9 w-9 cursor-pointer items-center justify-center rounded-xl border-0 bg-[#0a0a0a]/60 text-lg text-[rgba(255,255,255,0.72)] transition-all hover:bg-[#111111] hover:ring-1 hover:ring-(--sb-accent-fill)/25"
       aria-label={label}
     >
       ✕
@@ -49,7 +49,7 @@ function ModalClose({ onClick, label = "Close" }) {
   );
 }
 
-const slipDivider = "border-[#2a3754]/55";
+const slipDivider = "border-white/8";
 
 function computePlacementSnapshot(
   selections,
@@ -242,11 +242,7 @@ function MobileBetSlip({
       activeBonuses,
       lockedByFixture,
     };
-    const snap = computePlacementSnapshot(
-      selections,
-      stakeNum,
-      snapshotCtx,
-    );
+    const snap = computePlacementSnapshot(selections, stakeNum, snapshotCtx);
 
     try {
       const data = await placeBet(selections, stakeNum, {
@@ -272,7 +268,9 @@ function MobileBetSlip({
           const n = Number(row?.serverOdds);
           return !Number.isFinite(n) || n <= 1;
         });
-        const hasLiveSelection = selections.some((sel) => Boolean(sel?.fromLive));
+        const hasLiveSelection = selections.some((sel) =>
+          Boolean(sel?.fromLive),
+        );
         if (hasInvalidServerOdds && !hasLiveSelection) {
           setBetResult({
             type: "error",
@@ -438,21 +436,21 @@ function MobileBetSlip({
   return (
     <>
       <div
-        className={`fixed inset-x-0 bottom-0 z-60 flex flex-col rounded-t-[1.25rem] bg-gradient-to-br from-[#1f2038]/96 via-[#0f172b]/96 to-[#0a1122]/95 shadow-[0_-12px_40px_-8px_rgba(0,0,0,0.55)] ring-1 ring-[#3d3f5c]/40 backdrop-blur-md transition-transform duration-300 ease-in-out lg:hidden ${
+        className={`fixed inset-x-0 bottom-0 z-60 flex flex-col rounded-t-[1.25rem] bg-gradient-to-br from-[#111111]/96 via-[#0a0a0a]/96 to-[#000000]/95 shadow-[0_-12px_40px_-8px_rgba(0,0,0,0.55)]  backdrop-blur-md transition-transform duration-300 ease-in-out lg:hidden ${
           open ? "translate-y-0" : "translate-y-full"
         }`}
         style={{ height: "100vh", paddingTop: "env(safe-area-inset-top, 0px)" }}
       >
         {/* Tabs header */}
         <div
-          className={`flex shrink-0 items-center border-b bg-[#101020]/35 backdrop-blur-md ${slipDivider}`}
+          className={`flex shrink-0 items-center border-b bg-[#0a0a0a]/35 backdrop-blur-md ${slipDivider}`}
         >
           <button
             type="button"
             className={`mx-0.5 flex-1 cursor-pointer rounded-t-xl border-0 bg-transparent py-3 text-sm font-bold transition-colors ${
               isMulti
                 ? "text-(--sb-accent-text-on-dark) shadow-[inset_0_-2px_0_0_var(--sb-accent-fill)]"
-                : "text-[#8fa0c2]"
+                : "text-[rgba(255,255,255,0.72)]"
             }`}
           >
             Multi
@@ -462,7 +460,7 @@ function MobileBetSlip({
             className={`mx-0.5 flex-1 cursor-pointer rounded-t-xl border-0 bg-transparent py-3 text-sm font-bold transition-colors ${
               !isMulti
                 ? "text-(--sb-accent-text-on-dark) shadow-[inset_0_-2px_0_0_var(--sb-accent-fill)]"
-                : "text-[#8fa0c2]"
+                : "text-[rgba(255,255,255,0.72)]"
             }`}
           >
             Single
@@ -470,14 +468,14 @@ function MobileBetSlip({
           <button
             type="button"
             onClick={onClose}
-            className="flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-xl border-0 bg-transparent text-[#8fa0c2] transition-colors hover:bg-[#101020]/50 hover:text-[#e9eef9]"
+            className="flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-xl border-0 bg-transparent text-[rgba(255,255,255,0.72)] transition-colors hover:bg-[#0a0a0a]/50 hover:text-[#ffffff]"
           >
             <AppIcon name="chevronDown" size={20} />
           </button>
         </div>
 
         <div
-          className={`space-y-2 border-b bg-[#101020]/25 px-3 pb-2.5 pt-2 backdrop-blur-sm shrink-0 ${slipDivider}`}
+          className={`space-y-2 border-b bg-[#0a0a0a]/25 px-3 pb-2.5 pt-2 backdrop-blur-sm shrink-0 ${slipDivider}`}
         >
           <div className="flex gap-2">
             <input
@@ -490,17 +488,17 @@ function MobileBetSlip({
               placeholder="Load Coupon..."
               disabled={couponLoadingLoad}
               autoComplete="off"
-              className="h-10 min-w-0 flex-1 rounded-xl border-0 bg-[#101020]/80 px-3 text-[13px] text-[#e9eef9] shadow-inner shadow-black/25 ring-1 ring-[#34354f]/65 outline-none transition-all placeholder:text-[#7f8ea9] focus:ring-2 focus:ring-(--sb-accent-fill)/45 disabled:opacity-60"
+              className="h-10 min-w-0 flex-1 rounded-xl border-0 bg-[#0a0a0a]/80 px-3 text-[13px] text-[#ffffff] shadow-inner shadow-black/25 ring-1 ring-white/10 outline-none transition-all placeholder:text-[rgba(255,255,255,0.72)] focus:ring-2 focus:ring-(--sb-accent-fill)/45 disabled:opacity-60"
             />
             <button
               type="button"
               title="Load coupon into bet slip"
               disabled={couponLoadingLoad}
               onClick={handleLoadCouponSubmit}
-              className="flex h-10 w-11 shrink-0 cursor-pointer items-center justify-center rounded-xl border-0 bg-[#101020]/80 text-[#9aaed1] shadow-inner shadow-black/20 ring-1 ring-[#34354f]/65 transition-all hover:ring-(--sb-accent-fill)/35 disabled:pointer-events-none disabled:opacity-50"
+              className="flex h-10 w-11 shrink-0 cursor-pointer items-center justify-center rounded-xl border-0 bg-[#0a0a0a]/80 text-[#9aaed1] shadow-inner shadow-black/20 ring-1 ring-white/10 transition-all hover:ring-(--sb-accent-fill)/35 disabled:pointer-events-none disabled:opacity-50"
             >
               {couponLoadingLoad ? (
-                <span className="text-[10px] font-bold text-[#8fa0c2]">…</span>
+                <span className="text-[10px] font-bold text-[rgba(255,255,255,0.72)]">…</span>
               ) : (
                 <AppIcon name="clipboard" size={17} strokeWidth={1.9} />
               )}
@@ -517,17 +515,17 @@ function MobileBetSlip({
               placeholder="Check Coupon..."
               disabled={couponLoadingCheck}
               autoComplete="off"
-              className="h-10 min-w-0 flex-1 rounded-xl border-0 bg-[#101020]/80 px-3 text-[13px] text-[#e9eef9] shadow-inner shadow-black/25 ring-1 ring-[#34354f]/65 outline-none transition-all placeholder:text-[#7f8ea9] focus:ring-2 focus:ring-(--sb-accent-fill)/45 disabled:opacity-60"
+              className="h-10 min-w-0 flex-1 rounded-xl border-0 bg-[#0a0a0a]/80 px-3 text-[13px] text-[#ffffff] shadow-inner shadow-black/25 ring-1 ring-white/10 outline-none transition-all placeholder:text-[rgba(255,255,255,0.72)] focus:ring-2 focus:ring-(--sb-accent-fill)/45 disabled:opacity-60"
             />
             <button
               type="button"
               title="Check coupon status"
               disabled={couponLoadingCheck}
               onClick={handleCheckCouponSubmit}
-              className="flex h-10 w-11 shrink-0 cursor-pointer items-center justify-center rounded-xl border-0 bg-[#101020]/80 text-[#9aaed1] shadow-inner shadow-black/20 ring-1 ring-[#34354f]/65 transition-all hover:ring-(--sb-accent-fill)/35 disabled:pointer-events-none disabled:opacity-50"
+              className="flex h-10 w-11 shrink-0 cursor-pointer items-center justify-center rounded-xl border-0 bg-[#0a0a0a]/80 text-[#9aaed1] shadow-inner shadow-black/20 ring-1 ring-white/10 transition-all hover:ring-(--sb-accent-fill)/35 disabled:pointer-events-none disabled:opacity-50"
             >
               {couponLoadingCheck ? (
-                <span className="text-[10px] font-bold text-[#8fa0c2]">…</span>
+                <span className="text-[10px] font-bold text-[rgba(255,255,255,0.72)]">…</span>
               ) : (
                 <AppIcon name="ticket" size={17} strokeWidth={1.9} />
               )}
@@ -543,7 +541,7 @@ function MobileBetSlip({
               <div
                 key={sel.id}
                 className={`flex items-center justify-between border-b px-4 py-3 transition-colors ${slipDivider} ${
-                  expired ? "bg-[#2a1515]/55" : "active:bg-[#101020]/20"
+                  expired ? "bg-[#2a1515]/55" : "active:bg-[#0a0a0a]/20"
                 }`}
               >
                 <div className="min-w-0 flex-1">
@@ -552,7 +550,7 @@ function MobileBetSlip({
                       className={`text-sm font-bold ${
                         expired
                           ? "text-[#f87171] line-through decoration-[#f87171]/80"
-                          : "text-[#e9eef9]"
+                          : "text-[#ffffff]"
                       }`}
                     >
                       {sel.matchName}
@@ -565,7 +563,7 @@ function MobileBetSlip({
                   </div>
                   <div
                     className={`mt-0.5 text-xs ${
-                      expired ? "text-[#f87171]/90" : "text-[#7f8ea9]"
+                      expired ? "text-[#f87171]/90" : "text-[rgba(255,255,255,0.72)]"
                     }`}
                   >
                     {sel.marketLabel}: {sel.label}
@@ -584,7 +582,7 @@ function MobileBetSlip({
                   <button
                     type="button"
                     onClick={() => onRemoveSelection(sel.id)}
-                    className="cursor-pointer border-0 bg-transparent text-[#7f8ea9] hover:text-[#ff6b6b]"
+                    className="cursor-pointer border-0 bg-transparent text-[rgba(255,255,255,0.72)] hover:text-[#ff6b6b]"
                   >
                     <AppIcon name="x" size={16} />
                   </button>
@@ -596,7 +594,7 @@ function MobileBetSlip({
 
         {/* Bottom: stake input + stats + place bet */}
         <div
-          className={`shrink-0 border-t bg-[#101020]/30 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur-sm ${slipDivider}`}
+          className={`shrink-0 border-t bg-[#0a0a0a]/30 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur-sm ${slipDivider}`}
         >
           {selections.length > 0 && hasExpiredSelection ? (
             <div className="mb-3 rounded border border-[#3f1d1d] bg-[#1f0a0a] px-3 py-2 text-center text-[11px] font-bold text-[#fecaca]">
@@ -629,10 +627,10 @@ function MobileBetSlip({
                 if (!Number.isFinite(n)) return;
                 onStakeInputChange(String(clampStakeToUpperBound(limits, n)));
               }}
-              className={`h-11 min-w-0 flex-1 rounded-2xl border-0 bg-[#101020]/80 px-3 text-sm font-bold shadow-inner shadow-black/25 ring-1 outline-none transition-all focus:ring-2 ${
+              className={`h-11 min-w-0 flex-1 rounded-2xl border-0 bg-[#0a0a0a]/80 px-3 text-sm font-bold shadow-inner shadow-black/25 ring-1 outline-none transition-all focus:ring-2 ${
                 stakeFieldInvalid
                   ? "text-[#fecaca] ring-[#b91c1c]/55 focus:ring-red-500/35"
-                  : "text-[#e9eef9] ring-[#34354f]/65 focus:ring-(--sb-accent-fill)/45"
+                  : "text-[#ffffff] ring-white/10 focus:ring-(--sb-accent-fill)/45"
               }`}
             />
             <button
@@ -647,7 +645,7 @@ function MobileBetSlip({
                 Number.isFinite(limits.MAX_BET_AMOUNT) &&
                 onStakeInputChange(String(limits.MAX_BET_AMOUNT))
               }
-              className="h-11 shrink-0 cursor-pointer rounded-2xl border-0 bg-(--sb-accent-fill) px-4 text-xs font-extrabold text-[#101012] shadow-[0_8px_20px_-6px_rgba(79,220,204,0.4)] transition-all hover:bg-(--sb-accent-fill-hover) disabled:cursor-not-allowed disabled:opacity-40"
+              className="h-11 shrink-0 cursor-pointer rounded-2xl border-0 bg-(--sb-accent-fill) px-4 text-xs font-extrabold text-[#000000] shadow-[0_8px_20px_-6px_rgba(246,175,1,0.4)] transition-all hover:bg-(--sb-accent-fill-hover) disabled:cursor-not-allowed disabled:opacity-40"
             >
               MAX
             </button>
@@ -665,16 +663,16 @@ function MobileBetSlip({
 
           <div className="mb-3 grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
             <div className="flex justify-between">
-              <span className="text-[#7f8ea9]">Total Odds</span>
+              <span className="text-[rgba(255,255,255,0.72)]">Total Odds</span>
               <span className="font-bold text-(--sb-accent-text-muted)">
                 {totalOdds}
               </span>
             </div>
             <div className="flex justify-between">
-              <span className="text-[#7f8ea9]">
+              <span className="text-[rgba(255,255,255,0.72)]">
                 {winningsTaxLabel(winningsTax)}
               </span>
-              <span className="font-bold text-[#e9eef9]">
+              <span className="font-bold text-[#ffffff]">
                 {tax === "—" ? "—" : `${tax} ETB`}
               </span>
             </div>
@@ -683,7 +681,7 @@ function MobileBetSlip({
             !hasExpiredSelection &&
             accBonusExtraEtb != null ? (
               <div className="col-span-2 flex justify-between gap-2">
-                <span className="text-[#7f8ea9]">Accumulator bonus</span>
+                <span className="text-[rgba(255,255,255,0.72)]">Accumulator bonus</span>
                 <span className="flex flex-col items-end font-bold text-[#86efac]">
                   <span>
                     +
@@ -712,7 +710,7 @@ function MobileBetSlip({
             <button
               type="button"
               onClick={onClearSelections}
-              className="flex h-12 w-12 shrink-0 cursor-pointer items-center justify-center rounded-2xl border-0 bg-[#101020]/80 text-[#8fa0c2] shadow-inner shadow-black/20 ring-1 ring-[#34354f]/65 transition-all hover:ring-(--sb-accent-fill)/25"
+              className="flex h-12 w-12 shrink-0 cursor-pointer items-center justify-center rounded-2xl border-0 bg-[#0a0a0a]/80 text-[rgba(255,255,255,0.72)] shadow-inner shadow-black/20 ring-1 ring-white/10 transition-all hover:ring-(--sb-accent-fill)/25"
             >
               <AppIcon name="trash" size={18} />
             </button>
@@ -726,7 +724,7 @@ function MobileBetSlip({
                 Boolean(stakeViolation)
               }
               onClick={handlePlaceBet}
-              className="h-12 min-w-0 flex-1 cursor-pointer rounded-2xl border-0 bg-(--sb-accent-fill) text-base font-extrabold tracking-wide text-[#101012] shadow-[0_12px_28px_-8px_rgba(79,220,204,0.45)] transition-all hover:bg-(--sb-accent-fill-hover) hover:shadow-[0_16px_32px_-8px_rgba(79,220,204,0.52)] disabled:pointer-events-none disabled:opacity-50"
+              className="h-12 min-w-0 flex-1 cursor-pointer rounded-2xl border-0 bg-(--sb-accent-fill) text-base font-extrabold tracking-wide text-[#000000] shadow-[0_12px_28px_-8px_rgba(246,175,1,0.45)] transition-all hover:bg-(--sb-accent-fill-hover) hover:shadow-[0_16px_32px_-8px_rgba(246,175,1,0.52)] disabled:pointer-events-none disabled:opacity-50"
             >
               {placing ? "PLACING..." : "PLACE BET"}
             </button>
@@ -745,22 +743,22 @@ function MobileBetSlip({
                 <h2 className="text-xl font-extrabold text-(--sb-accent)">
                   Coupon template
                 </h2>
-                <p className="mt-1 font-mono text-lg font-bold tracking-wide text-[#e9eef9]">
+                <p className="mt-1 font-mono text-lg font-bold tracking-wide text-[#ffffff]">
                   {couponCheckPreview.couponNumber}
                 </p>
-                <p className="mt-3 text-left text-xs leading-relaxed text-[#8a8ca0]">
+                <p className="mt-3 text-left text-xs leading-relaxed text-[rgba(255,255,255,0.72)]">
                   This shows the selections linked to this coupon code. Stake,
                   status, and payout use your receipt number (issued when you
                   pay or when the slip is printed at the shop).
                 </p>
               </div>
-              <div className="overflow-hidden rounded-[1rem] ring-1 ring-[#3d3f5c]/45 shadow-inner shadow-black/20">
-                <div className="bg-(--sb-accent-fill) px-3 py-2 text-sm font-bold text-[#101012]">
+              <div className="overflow-hidden rounded-[1rem] ring-1 ring-white/10 shadow-inner shadow-black/20">
+                <div className="bg-(--sb-accent-fill) px-3 py-2 text-sm font-bold text-[#000000]">
                   Games on this coupon
                 </div>
                 <table className="w-full text-left text-[11px]">
                   <thead>
-                    <tr className="border-b border-[#2a3754]/55 bg-[#101020]/70 text-[#8a8ca0] backdrop-blur-sm">
+                    <tr className="border-b border-white/8 bg-[#0a0a0a]/70 text-[rgba(255,255,255,0.72)] backdrop-blur-sm">
                       <th className="px-2 py-2 font-semibold">Match</th>
                       <th className="px-2 py-2 font-semibold">Market</th>
                       <th className="px-2 py-2 font-semibold">Pick</th>
@@ -773,7 +771,7 @@ function MobileBetSlip({
                     {(couponCheckPreview.selections || []).map((sel, idx) => (
                       <tr
                         key={`${couponCheckPreview.couponNumber}-${idx}`}
-                        className="border-b border-[#2a2a3e] text-[#d5d8ea]"
+                        className="border-b border-[#2a2a3e] text-[#ffffff]"
                       >
                         <td className="max-w-[120px] px-2 py-2 align-top">
                           {sel.matchName}
@@ -821,7 +819,7 @@ function MobileBetSlip({
                 ) : (
                   <>
                     <div className="mt-4 flex items-center justify-center gap-2">
-                      <p className="text-2xl font-bold tracking-wider text-white">
+                      <p className="text-2xl font-bold tracking-wider text-[#ffffff]">
                         {placedBet.couponNumber || "—"}
                       </p>
                       <button
@@ -833,7 +831,7 @@ function MobileBetSlip({
                             ? "Copied to clipboard"
                             : "Copy coupon number"
                         }
-                        className="flex cursor-pointer items-center justify-center rounded-xl border-0 bg-[#101020]/80 p-2 text-[#f5f6ff] shadow-inner shadow-black/20 ring-1 ring-[#34354f]/65 transition-all hover:ring-(--sb-accent-fill)/45"
+                        className="flex cursor-pointer items-center justify-center rounded-xl border-0 bg-[#0a0a0a]/80 p-2 text-[#ffffff] shadow-inner shadow-black/20 ring-1 ring-white/10 transition-all hover:ring-(--sb-accent-fill)/45"
                       >
                         {copiedCoupon ? (
                           <AppIcon
@@ -847,8 +845,8 @@ function MobileBetSlip({
                       </button>
                     </div>
 
-                    <p className="mt-4 text-sm leading-relaxed text-[#8a8ca0]">
-                      Please find a nearby Michubet shop to pay and print your
+                    <p className="mt-4 text-sm leading-relaxed text-[rgba(255,255,255,0.72)]">
+                      Please find a nearby Michotbet shop to pay and print your
                       slip.
                     </p>
                   </>
@@ -866,25 +864,25 @@ function MobileBetSlip({
                 </p>
               </div>
 
-              <div className="mx-5 rounded-[1rem] bg-gradient-to-br from-[#151528]/95 to-[#0c101c]/95 px-4 py-3 ring-1 ring-[#3d3f5c]/45 shadow-inner shadow-black/20">
+              <div className="mx-5 rounded-[1rem] bg-gradient-to-br from-[#151528]/95 to-[#0c101c]/95 px-4 py-3 ring-1 ring-white/10 shadow-inner shadow-black/20">
                 {placedBet.paidWithWallet ? (
                   <div className="flex justify-between border-b border-[#2a2a3e] py-1.5 text-sm">
-                    <span className="text-[#8a8ca0]">Payment</span>
+                    <span className="text-[rgba(255,255,255,0.72)]">Payment</span>
                     <span className="font-semibold text-[#86efac]">
                       Paid {placedBet.stake} ETB
                     </span>
                   </div>
                 ) : null}
                 <div className="flex justify-between border-b border-[#2a2a3e] py-1.5 text-sm">
-                  <span className="text-[#8a8ca0]">Stake</span>
+                  <span className="text-[rgba(255,255,255,0.72)]">Stake</span>
                   <span className="font-bold">{placedBet.stake} ETB</span>
                 </div>
                 <div className="flex justify-between border-b border-[#2a2a3e] py-1.5 text-sm">
-                  <span className="text-[#8a8ca0]">Max Win</span>
+                  <span className="text-[rgba(255,255,255,0.72)]">Max Win</span>
                   <span className="font-bold">{placedBet.maxWin} ETB</span>
                 </div>
                 <div className="flex justify-between border-b border-[#2a2a3e] py-1.5 text-sm">
-                  <span className="text-[#8a8ca0]">Total Odd</span>
+                  <span className="text-[rgba(255,255,255,0.72)]">Total Odd</span>
                   <span className="font-bold">{placedBet.totalOdds}</span>
                 </div>
                 <div className="flex justify-between pt-2 text-sm font-extrabold">
@@ -895,13 +893,13 @@ function MobileBetSlip({
                 </div>
               </div>
 
-              <div className="mx-5 mb-5 mt-4 overflow-hidden rounded-[1rem] ring-1 ring-[#3d3f5c]/45 shadow-inner shadow-black/20">
-                <div className="flex items-center justify-between bg-(--sb-accent-fill) px-4 py-2 font-bold text-[#101012]">
+              <div className="mx-5 mb-5 mt-4 overflow-hidden rounded-[1rem] ring-1 ring-white/10 shadow-inner shadow-black/20">
+                <div className="flex items-center justify-between bg-(--sb-accent-fill) px-4 py-2 font-bold text-[#000000]">
                   <span>My Games</span>
                 </div>
                 <table className="w-full text-xs">
                   <thead>
-                    <tr className="border-b border-[#2a3754]/55 bg-[#101020]/70 text-[#8a8ca0] backdrop-blur-sm">
+                    <tr className="border-b border-white/8 bg-[#0a0a0a]/70 text-[rgba(255,255,255,0.72)] backdrop-blur-sm">
                       <th className="px-2 py-2 text-left font-semibold">
                         Date
                       </th>
@@ -923,7 +921,7 @@ function MobileBetSlip({
                     {placedBet.selections.map((sel) => (
                       <tr
                         key={sel.id}
-                        className="border-b border-[#2a2a3e] text-[#d5d8ea]"
+                        className="border-b border-[#2a2a3e] text-[#ffffff]"
                       >
                         <td className="whitespace-nowrap px-2 py-2">
                           {new Date().toLocaleDateString()}

@@ -20,7 +20,7 @@ import {
 } from "../services/api";
 
 const insetRow =
-  "flex items-center justify-between gap-3 rounded-2xl bg-[#101020]/55 px-4 py-3 ring-1 ring-[#34354f]/35 transition-colors duration-300";
+  "flex items-center justify-between gap-3 rounded-2xl bg-[#0a0a0a]/55 px-4 py-3  transition-colors duration-300";
 
 function Profile() {
   const navigate = useNavigate();
@@ -154,7 +154,7 @@ function Profile() {
 
       <div className="relative mx-auto w-full max-w-lg px-4 pb-28 pt-2 sm:px-5 sm:pt-4">
         <div
-          className="pointer-events-none absolute -top-4 left-1/2 h-64 w-[min(100%,28rem)] -translate-x-1/2 rounded-full bg-[radial-gradient(ellipse_at_center,rgba(79,220,204,0.14),transparent_68%)] blur-xl"
+          className="pointer-events-none absolute -top-4 left-1/2 h-64 w-[min(100%,28rem)] -translate-x-1/2 rounded-full bg-[radial-gradient(ellipse_at_center,rgba(246,175,1,0.14),transparent_68%)] blur-xl"
           aria-hidden
         />
 
@@ -162,26 +162,26 @@ function Profile() {
           <button
             type="button"
             onClick={() => navigate("/")}
-            className="flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-full bg-[#2f3050]/90 text-[#eceefd] shadow-lg shadow-black/20 ring-1 ring-[#4a4d6e]/40 transition-transform duration-300 hover:scale-105 hover:bg-[#3f4070] hover:ring-(--sb-accent-fill)/30 active:scale-95"
+            className="flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-full bg-[#111111]/90 text-[#ffffff] shadow-lg shadow-black/20  transition-transform duration-300 hover:scale-105 hover:bg-[#111111] hover:ring-(--sb-accent-fill)/30 active:scale-95"
           >
             <AppIcon name="chevronDown" size={18} className="rotate-90" />
           </button>
           <div>
-            <p className="m-0 text-[11px] font-extrabold uppercase tracking-[0.2em] text-[#8a8ca0]">
+            <p className="m-0 text-[11px] font-extrabold uppercase tracking-[0.2em] text-[rgba(255,255,255,0.72)]">
               Account
             </p>
-            <h1 className="m-0 bg-gradient-to-r from-[#f4f5ff] via-[#c6fff8] to-[#f4f5ff] bg-clip-text text-2xl font-black tracking-tight text-transparent sm:text-3xl">
+            <h1 className="m-0 text-2xl font-black tracking-tight text-[#ffffff] sm:text-3xl">
               My profile
             </h1>
           </div>
         </header>
 
         {loading ? (
-          <div className="flex flex-col items-center justify-center gap-4 py-24 text-[#8a8ca0]">
+          <div className="flex flex-col items-center justify-center gap-4 py-24 text-[rgba(255,255,255,0.72)]">
             <div className="relative h-14 w-14">
               <div className="absolute inset-0 animate-ping rounded-full bg-(--sb-accent-fill)/25" />
-              <div className="relative flex h-14 w-14 items-center justify-center rounded-full bg-[#1f2038] ring-2 ring-(--sb-accent-fill)/40">
-                <div className="h-7 w-7 animate-spin rounded-full border-2 border-[#34354f] border-t-(--sb-accent-fill)" />
+              <div className="relative flex h-14 w-14 items-center justify-center rounded-full bg-[#111111] ring-2 ring-(--sb-accent-fill)/40">
+                <div className="h-7 w-7 animate-spin rounded-full border-2 border-[#F6AF01] border-t-(--sb-accent-fill)" />
               </div>
             </div>
             <span className="text-sm font-semibold">Loading profile…</span>
@@ -193,19 +193,19 @@ function Profile() {
         ) : (
           <div className="flex flex-col gap-4">
             <SoftPanel className="animate-deposit-panel">
-              <p className="mb-4 text-center text-xs font-extrabold uppercase tracking-[0.18em] text-[#8a8ca0]">
+              <p className="mb-4 text-center text-xs font-extrabold uppercase tracking-[0.18em] text-[rgba(255,255,255,0.72)]">
                 Overview
               </p>
               <div className="flex flex-col gap-2.5">
                 <div className={insetRow}>
-                  <span className="text-sm text-[#8a8ca0]">Wallet</span>
+                  <span className="text-sm text-[rgba(255,255,255,0.72)]">Wallet</span>
                   <span className="text-lg font-black tabular-nums text-(--sb-positive)">
                     {balance === null ? "—" : `${balance.toLocaleString()} ETB`}
                   </span>
                 </div>
                 <div className={insetRow}>
-                  <span className="text-sm text-[#8a8ca0]">Member since</span>
-                  <span className="text-sm font-bold text-[#f4f5ff]">
+                  <span className="text-sm text-[rgba(255,255,255,0.72)]">Member since</span>
+                  <span className="text-sm font-bold text-[#ffffff]">
                     {memberSince}
                   </span>
                 </div>
@@ -215,7 +215,7 @@ function Profile() {
                   <Link
                     key={l.to}
                     to={l.to}
-                    className="inline-flex items-center gap-1.5 rounded-full bg-[#101020]/70 px-4 py-2 text-xs font-extrabold text-[#c6fff8] no-underline ring-1 ring-[#34354f]/55 transition-all duration-300 hover:scale-[1.03] hover:bg-[#0f4a45]/35 hover:ring-(--sb-accent-fill)/40"
+                    className="inline-flex items-center gap-1.5 rounded-full bg-[#0a0a0a]/70 px-4 py-2 text-xs font-extrabold text-[#ffffff] no-underline transition-all duration-300 hover:scale-[1.03] hover:bg-(--sb-accent-surface)/35"
                   >
                     {l.label}
                     <AppIcon
@@ -233,12 +233,12 @@ function Profile() {
               className="animate-deposit-panel"
             >
               <SoftPanel>
-                <p className="mb-5 text-center text-xs font-extrabold uppercase tracking-[0.18em] text-[#8a8ca0]">
+                <p className="mb-5 text-center text-xs font-extrabold uppercase tracking-[0.18em] text-[rgba(255,255,255,0.72)]">
                   Profile details
                 </p>
                 <div className="flex flex-col gap-4">
                   <label className="block">
-                    <span className="mb-2 block text-xs font-semibold text-[#a3a5bf]">
+                    <span className="mb-2 block text-xs font-semibold text-[rgba(255,255,255,0.72)]">
                       Display name
                     </span>
                     <input
@@ -250,7 +250,7 @@ function Profile() {
                     />
                   </label>
                   <label className="block">
-                    <span className="mb-2 block text-xs font-semibold text-[#a3a5bf]">
+                    <span className="mb-2 block text-xs font-semibold text-[rgba(255,255,255,0.72)]">
                       Phone {isPlayer ? "(login)" : ""}
                     </span>
                     <input
@@ -268,7 +268,7 @@ function Profile() {
                       }`}
                     />
                     {!isPlayer && (
-                      <p className="mt-2 text-[11px] leading-relaxed text-[#6b6d8a]">
+                      <p className="mt-2 text-[11px] leading-relaxed text-[rgba(255,255,255,0.5)]">
                         Phone changes are limited to player accounts on this
                         site.
                       </p>
@@ -281,7 +281,7 @@ function Profile() {
                   </p>
                 )}
                 {profileMsg && (
-                  <p className="mt-4 rounded-2xl bg-[#0f4a45]/40 px-4 py-3 text-center text-sm font-semibold text-[#c6fff8] ring-1 ring-(--sb-accent-fill)/25">
+                  <p className="mt-4 rounded-2xl bg-(--sb-accent-surface)/40 px-4 py-3 text-center text-sm font-semibold text-[#ffffff] ring-1 ring-(--sb-accent-fill)/25">
                     {profileMsg}
                   </p>
                 )}
@@ -300,7 +300,7 @@ function Profile() {
               className="animate-deposit-panel"
             >
               <SoftPanel>
-                <p className="mb-5 text-center text-xs font-extrabold uppercase tracking-[0.18em] text-[#8a8ca0]">
+                <p className="mb-5 text-center text-xs font-extrabold uppercase tracking-[0.18em] text-[rgba(255,255,255,0.72)]">
                   Change password
                 </p>
                 <div className="flex flex-col gap-3">
@@ -339,7 +339,7 @@ function Profile() {
                   </p>
                 )}
                 {pwdMsg && (
-                  <p className="mt-4 rounded-2xl bg-[#0f4a45]/40 px-4 py-3 text-center text-sm font-semibold text-[#c6fff8] ring-1 ring-(--sb-accent-fill)/25">
+                  <p className="mt-4 rounded-2xl bg-(--sb-accent-surface)/40 px-4 py-3 text-center text-sm font-semibold text-[#ffffff] ring-1 ring-(--sb-accent-fill)/25">
                     {pwdMsg}
                   </p>
                 )}
@@ -356,7 +356,7 @@ function Profile() {
             <button
               type="button"
               onClick={handleSignOut}
-              className="animate-deposit-panel rounded-2xl bg-[#101020]/60 px-5 py-4 text-sm font-extrabold text-[#d5d8ea] ring-1 ring-[#4a4d6e]/55 transition-all duration-300 hover:bg-[#2a1a1f]/80 hover:ring-[#ff6b6b]/30 hover:text-[#ff9a9a]"
+              className="animate-deposit-panel rounded-2xl bg-[#0a0a0a]/60 px-5 py-4 text-sm font-extrabold text-[#ffffff] transition-all duration-300 hover:bg-[#2a1a1f]/80 hover:text-[#ff9a9a]"
             >
               Sign out
             </button>

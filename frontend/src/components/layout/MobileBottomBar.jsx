@@ -98,7 +98,7 @@ function MobileBottomBar({
   );
 
   const bottomNav = (
-    <nav className="fixed inset-x-0 bottom-0 z-50 flex items-stretch justify-around border-t border-t-[#1b2842] bg-[#091025] lg:hidden">
+    <nav className="fixed inset-x-0 bottom-0 z-50 flex items-stretch justify-around border-t border-white/10 bg-[#000000] lg:hidden">
       {visibleNavItems.map((item) => (
         <button
           key={item.id}
@@ -122,7 +122,7 @@ function MobileBottomBar({
           }`}
         >
           {item.id === "menu" ? (
-            <span className="flex h-12 w-12 items-center justify-center rounded-full bg-(--sb-accent-fill) text-[#101012]">
+            <span className="flex h-12 w-12 items-center justify-center rounded-full bg-(--sb-accent-fill) text-[#000000]">
               <AppIcon name={item.icon} size={22} strokeWidth={2.5} />
             </span>
           ) : (
@@ -174,7 +174,7 @@ function MobileBottomBar({
           <button
             type="button"
             onClick={() => setSlipOpen((p) => !p)}
-            className={`flex w-full cursor-pointer items-center justify-between rounded-2xl border bg-[#091025] px-4 py-2.5 text-[#e9eef9] shadow-[0_0_0_1px_rgba(56,203,191,0.35),0_10px_24px_rgba(56,203,191,0.42)] ${
+            className={`flex w-full cursor-pointer items-center justify-between rounded-2xl border bg-[#000000] px-4 py-2.5 text-[#ffffff] shadow-[0_0_0_1px_rgba(246,175,1,0.35),0_10px_24px_rgba(246,175,1,0.42)] ${
               stakeSummaryInvalid
                 ? "border-[#991b1b]/70 ring-1 ring-[#b91c1c]/40"
                 : "border-[#1b3231]"
@@ -191,7 +191,7 @@ function MobileBottomBar({
             <div className="flex shrink-0 items-center gap-3">
               <span className="text-right text-xs font-bold leading-tight text-(--sb-accent-text-muted) tabular-nums">
                 ETB{" "}
-                <span className="text-[13px] text-[#e9eef9]">
+                <span className="text-[13px] text-[#ffffff]">
                   {netWinFormatted}
                 </span>
               </span>

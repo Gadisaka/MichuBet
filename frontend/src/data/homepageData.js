@@ -1,5 +1,5 @@
 export const topHeaderData = {
-  brand: "Michubet",
+  brand: "Michotbet",
   balanceLabel: "1 ETB",
   timeLabel: "ID: 726",
 };

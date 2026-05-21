@@ -24,10 +24,9 @@ export default function LoginPage() {
     try {
       const fingerprint = await getDeviceFingerprint();
       const loggedInUser = await login(phone.trim(), password, fingerprint);
-      navigate(
-        loggedInUser?.role === "CASHIER" ? "/tickets" : "/",
-        { replace: true },
-      );
+      navigate(loggedInUser?.role === "CASHIER" ? "/tickets" : "/", {
+        replace: true,
+      });
     } catch (err) {
       if (err.code === "DEVICE_APPROVAL_REQUIRED") {
         setDevicePending({
@@ -47,7 +46,9 @@ export default function LoginPage() {
       <AuthLayout>
         <PanelCard className="p-7">
           <div className="mb-6 text-center">
-            <h1 className="text-2xl font-bold tracking-tight">Device Approval Required</h1>
+            <h1 className="text-2xl font-bold tracking-tight">
+              Device Approval Required
+            </h1>
             <p className="mt-3 text-sm text-[var(--muted)]">
               {devicePending.message ||
                 "Login from a new device requires admin approval."}
@@ -76,8 +77,8 @@ export default function LoginPage() {
           </div>
 
           <p className="mt-4 text-sm text-[var(--muted)]">
-            An administrator has been notified. Try signing in again after your device
-            is approved.
+            An administrator has been notified. Try signing in again after your
+            device is approved.
           </p>
 
           <PrimaryButton
@@ -97,7 +98,7 @@ export default function LoginPage() {
       <form className="space-y-5" onSubmit={handleSubmit}>
         <PanelCard className="p-7">
           <div className="mb-6 text-center">
-            <h1 className="text-2xl font-bold tracking-tight">Michubet</h1>
+            <h1 className="text-2xl font-bold tracking-tight">Michotbet</h1>
             <p className="mt-1 text-sm text-[var(--muted)]">Admin Portal</p>
           </div>
 

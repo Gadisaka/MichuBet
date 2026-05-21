@@ -144,15 +144,15 @@ function LiveIndicator() {
 
 function LiveExpansionEmpty({ onClose }) {
   return (
-    <div className="border-t border-[#2f3f5c]/55 bg-gradient-to-b from-[#060d1b]/98 to-[#050a14]/98">
-      <div className="flex items-center justify-between border-b border-[#2a3754]/60 px-3 py-2.5">
+    <div className="border-t border-white/8 bg-gradient-to-b from-[#000000]/98 to-[#0a0a0a]/98">
+      <div className="flex items-center justify-between border-b border-white/8 px-3 py-2.5">
         <span className="text-[11px] font-semibold text-[#7f89a4]">
           Live Match
         </span>
         <button
           type="button"
           onClick={onClose}
-          className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-xl border border-[#3d4f6c]/50 bg-[#101a2e]/80 text-[#b6bfd8] transition-all duration-200 hover:bg-[#1a2440] hover:ring-1 hover:ring-(--sb-accent-fill)/25"
+          className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-xl border-0 bg-[#0a0a0a]/80 text-[rgba(255,255,255,0.72)] transition-all duration-200 hover:bg-[#111111] hover:ring-1 hover:ring-(--sb-accent-fill)/25"
         >
           <AppIcon name="x" size={14} />
         </button>
@@ -188,8 +188,8 @@ function LiveExpansion({ match, onClose, onOddsClick, selectedOdds }) {
   }
 
   return (
-    <div className="border-t border-[#2f3f5c]/55 bg-gradient-to-b from-[#060d1b]/98 to-[#050a14]/98">
-      <div className="flex items-center justify-between border-b border-[#2a3754]/60 px-3 py-2.5">
+    <div className="border-t border-white/8 bg-gradient-to-b from-[#000000]/98 to-[#0a0a0a]/98">
+      <div className="flex items-center justify-between border-b border-white/8 px-3 py-2.5">
         <div className="flex min-w-0 items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-[#7f89a4]">
           {match.countryFlag ? (
             <LogoImg
@@ -197,7 +197,7 @@ function LiveExpansion({ match, onClose, onOddsClick, selectedOdds }) {
               alt=""
               size={18}
               rounded="rounded-[2px]"
-              className="border border-[#1f2a40]"
+              className="border border-transparent"
             />
           ) : null}
           {match.leagueLogo ? (
@@ -205,7 +205,7 @@ function LiveExpansion({ match, onClose, onOddsClick, selectedOdds }) {
               src={match.leagueLogo}
               alt=""
               size={20}
-              className="border border-[#1f2a40] bg-[#0a1225]"
+              className="border border-transparent bg-[#000000]"
             />
           ) : null}
           <span className="truncate">{formatLeagueLabel(match.league)}</span>
@@ -213,13 +213,13 @@ function LiveExpansion({ match, onClose, onOddsClick, selectedOdds }) {
         <button
           type="button"
           onClick={onClose}
-          className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-xl border border-[#3d4f6c]/50 bg-[#101a2e]/80 text-[#b6bfd8] transition-all duration-200 hover:bg-[#1a2440] hover:ring-1 hover:ring-(--sb-accent-fill)/25"
+          className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-xl border-0 bg-[#0a0a0a]/80 text-[rgba(255,255,255,0.72)] transition-all duration-200 hover:bg-[#111111] hover:ring-1 hover:ring-(--sb-accent-fill)/25"
         >
           <AppIcon name="x" size={14} />
         </button>
       </div>
 
-      <div className="border-b border-[#2a3754]/50 bg-[#081128]/90 px-3 py-3">
+      <div className="border-b border-white/8 bg-[#000000]/90 px-3 py-3">
         <div className="mb-1 flex items-center justify-center gap-1 text-[11px] font-semibold text-[#ef4444]">
           <LiveIndicator />
           {match.elapsedSeconds ||
@@ -227,7 +227,7 @@ function LiveExpansion({ match, onClose, onOddsClick, selectedOdds }) {
         </div>
         <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
           <div className="flex flex-col items-center gap-1 text-center">
-            <div className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full border border-[#2b3656] bg-[#101a33]">
+            <div className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full border border-transparent bg-[#111111]">
               {match.homeTeamLogo ? (
                 <LogoImg
                   src={match.homeTeamLogo}
@@ -249,7 +249,7 @@ function LiveExpansion({ match, onClose, onOddsClick, selectedOdds }) {
             VS
           </div>
           <div className="flex flex-col items-center gap-1 text-center">
-            <div className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full border border-[#2b3656] bg-[#101a33]">
+            <div className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full border border-transparent bg-[#111111]">
               {match.awayTeamLogo ? (
                 <LogoImg
                   src={match.awayTeamLogo}
@@ -270,7 +270,7 @@ function LiveExpansion({ match, onClose, onOddsClick, selectedOdds }) {
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-1 border-b border-[#1f2a40] px-3 py-2">
+      <div className="flex flex-wrap gap-1 border-b border-white/8 px-3 py-2">
         {MARKET_FILTER_CHIPS.map((chip) => (
           <button
             key={chip.id}
@@ -279,7 +279,7 @@ function LiveExpansion({ match, onClose, onOddsClick, selectedOdds }) {
             className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold ${
               chip.id === activeChipId
                 ? "border-(--sb-accent) bg-(--sb-accent-surface) text-(--sb-accent-text-soft)"
-                : "border-[#2f3047] bg-[#131a2c] text-[#9ea6c2]"
+                : "border-[#2f3047] bg-[#131a2c] text-[rgba(255,255,255,0.72)]"
             }`}
           >
             {chip.label}
@@ -321,8 +321,8 @@ function LiveOddButton({ value, selected, onClick }) {
       onClick={onClick}
       className={`flex h-[36px] w-full items-center justify-center rounded-xl border text-[13px] font-semibold transition-all duration-200 ${
         selected
-          ? "border-(--sb-accent) bg-(--sb-accent-surface-deep) text-(--sb-accent-text-muted) shadow-[0_0_12px_rgba(56,203,191,0.35)]"
-          : "border-[#2a3754] bg-[#0a1225] text-[#e7ecfb] hover:bg-[#131d32] hover:ring-1 hover:ring-[#3d4f6c]/40"
+          ? "border-(--sb-accent) bg-(--sb-accent-surface-deep) text-(--sb-accent-text-muted) shadow-[0_0_12px_rgba(246,175,1,0.35)]"
+          : "border-transparent bg-[#000000] text-[#ffffff] hover:bg-[#111111]"
       }`.trim()}
     >
       {value ?? "-"}
@@ -373,10 +373,10 @@ function LiveRow({ match, isExpanded, onToggle, onOddsClick, selectedOdds }) {
 
   return (
     <article
-      className={`border-b border-[#2a3754]/70 transition-all duration-300 last:border-b-0 ${
+      className={`border-b border-white/8 transition-all duration-300 last:border-b-0 ${
         isExpanded
-          ? "bg-[#0c1527]/60 ring-1 ring-(--sb-accent-fill)/45 shadow-[0_8px_28px_-8px_rgba(56,203,191,0.22)]"
-          : "hover:bg-[#0c1527]/35"
+          ? "bg-[#0a0a0a]/60 ring-1 ring-(--sb-accent-fill)/45 shadow-[0_8px_28px_-8px_rgba(246,175,1,0.22)]"
+          : "hover:bg-[#0a0a0a]/35"
       }`}
     >
       <div
@@ -393,7 +393,7 @@ function LiveRow({ match, isExpanded, onToggle, onOddsClick, selectedOdds }) {
       >
         <div className="grid grid-cols-[minmax(0,1fr)_72px_72px_72px_72px] items-center gap-2 max-md:grid-cols-1">
           <div className="min-w-0">
-            <div className="mb-0.5 flex items-center truncate text-[11px] text-[#8a95b0]">
+            <div className="mb-0.5 flex items-center truncate text-[11px] text-[rgba(255,255,255,0.72)]">
               {String(match.league || "").replace(" - ", " • ")}
             </div>
             <div className="space-y-0.5 text-[13px] leading-tight">
@@ -511,11 +511,11 @@ function LiveMatchesList({
 }) {
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center px-4 py-24 text-[#8a8ca0]">
+      <div className="flex flex-col items-center justify-center px-4 py-24 text-[rgba(255,255,255,0.72)]">
         <div className="relative h-14 w-14">
           <div className="absolute inset-0 animate-ping rounded-full bg-red-500/20" />
-          <div className="relative flex h-14 w-14 items-center justify-center rounded-full bg-[#1f2038] ring-2 ring-red-500/30">
-            <div className="h-7 w-7 animate-spin rounded-full border-2 border-[#34354f] border-t-red-500" />
+          <div className="relative flex h-14 w-14 items-center justify-center rounded-full bg-[#111111] ring-2 ring-red-500/30">
+            <div className="h-7 w-7 animate-spin rounded-full border-2 border-[#F6AF01] border-t-red-500" />
           </div>
         </div>
         <span className="mt-4 text-sm font-semibold">Loading live games…</span>
@@ -525,8 +525,8 @@ function LiveMatchesList({
 
   if (!matches.length) {
     return (
-      <div className="mx-2 mb-3 mt-1 rounded-[1.25rem] bg-gradient-to-br from-[#1f2038]/88 via-[#18182a]/92 to-[#12121f]/92 px-4 py-14 text-center ring-1 ring-[#3d3f5c]/40">
-        <p className="m-0 text-sm font-medium text-[#8a8ca0]">
+      <div className="mx-2 mb-3 mt-1 rounded-[1.25rem] bg-gradient-to-br from-[#111111]/88 via-[#111111]/92 to-[#000000]/92 px-4 py-14 text-center ">
+        <p className="m-0 text-sm font-medium text-[rgba(255,255,255,0.72)]">
           No live games right now.
         </p>
       </div>
@@ -534,8 +534,8 @@ function LiveMatchesList({
   }
 
   return (
-    <section className="mx-2 mb-3 mt-1 overflow-hidden rounded-[1.25rem] bg-gradient-to-br from-[#131d32]/95 via-[#091324]/98 to-[#060d1b]/95 ring-1 ring-[#3d3f5c]/45 shadow-[0_16px_40px_-20px_rgba(0,0,0,0.55)] animate-deposit-panel">
-      <header className="grid grid-cols-[minmax(0,1fr)_72px_72px_72px_72px] items-center gap-2 border-b border-[#2f3f5c]/55 bg-[#101a2e]/40 px-3 py-2.5 text-[11px] font-semibold text-[#8a95b0] max-md:grid-cols-1">
+    <section className="sb-card mx-2 mb-3 mt-1 overflow-hidden rounded-[1.25rem] animate-deposit-panel">
+      <header className="grid grid-cols-[minmax(0,1fr)_72px_72px_72px_72px] items-center gap-2 border-b border-white/8 bg-[#0a0a0a]/40 px-3 py-2.5 text-[11px] font-semibold text-[rgba(255,255,255,0.72)] max-md:grid-cols-1">
         <span>Teams</span>
         <span className="text-center max-md:hidden">1</span>
         <span className="text-center max-md:hidden">X</span>
@@ -863,10 +863,10 @@ function Live() {
           center={
             <>
               <div className="animate-deposit-panel px-2 pt-1 sm:px-3 sm:pt-2">
-                <p className="m-0 text-[11px] font-extrabold uppercase tracking-[0.2em] text-[#8a8ca0]">
+                <p className="m-0 text-[11px] font-extrabold uppercase tracking-[0.2em] text-[rgba(255,255,255,0.72)]">
                   In play
                 </p>
-                <h1 className="m-0 bg-gradient-to-r from-[#f4f5ff] via-[#fecaca] to-[#f4f5ff] bg-clip-text text-xl font-black tracking-tight text-transparent sm:text-2xl">
+                <h1 className="m-0 bg-gradient-to-r from-[#ffffff] via-[#fecaca] to-[#ffffff] bg-clip-text text-xl font-black tracking-tight text-transparent sm:text-2xl">
                   Live betting
                 </h1>
               </div>

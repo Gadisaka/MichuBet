@@ -366,7 +366,7 @@ function Home() {
       </div>
       <div className="relative">
         <div
-          className="pointer-events-none absolute left-1/2 top-[-1rem] h-80 w-[min(100%,56rem)] -translate-x-1/2 rounded-full bg-[radial-gradient(ellipse_at_center,rgba(79,220,204,0.1),transparent_68%)] blur-2xl"
+          className="pointer-events-none absolute left-1/2 top-[-1rem] h-80 w-[min(100%,56rem)] -translate-x-1/2 rounded-full bg-[radial-gradient(ellipse_at_center,rgba(246,175,1,0.1),transparent_68%)] blur-2xl"
           aria-hidden
         />
         <MainLayout
@@ -438,16 +438,16 @@ function Home() {
       </div>
       {loading ? (
         <div
-          className="pointer-events-auto fixed inset-0 z-80 flex items-center justify-center bg-[#050914]/35 backdrop-blur-md"
+          className="pointer-events-auto fixed inset-0 z-80 flex items-center justify-center bg-black/35 backdrop-blur-md"
           role="status"
           aria-live="polite"
           aria-busy="true"
           aria-label="Loading"
         >
           <div className="relative flex h-56 w-56 items-center justify-center sm:h-64 sm:w-64">
-            <div className="absolute h-52 w-52 animate-pulse rounded-full bg-[#38cbbf]/30 blur-3xl sm:h-56 sm:w-56" />
-            <div className="absolute h-36 w-36 animate-ping rounded-full border border-[#38cbbf]/55" />
-            <div className="absolute h-28 w-28 animate-spin rounded-full border-2 border-transparent border-t-[#38cbbf] border-r-cyan-300 sm:h-32 sm:w-32" />
+            <div className="absolute h-52 w-52 animate-pulse rounded-full bg-[#F6AF01]/30 blur-3xl sm:h-56 sm:w-56" />
+            <div className="absolute h-36 w-36 animate-ping rounded-full border border-[#F6AF01]/55" />
+            <div className="absolute h-28 w-28 animate-spin rounded-full border-2 border-transparent border-t-[#F6AF01] border-r-[#F6AF01]/35 sm:h-32 sm:w-32" />
             <img
               src={loadingLogo}
               alt=""

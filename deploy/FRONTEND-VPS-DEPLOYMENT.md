@@ -1,6 +1,6 @@
 # Frontend VPS deployment (Vite SPA + nginx)
 
-The public **frontend** app is a **static React SPA** built with **Vite**. Production deploy means: **`npm run build`** → upload the **`dist/`** folder → serve it with **nginx** (HTTPS, gzip, SPA `try_files` fallback).  
+The public **frontend** app is a **static React SPA** built with **Vite**. Production deploy means: **`npm run build`** → upload the **`dist/`** folder → serve it with **nginx** (HTTPS, gzip, SPA `try_files` fallback).
 
 The frontend talks to the **backend REST API** on a separate host (see [`BACKEND-VPS-DEPLOYMENT.md`](./BACKEND-VPS-DEPLOYMENT.md)).
 
@@ -8,12 +8,12 @@ The frontend talks to the **backend REST API** on a separate host (see [`BACKEND
 
 ## Architecture (quick reference)
 
-| Piece | Role |
-|-------|------|
-| **Built assets** | HTML/JS/CSS in `frontend/dist/` after `vite build` |
-| **nginx** | Serves static files + routes all unknown paths to `index.html` (client-side router) |
-| **TLS** | Let’s Encrypt (Certbot), same pattern as backend |
-| **API** | HTTPS origin like `https://kizza-api.sheqaygames.com` — injected at **build time** |
+| Piece            | Role                                                                                |
+| ---------------- | ----------------------------------------------------------------------------------- |
+| **Built assets** | HTML/JS/CSS in `frontend/dist/` after `vite build`                                  |
+| **nginx**        | Serves static files + routes all unknown paths to `index.html` (client-side router) |
+| **TLS**          | Let’s Encrypt (Certbot), same pattern as backend                                    |
+| **API**          | HTTPS origin like `https://kizza-api.sheqaygames.com` — injected at **build time**  |
 
 **Important:** Vite bakes **`VITE_*`** values into the JS bundle during **`npm run build`**. If you change API URL or poll settings, **rebuild and redeploy** `dist/`.
 
@@ -73,9 +73,9 @@ curl -sS -o /dev/null -w "%{http_code}\n" http://127.0.0.1:4173/
 Typical layout on the VPS:
 
 ```bash
-sudo mkdir -p /var/www/michubet-frontend
+sudo mkdir -p /var/www/michotbet-frontend
 # from your dev machine or CI:
-rsync -avz --delete frontend/dist/ user@your-vps:/var/www/michubet-frontend/
+rsync -avz --delete frontend/dist/ user@your-vps:/var/www/michotbet-frontend/
 ```
 
 Or build **on the VPS** after `git pull`:
@@ -83,7 +83,7 @@ Or build **on the VPS** after `git pull`:
 ```bash
 cd /path/to/repo/frontend
 npm ci && npm run build
-sudo rsync -av --delete dist/ /var/www/michubet-frontend/
+sudo rsync -av --delete dist/ /var/www/michotbet-frontend/
 ```
 
 Adjust paths and user as needed.
@@ -92,14 +92,14 @@ Adjust paths and user as needed.
 
 ## 4. nginx (static site + SPA fallback)
 
-Example file in the repo: **`deploy/nginx/michubet-frontend.example.conf`**.
+Example file in the repo: **`deploy/nginx/michotbet-frontend.example.conf`**.
 
 Install (replace domain and root path):
 
 ```bash
-sudo cp /path/to/repo/deploy/nginx/michubet-frontend.example.conf /etc/nginx/sites-available/michubet-frontend.conf
-sudo nano /etc/nginx/sites-available/michubet-frontend.conf   # server_name, root
-sudo ln -sf /etc/nginx/sites-available/michubet-frontend.conf /etc/nginx/sites-enabled/
+sudo cp /path/to/repo/deploy/nginx/michotbet-frontend.example.conf /etc/nginx/sites-available/michotbet-frontend.conf
+sudo nano /etc/nginx/sites-available/michotbet-frontend.conf   # server_name, root
+sudo ln -sf /etc/nginx/sites-available/michotbet-frontend.conf /etc/nginx/sites-enabled/
 sudo nginx -t && sudo systemctl reload nginx
 ```
 
@@ -128,54 +128,54 @@ Use the same **UFW** pattern as the backend doc: allow **OpenSSH** and **Nginx F
 
 ## 6. Verification
 
-| Check | Command / action |
-|--------|------------------|
-| Static root | Open `https://your-domain/` in a browser — app shell loads |
-| Deep link | Navigate directly to `https://your-domain/live` — should not 404 (**try_files**) |
-| API calls | Browser devtools → Network: XHR targets your API host, **200** on key routes |
-| Wrong API fallback | Build **without** `VITE_API_URL` → bundle still calls localhost → **avoid** |
+| Check              | Command / action                                                                 |
+| ------------------ | -------------------------------------------------------------------------------- |
+| Static root        | Open `https://your-domain/` in a browser — app shell loads                       |
+| Deep link          | Navigate directly to `https://your-domain/live` — should not 404 (**try_files**) |
+| API calls          | Browser devtools → Network: XHR targets your API host, **200** on key routes     |
+| Wrong API fallback | Build **without** `VITE_API_URL` → bundle still calls localhost → **avoid**      |
 
 ---
 
 ## 7. Troubleshooting
 
-| Symptom | Likely fix |
-|---------|-------------|
-| Blank page / failed chunk load | Wrong **base URL** deployment path; ensure assets load from `/assets/...` on same origin |
-| **404** on refresh for `/some/route` | Missing **`try_files ... /index.html`** in nginx |
-| CORS errors | Backend **`Access-Control-Allow-Origin`** — ensure API allows your frontend origin |
-| Calls go to `localhost` | Rebuild with **`VITE_API_URL`** in **`.env.production`** |
+| Symptom                              | Likely fix                                                                               |
+| ------------------------------------ | ---------------------------------------------------------------------------------------- |
+| Blank page / failed chunk load       | Wrong **base URL** deployment path; ensure assets load from `/assets/...` on same origin |
+| **404** on refresh for `/some/route` | Missing **`try_files ... /index.html`** in nginx                                         |
+| CORS errors                          | Backend **`Access-Control-Allow-Origin`** — ensure API allows your frontend origin       |
+| Calls go to `localhost`              | Rebuild with **`VITE_API_URL`** in **`.env.production`**                                 |
 
 ---
 
 ## 8. Operational cheatsheet
 
-| Task | Steps |
-|------|--------|
-| New API URL | Edit **`.env.production`**, `npm run build`, redeploy **`dist/`** |
-| Logs | Frontend has no server logs — nginx `access_log` / `error_log` |
-| Rollback | Keep previous **`dist`** tarball or symlink `current` / `releases` |
+| Task        | Steps                                                              |
+| ----------- | ------------------------------------------------------------------ |
+| New API URL | Edit **`.env.production`**, `npm run build`, redeploy **`dist/`**  |
+| Logs        | Frontend has no server logs — nginx `access_log` / `error_log`     |
+| Rollback    | Keep previous **`dist`** tarball or symlink `current` / `releases` |
 
 ---
 
 ## Referenced repo files
 
-| Path | Purpose |
-|------|---------|
-| `frontend/package.json` | `build`, `preview` scripts |
-| `frontend/src/services/api.js` | **`VITE_API_URL`** normalization |
-| `frontend/src/hooks/useMatches.js` | Optional **`VITE_*`** tuning |
-| `deploy/nginx/michubet-frontend.example.conf` | nginx template |
+| Path                                           | Purpose                          |
+| ---------------------------------------------- | -------------------------------- |
+| `frontend/package.json`                        | `build`, `preview` scripts       |
+| `frontend/src/services/api.js`                 | **`VITE_API_URL`** normalization |
+| `frontend/src/hooks/useMatches.js`             | Optional **`VITE_*`** tuning     |
+| `deploy/nginx/michotbet-frontend.example.conf` | nginx template                   |
 
 ---
 
 ## Checklist
 
-- [ ] **`VITE_API_URL`** set for production build  
-- [ ] **`npm run build`** succeeds  
-- [ ] **`dist/`** synced to **`/var/www/...`**  
-- [ ] nginx **SPA** `try_files` in place  
-- [ ] TLS works (HTTPS)  
-- [ ] Firewall allows 80 / 443  
-- [ ] Manual test: open site + hard-refresh deep link  
-- [ ] Backend [`BACKEND-VPS-DEPLOYMENT.md`](./BACKEND-VPS-DEPLOYMENT.md) deployed and healthy  
+- [ ] **`VITE_API_URL`** set for production build
+- [ ] **`npm run build`** succeeds
+- [ ] **`dist/`** synced to **`/var/www/...`**
+- [ ] nginx **SPA** `try_files` in place
+- [ ] TLS works (HTTPS)
+- [ ] Firewall allows 80 / 443
+- [ ] Manual test: open site + hard-refresh deep link
+- [ ] Backend [`BACKEND-VPS-DEPLOYMENT.md`](./BACKEND-VPS-DEPLOYMENT.md) deployed and healthy

@@ -2,7 +2,7 @@
  * Allowed browser origins for CORS + credential cookies (admin device_token).
  *
  * Set CORS_ORIGINS as a comma-separated list in production, e.g.:
- *   CORS_ORIGINS=https://michubet.com,https://admin.michubet.com
+ *   CORS_ORIGINS=https://michot.bet,https://admin.michot.bet
  *
  * ADMIN_ORIGIN / FRONTEND_ORIGIN are merged for backward compatibility.
  */

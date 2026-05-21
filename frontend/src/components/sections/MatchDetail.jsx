@@ -8,7 +8,7 @@ function CompactMatchRow({ match, isSelected, onClick }) {
     <button
       type="button"
       onClick={onClick}
-      className={`block w-full cursor-pointer border border-[#34354f] bg-[#18182a] text-left transition-colors duration-150 ${
+      className={`block w-full cursor-pointer border border-transparent bg-[#111111] text-left transition-colors duration-150 ${
         isSelected ? "ring-1 ring-(--sb-accent)" : "hover:bg-[#1f1f35]"
       }`}
     >
@@ -26,7 +26,7 @@ function CompactMatchRow({ match, isSelected, onClick }) {
               key={m.id}
               className="flex min-w-0 flex-1 items-center justify-center gap-0.5 rounded-sm border border-[#2f3047] bg-[#090912] px-1 py-0.5"
             >
-              <span className="text-[10px] font-bold text-[#f0f2fd]">
+              <span className="text-[10px] font-bold text-[#ffffff]">
                 {m.id.toUpperCase()}
               </span>
               <span className="text-[10px] font-bold text-(--sb-accent-soft)">
@@ -63,19 +63,19 @@ function OddsCategory({
       <button
         type="button"
         onClick={() => setOpen((p) => !p)}
-        className="flex w-full cursor-pointer items-center justify-between border-0 bg-transparent px-3 py-2 text-left text-sm font-bold text-[#eceefd]"
+        className="flex w-full cursor-pointer items-center justify-between border-0 bg-transparent px-3 py-2 text-left text-sm font-bold text-[#ffffff]"
       >
         <span className="flex items-center gap-1.5">
           {category}
           {icon && (
-            <AppIcon name="circleDot" size={12} className="text-[#8a8ca0]" />
+            <AppIcon name="circleDot" size={12} className="text-[rgba(255,255,255,0.72)]" />
           )}
         </span>
         <AppIcon
           name={open ? "chevronUp" : "chevronDown"}
           size={14}
           strokeWidth={2.5}
-          className="text-[#8a8ca0]"
+          className="text-[rgba(255,255,255,0.72)]"
         />
       </button>
       <div
@@ -145,16 +145,16 @@ function MatchDetail({
 
   return (
     <div className="grid gap-2 lg:grid-cols-[1fr_1.2fr] max-lg:grid-cols-1">
-      <div className="hidden flex-col gap-1.5 overflow-hidden rounded-lg border border-[#303046] bg-[#1b1b2d] lg:flex">
-        <div className="flex items-center gap-2 border-b border-b-[#303046] px-3 py-2">
+      <div className="hidden flex-col gap-1.5 overflow-hidden rounded-lg border border-transparent bg-[#1b1b2d] lg:flex">
+        <div className="flex items-center gap-2 border-b border-b-white/8 px-3 py-2">
           <button
             type="button"
             onClick={onBack}
-            className="flex h-6 w-6 cursor-pointer items-center justify-center rounded border-0 bg-[#2f3050] text-[#eceefd] transition-colors hover:bg-[#3f4070]"
+            className="flex h-6 w-6 cursor-pointer items-center justify-center rounded border-0 bg-[#111111] text-[#ffffff] transition-colors hover:bg-[#111111]"
           >
             <AppIcon name="chevronDown" size={14} className="rotate-90" />
           </button>
-          <span className="text-sm font-bold text-[#eceefd]">
+          <span className="text-sm font-bold text-[#ffffff]">
             {selectedMatch.league}
           </span>
         </div>
@@ -170,18 +170,18 @@ function MatchDetail({
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-lg border border-[#303046] bg-[#1b1b2d]">
-        <div className="border-b border-b-[#303046] bg-[#28293a] px-3 py-2">
+      <div className="overflow-hidden rounded-lg border border-transparent bg-[#1b1b2d]">
+        <div className="border-b border-b-white/8 bg-[#111111] px-3 py-2">
           <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={onBack}
-              className="flex h-6 w-6 cursor-pointer items-center justify-center rounded border-0 bg-[#2f3050] text-[#eceefd] transition-colors hover:bg-[#3f4070] lg:hidden"
+              className="flex h-6 w-6 cursor-pointer items-center justify-center rounded border-0 bg-[#111111] text-[#ffffff] transition-colors hover:bg-[#111111] lg:hidden"
             >
               <AppIcon name="chevronDown" size={14} className="rotate-90" />
             </button>
             <div>
-              <div className="text-xs text-[#8a8ca0]">
+              <div className="text-xs text-[rgba(255,255,255,0.72)]">
                 {selectedMatch.league}
               </div>
               <div className="text-[15px] font-bold text-[#f5f7ff]">

@@ -5,7 +5,7 @@ import AppIcon from './AppIcon'
 function LeagueRow({ league, match, date, markets, sideBets, onClick, onOddsClick, selectedOdds }) {
   return (
     <article
-      className="cursor-pointer border border-[#34354f] bg-[#18182a] transition-colors duration-150 hover:bg-[#1f1f35]"
+      className="cursor-pointer border border-transparent bg-[#111111] transition-colors duration-150 hover:bg-[#1f1f35]"
       onClick={onClick}
     >
       <header className="flex items-center justify-between border-b border-b-[#2f3047] px-2.5 py-1.5 text-sm font-semibold text-[#cfd2e4]">

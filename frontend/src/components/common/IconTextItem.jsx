@@ -16,28 +16,28 @@ function IconTextItem({
     <Component
       type={interactive ? "button" : undefined}
       onClick={onClick}
-      className={`flex items-center justify-between gap-2 border-b border-b-[#1b2842] ${
+      className={`flex items-center justify-between gap-2 border-b border-b-white/8 ${
         compact ? "px-2.5 py-2 text-[12px]" : "px-[11px] py-[9px] text-sm"
       } font-semibold transition-colors ${
-        active ? "bg-[#142038]" : "hover:bg-[#111a2f]"
+        active ? "bg-[#111111]" : "hover:bg-[#111111]"
       } ${interactive ? "w-full cursor-pointer border-0 bg-transparent text-left" : ""} ${className}`.trim()}
     >
       <div className="flex min-w-0 items-center gap-2">
-        <span className="inline-flex h-[14px] w-[14px] shrink-0 items-center justify-center text-[#7f8dad]">
+        <span className="inline-flex h-[14px] w-[14px] shrink-0 items-center justify-center text-[rgba(255,255,255,0.72)]">
           <AppIcon name={icon} size={compact ? 11 : 12} strokeWidth={2.5} />
         </span>
-        <span className="truncate whitespace-nowrap text-[#d8deef]">
+        <span className="truncate whitespace-nowrap text-[#ffffff]">
           {text}
         </span>
       </div>
       <div className="flex items-center gap-1.5">
         {typeof trailing !== "undefined" ? (
-          <span className={`${compact ? "text-[11px]" : "text-sm"} font-bold text-[#9ea9c6]`}>
+          <span className={`${compact ? "text-[11px]" : "text-sm"} font-bold text-[rgba(255,255,255,0.72)]`}>
             {trailing}
           </span>
         ) : null}
         {withChevron ? (
-          <span className="text-[#4f5f86]">
+          <span className="text-[rgba(255,255,255,0.5)]">
             <AppIcon name="chevronRight" size={12} strokeWidth={2.6} />
           </span>
         ) : null}

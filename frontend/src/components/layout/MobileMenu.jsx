@@ -4,7 +4,7 @@ import AppIcon from "../common/AppIcon";
 import { useTranslation } from "../../i18n/LanguageContext.jsx";
 
 const subLinkCls =
-  "flex w-full cursor-pointer items-center gap-3 rounded-xl border-0 bg-[#101020]/55 px-4 py-3 text-left text-sm font-bold text-[#d5d8ea] ring-1 ring-[#34354f]/40 transition-all duration-200 hover:bg-[#101020]/85 hover:ring-(--sb-accent-fill)/22";
+  "flex w-full cursor-pointer items-center gap-3 rounded-xl border-0 bg-[#0a0a0a]/55 px-4 py-3 text-left text-sm font-bold text-[#ffffff]  transition-all duration-200 hover:bg-[#0a0a0a]/85 hover:ring-(--sb-accent-fill)/22";
 
 function MobileMenu({ open, onClose }) {
   const { t } = useTranslation();
@@ -32,26 +32,26 @@ function MobileMenu({ open, onClose }) {
         />
       ) : null}
       <div
-        className={`fixed inset-y-0 right-0 z-[90] flex w-[min(100vw-1.25rem,20rem)] flex-col overflow-hidden rounded-l-[1.75rem] bg-gradient-to-br from-[#1f2038]/98 via-[#18182a]/99 to-[#12121f]/98 shadow-[0_0_80px_-10px_rgba(0,0,0,0.85)] ring-1 ring-[#3d3f5c]/45 backdrop-blur-md transition-transform duration-300 ease-out lg:hidden ${
+        className={`fixed inset-y-0 right-0 z-[90] flex w-[min(100vw-1.25rem,20rem)] flex-col overflow-hidden rounded-l-[1.75rem] bg-gradient-to-br from-[#111111]/98 via-[#111111]/99 to-[#000000]/98 shadow-[0_0_80px_-10px_rgba(0,0,0,0.85)]  backdrop-blur-md transition-transform duration-300 ease-out lg:hidden ${
           open ? "translate-x-0" : "translate-x-full"
         }`}
         role="dialog"
         aria-label={t("common.accountMenu")}
       >
-        <div className="pointer-events-none absolute -left-16 top-24 h-40 w-48 rounded-full bg-[radial-gradient(ellipse_at_center,rgba(79,220,204,0.16),transparent_70%)] blur-2xl" />
+        <div className="pointer-events-none absolute -left-16 top-24 h-40 w-48 rounded-full bg-[radial-gradient(ellipse_at_center,rgba(246,175,1,0.16),transparent_70%)] blur-2xl" />
 
         <div className="relative flex h-14 shrink-0 items-center justify-between px-4 shadow-[0_12px_28px_-16px_rgba(0,0,0,0.6)]">
           <div
             className="absolute inset-0 -z-10 rounded-br-[2rem] bg-(--sb-accent-fill) shadow-[inset_0_-1px_0_rgba(0,0,0,0.08)]"
             aria-hidden
           />
-          <p className="m-0 text-xs font-extrabold uppercase tracking-[0.18em] text-[#101012]">
+          <p className="m-0 text-xs font-extrabold uppercase tracking-[0.18em] text-white">
             {t("menu.accountTitle")}
           </p>
           <button
             type="button"
             onClick={onClose}
-            className="relative z-10 flex h-10 w-10 cursor-pointer items-center justify-center rounded-full border-0 bg-[#101020]/18 text-[#101012] transition-transform hover:scale-105 active:scale-95"
+            className="relative z-10 flex h-10 w-10 cursor-pointer items-center justify-center rounded-full border-0 bg-[#0a0a0a]/18 text-white transition-transform hover:scale-105 active:scale-95"
             aria-label={t("common.close")}
           >
             <AppIcon name="x" size={22} strokeWidth={2.5} />
@@ -61,9 +61,9 @@ function MobileMenu({ open, onClose }) {
         <div className="relative flex-1 overflow-y-auto px-3 pb-8 pt-4">
           <button
             type="button"
-            className="mb-2 flex w-full cursor-pointer items-center gap-3 rounded-xl border-0 bg-[#101020]/40 px-4 py-3.5 text-left text-sm font-extrabold text-[#e8eafa] ring-1 ring-[#34354f]/45 transition-all duration-200 hover:bg-[#101020]/70 hover:ring-(--sb-accent-fill)/20"
+            className="mb-2 flex w-full cursor-pointer items-center gap-3 rounded-xl border-0 bg-[#0a0a0a]/40 px-4 py-3.5 text-left text-sm font-extrabold text-[#ffffff]  transition-all duration-200 hover:bg-[#0a0a0a]/70 hover:ring-(--sb-accent-fill)/20"
           >
-            <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#18182a] text-[#8a8ca0] ring-1 ring-[#34354f]/50">
+            <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#111111] text-[rgba(255,255,255,0.72)] ">
               <AppIcon name="send" size={18} />
             </span>
             {t("menu.messages")}
@@ -75,25 +75,25 @@ function MobileMenu({ open, onClose }) {
               onClose();
               navigate("/profile");
             }}
-            className="mb-3 flex w-full cursor-pointer items-center gap-3 rounded-xl border-0 bg-[#101020]/40 px-4 py-3.5 text-left text-sm font-extrabold text-[#e8eafa] ring-1 ring-[#34354f]/45 transition-all duration-200 hover:bg-[#0f4a45]/35 hover:ring-(--sb-accent-fill)/35"
+            className="mb-3 flex w-full cursor-pointer items-center gap-3 rounded-xl border-0 bg-[#0a0a0a]/40 px-4 py-3.5 text-left text-sm font-extrabold text-[#ffffff]  transition-all duration-200 hover:bg-(--sb-accent-surface)/35 hover:ring-(--sb-accent-fill)/35"
           >
-            <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#18182a] text-[#8a8ca0] ring-1 ring-[#34354f]/50">
+            <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#111111] text-[rgba(255,255,255,0.72)] ">
               <AppIcon name="user" size={18} />
             </span>
             {t("menu.myProfile")}
           </button>
 
-          <div className="mb-2 overflow-hidden rounded-xl ring-1 ring-[#34354f]/40">
+          <div className="mb-2 overflow-hidden rounded-xl ">
             <button
               type="button"
               onClick={() => setMyBetsOpen((p) => !p)}
-              className="flex w-full cursor-pointer items-center justify-between border-0 bg-[#101020]/35 px-4 py-3.5 text-left text-sm font-extrabold text-[#e8eafa] transition-colors hover:bg-[#101020]/55"
+              className="flex w-full cursor-pointer items-center justify-between border-0 bg-[#0a0a0a]/35 px-4 py-3.5 text-left text-sm font-extrabold text-[#ffffff] transition-colors hover:bg-[#0a0a0a]/55"
             >
               {t("menu.myBets")}
               <AppIcon
                 name={myBetsOpen ? "chevronUp" : "chevronDown"}
                 size={16}
-                className="text-[#8a8ca0]"
+                className="text-[rgba(255,255,255,0.72)]"
               />
             </button>
             <div
@@ -111,7 +111,7 @@ function MobileMenu({ open, onClose }) {
                     }}
                     className={subLinkCls}
                   >
-                    <AppIcon name="circleDot" size={16} className="text-[#8a8ca0]" />
+                    <AppIcon name="circleDot" size={16} className="text-[rgba(255,255,255,0.72)]" />
                     {t("menu.betHistory")}
                   </button>
                   <button
@@ -122,7 +122,7 @@ function MobileMenu({ open, onClose }) {
                     }}
                     className={subLinkCls}
                   >
-                    <AppIcon name="ticket" size={16} className="text-[#8a8ca0]" />
+                    <AppIcon name="ticket" size={16} className="text-[rgba(255,255,255,0.72)]" />
                     {t("menu.checkTicket")}
                   </button>
                 </div>
@@ -130,17 +130,17 @@ function MobileMenu({ open, onClose }) {
             </div>
           </div>
 
-          <div className="mb-4 overflow-hidden rounded-xl ring-1 ring-[#34354f]/40">
+          <div className="mb-4 overflow-hidden rounded-xl ">
             <button
               type="button"
               onClick={() => setBalanceOpen((p) => !p)}
-              className="flex w-full cursor-pointer items-center justify-between border-0 bg-[#101020]/35 px-4 py-3.5 text-left text-sm font-extrabold text-[#e8eafa] transition-colors hover:bg-[#101020]/55"
+              className="flex w-full cursor-pointer items-center justify-between border-0 bg-[#0a0a0a]/35 px-4 py-3.5 text-left text-sm font-extrabold text-[#ffffff] transition-colors hover:bg-[#0a0a0a]/55"
             >
               {t("menu.balance")}
               <AppIcon
                 name={balanceOpen ? "chevronUp" : "chevronDown"}
                 size={16}
-                className="text-[#8a8ca0]"
+                className="text-[rgba(255,255,255,0.72)]"
               />
             </button>
             <div

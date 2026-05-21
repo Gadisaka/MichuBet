@@ -103,7 +103,7 @@ function NextCalendarDayFooter({
             disabled={disabled}
             onClick={() => onSelectDay(nextId)}
             aria-label={ariaLabel}
-            className="inline-flex min-h-10 cursor-pointer items-center justify-center rounded-2xl border border-(--sb-accent-border) bg-(--sb-accent-surface-alt) px-5 py-2 text-sm font-bold text-(--sb-accent-text-on-dark) shadow-[0_6px_20px_-8px_rgba(79,220,204,0.35)] transition-colors hover:bg-(--sb-accent-surface) disabled:cursor-not-allowed disabled:opacity-50"
+            className="inline-flex min-h-10 cursor-pointer items-center justify-center rounded-2xl border border-(--sb-accent-border) bg-(--sb-accent-surface-alt) px-5 py-2 text-sm font-bold text-(--sb-accent-text-on-dark) shadow-[0_6px_20px_-8px_rgba(246,175,1,0.35)] transition-colors hover:bg-(--sb-accent-surface) disabled:cursor-not-allowed disabled:opacity-50"
           >
             {label}
           </button>

@@ -46,7 +46,7 @@ function CheckTicket() {
 
       <div className="relative mx-auto w-full max-w-lg px-4 pb-28 pt-2 sm:px-5 sm:pt-4">
         <div
-          className="pointer-events-none absolute -top-4 left-1/2 h-64 w-[min(100%,28rem)] -translate-x-1/2 rounded-full bg-[radial-gradient(ellipse_at_center,rgba(79,220,204,0.14),transparent_68%)] blur-xl"
+          className="pointer-events-none absolute -top-4 left-1/2 h-64 w-[min(100%,28rem)] -translate-x-1/2 rounded-full bg-[radial-gradient(ellipse_at_center,rgba(246,175,1,0.14),transparent_68%)] blur-xl"
           aria-hidden
         />
 
@@ -54,15 +54,15 @@ function CheckTicket() {
           <button
             type="button"
             onClick={() => navigate(-1)}
-            className="flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-full bg-[#2f3050]/90 text-[#eceefd] shadow-lg shadow-black/20 ring-1 ring-[#4a4d6e]/40 transition-transform duration-300 hover:scale-105 hover:bg-[#3f4070] hover:ring-(--sb-accent-fill)/30 active:scale-95"
+            className="flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-full bg-[#111111]/90 text-[#ffffff] shadow-lg shadow-black/20  transition-transform duration-300 hover:scale-105 hover:bg-[#111111] hover:ring-(--sb-accent-fill)/30 active:scale-95"
           >
             <AppIcon name="chevronDown" size={18} className="rotate-90" />
           </button>
           <div>
-            <p className="m-0 text-[11px] font-extrabold uppercase tracking-[0.2em] text-[#8a8ca0]">
+            <p className="m-0 text-[11px] font-extrabold uppercase tracking-[0.2em] text-[rgba(255,255,255,0.72)]">
               Tools
             </p>
-            <h1 className="m-0 bg-gradient-to-r from-[#f4f5ff] via-[#c6fff8] to-[#f4f5ff] bg-clip-text text-2xl font-black tracking-tight text-transparent sm:text-3xl">
+            <h1 className="m-0 text-2xl font-black tracking-tight text-[#ffffff] sm:text-3xl">
               Check ticket
             </h1>
           </div>
@@ -70,10 +70,10 @@ function CheckTicket() {
 
         <form onSubmit={handleSubmit} className="animate-deposit-panel">
           <SoftPanel>
-            <p className="mb-4 text-center text-xs font-extrabold uppercase tracking-[0.18em] text-[#8a8ca0]">
+            <p className="mb-4 text-center text-xs font-extrabold uppercase tracking-[0.18em] text-[rgba(255,255,255,0.72)]">
               Coupon code
             </p>
-            <p className="mb-4 text-center text-[11px] leading-relaxed text-[#6b6d8a]">
+            <p className="mb-4 text-center text-[11px] leading-relaxed text-[rgba(255,255,255,0.5)]">
               Enter the coupon number from your slip. This shows the selections
               linked to that code. Stake and payout follow your receipt when the
               bet is paid or printed.
@@ -91,11 +91,11 @@ function CheckTicket() {
               <button
                 type="submit"
                 disabled={loading || !String(couponInput || "").trim()}
-                className="inline-flex min-h-[3rem] shrink-0 cursor-pointer items-center justify-center rounded-2xl border-0 bg-[#101020]/90 px-4 text-[#9aaed1] ring-1 ring-[#34354f]/70 transition-all hover:ring-(--sb-accent-fill)/45 disabled:pointer-events-none disabled:opacity-45"
+                className="inline-flex min-h-[3rem] shrink-0 cursor-pointer items-center justify-center rounded-2xl border-0 bg-[#0a0a0a]/90 px-4 text-[#9aaed1] ring-1 ring-[#F6AF01]/70 transition-all hover:ring-(--sb-accent-fill)/45 disabled:pointer-events-none disabled:opacity-45"
                 aria-label="Look up ticket"
               >
                 {loading ? (
-                  <span className="text-xs font-bold text-[#8fa0c2]">…</span>
+                  <span className="text-xs font-bold text-[rgba(255,255,255,0.72)]">…</span>
                 ) : (
                   <AppIcon name="ticket" size={20} strokeWidth={1.9} />
                 )}
@@ -118,16 +118,16 @@ function CheckTicket() {
 
         {preview ? (
           <SoftPanel className="animate-deposit-panel mt-4">
-            <p className="mb-1 text-center font-mono text-lg font-bold tracking-wide text-[#e9eef9]">
+            <p className="mb-1 text-center font-mono text-lg font-bold tracking-wide text-[#ffffff]">
               {preview.couponNumber}
             </p>
-            <p className="mb-4 text-center text-[11px] text-[#6b6d8a]">
+            <p className="mb-4 text-center text-[11px] text-[rgba(255,255,255,0.5)]">
               Games on this coupon
             </p>
-            <div className="overflow-x-auto rounded-[1rem] ring-1 ring-[#3d3f5c]/45">
+            <div className="overflow-x-auto rounded-[1rem] ">
               <table className="w-full min-w-[320px] text-left text-[11px]">
                 <thead>
-                  <tr className="border-b border-[#2a3754]/55 bg-[#101020]/70 text-[#8a8ca0]">
+                  <tr className="border-b border-white/8 bg-[#0a0a0a]/70 text-[rgba(255,255,255,0.72)]">
                     <th className="px-2 py-2 font-semibold">Match</th>
                     <th className="px-2 py-2 font-semibold">Market</th>
                     <th className="px-2 py-2 font-semibold">Pick</th>
@@ -138,7 +138,7 @@ function CheckTicket() {
                   {(preview.selections || []).map((sel, idx) => (
                     <tr
                       key={`${preview.couponNumber}-${idx}`}
-                      className="border-b border-[#2a2a3e] text-[#d5d8ea]"
+                      className="border-b border-[#2a2a3e] text-[#ffffff]"
                     >
                       <td className="max-w-[120px] px-2 py-2 align-top">
                         {sel.matchName}

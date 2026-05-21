@@ -107,10 +107,10 @@ export default function NotificationsDialog({ open, onClose, onReadChange }) {
         role="dialog"
         aria-modal="true"
         aria-labelledby="notifications-dialog-title"
-        className="flex max-h-[min(80vh,560px)] w-full max-w-md flex-col overflow-hidden rounded-2xl border border-[#1f2a40] bg-[#0b1326] shadow-xl"
+        className="flex max-h-[min(80vh,560px)] w-full max-w-md flex-col overflow-hidden rounded-2xl border border-transparent bg-[#000000] shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between border-b border-[#1f2a40] px-4 py-3">
+        <div className="flex items-center justify-between border-b border-white/8 px-4 py-3">
           <h2
             id="notifications-dialog-title"
             className="text-sm font-bold uppercase tracking-wide text-[#e8edf8]"
@@ -132,7 +132,7 @@ export default function NotificationsDialog({ open, onClose, onReadChange }) {
               type="button"
               onClick={onClose}
               aria-label={t("common.close")}
-              className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-full text-[#9eb1d4] hover:bg-[#101a33] hover:text-white"
+              className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-full text-[rgba(255,255,255,0.72)] hover:bg-[#111111] hover:text-white"
             >
               <AppIcon name="x" size={18} />
             </button>
@@ -141,13 +141,13 @@ export default function NotificationsDialog({ open, onClose, onReadChange }) {
 
         <div className="flex-1 overflow-y-auto px-3 py-3">
           {loading ? (
-            <p className="py-8 text-center text-sm text-[#8fa0c5]">
+            <p className="py-8 text-center text-sm text-[rgba(255,255,255,0.72)]">
               {t("notifications.loading")}
             </p>
           ) : error ? (
             <p className="py-8 text-center text-sm text-[#f87171]">{error}</p>
           ) : items.length === 0 ? (
-            <p className="py-8 text-center text-sm text-[#8fa0c5]">
+            <p className="py-8 text-center text-sm text-[rgba(255,255,255,0.72)]">
               {t("notifications.empty")}
             </p>
           ) : (
@@ -161,8 +161,8 @@ export default function NotificationsDialog({ open, onClose, onReadChange }) {
                       onClick={() => void handleItemClick(n)}
                       className={`w-full rounded-xl border px-3 py-2.5 text-left transition ${
                         unread
-                          ? "border-[#3d5a9e]/60 bg-[#101a33]"
-                          : "border-[#1f2a40] bg-[#0a1122]"
+                          ? "border-transparent bg-[#111111]"
+                          : "border-transparent bg-[#000000]"
                       }`}
                     >
                       <div className="flex items-start justify-between gap-2">
@@ -175,7 +175,7 @@ export default function NotificationsDialog({ open, onClose, onReadChange }) {
                           </span>
                         ) : null}
                       </div>
-                      <p className="mt-1 text-xs leading-relaxed text-[#9eb1d4]">
+                      <p className="mt-1 text-xs leading-relaxed text-[rgba(255,255,255,0.72)]">
                         {n.body}
                       </p>
                       <p className="mt-1.5 text-[10px] text-[#6b7a99]">

@@ -1,6 +1,6 @@
 /** @typedef {'en' | 'am'} AppLanguage */
 
-export const LANGUAGE_STORAGE_KEY = "michubet_ui_lang";
+export const LANGUAGE_STORAGE_KEY = "michotbet_ui_lang";
 
 export const SUPPORTED_LANGUAGES = /** @type {const} */ (["en", "am"]);
 

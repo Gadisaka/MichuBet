@@ -11,7 +11,7 @@ import { topHeaderData, topNavItems } from "../data/homepageData";
 import { fetchPlayerWalletHistory } from "../services/api";
 
 const insetRow =
-  "flex flex-col gap-1 rounded-2xl bg-[#101020]/55 px-4 py-3 ring-1 ring-[#34354f]/35 sm:flex-row sm:items-center sm:justify-between";
+  "flex flex-col gap-1 rounded-2xl bg-[#0a0a0a]/55 px-4 py-3  sm:flex-row sm:items-center sm:justify-between";
 
 function formatTypeLabel(type) {
   if (!type) return "—";
@@ -24,7 +24,7 @@ function amountToneClass(type) {
     return "text-(--sb-positive)";
   }
   if (t === "WITHDRAW" || t === "BET") return "text-[#ffb4a8]";
-  return "text-[#e8eafa]";
+  return "text-[#ffffff]";
 }
 
 function Transactions() {
@@ -71,7 +71,7 @@ function Transactions() {
 
       <div className="relative mx-auto w-full max-w-lg px-4 pb-28 pt-2 sm:px-5 sm:pt-4">
         <div
-          className="pointer-events-none absolute -top-4 left-1/2 h-64 w-[min(100%,28rem)] -translate-x-1/2 rounded-full bg-[radial-gradient(ellipse_at_center,rgba(79,220,204,0.14),transparent_68%)] blur-xl"
+          className="pointer-events-none absolute -top-4 left-1/2 h-64 w-[min(100%,28rem)] -translate-x-1/2 rounded-full bg-[radial-gradient(ellipse_at_center,rgba(246,175,1,0.14),transparent_68%)] blur-xl"
           aria-hidden
         />
 
@@ -79,26 +79,26 @@ function Transactions() {
           <button
             type="button"
             onClick={() => navigate(-1)}
-            className="flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-full bg-[#2f3050]/90 text-[#eceefd] shadow-lg shadow-black/20 ring-1 ring-[#4a4d6e]/40 transition-transform duration-300 hover:scale-105 hover:bg-[#3f4070] hover:ring-(--sb-accent-fill)/30 active:scale-95"
+            className="flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-full bg-[#111111]/90 text-[#ffffff] shadow-lg shadow-black/20  transition-transform duration-300 hover:scale-105 hover:bg-[#111111] hover:ring-(--sb-accent-fill)/30 active:scale-95"
           >
             <AppIcon name="chevronDown" size={18} className="rotate-90" />
           </button>
           <div>
-            <p className="m-0 text-[11px] font-extrabold uppercase tracking-[0.2em] text-[#8a8ca0]">
+            <p className="m-0 text-[11px] font-extrabold uppercase tracking-[0.2em] text-[rgba(255,255,255,0.72)]">
               Account
             </p>
-            <h1 className="m-0 bg-gradient-to-r from-[#f4f5ff] via-[#c6fff8] to-[#f4f5ff] bg-clip-text text-2xl font-black tracking-tight text-transparent sm:text-3xl">
+            <h1 className="m-0 text-2xl font-black tracking-tight text-[#ffffff] sm:text-3xl">
               Transaction history
             </h1>
           </div>
         </header>
 
         {loading ? (
-          <div className="flex flex-col items-center justify-center gap-4 py-24 text-[#8a8ca0]">
+          <div className="flex flex-col items-center justify-center gap-4 py-24 text-[rgba(255,255,255,0.72)]">
             <div className="relative h-14 w-14">
               <div className="absolute inset-0 animate-ping rounded-full bg-(--sb-accent-fill)/25" />
-              <div className="relative flex h-14 w-14 items-center justify-center rounded-full bg-[#1f2038] ring-2 ring-(--sb-accent-fill)/40">
-                <div className="h-7 w-7 animate-spin rounded-full border-2 border-[#34354f] border-t-(--sb-accent-fill)" />
+              <div className="relative flex h-14 w-14 items-center justify-center rounded-full bg-[#111111] ring-2 ring-(--sb-accent-fill)/40">
+                <div className="h-7 w-7 animate-spin rounded-full border-2 border-[#F6AF01] border-t-(--sb-accent-fill)" />
               </div>
             </div>
             <span className="text-sm font-semibold">Loading…</span>
@@ -109,7 +109,7 @@ function Transactions() {
             <button
               type="button"
               onClick={() => load(page)}
-              className="mt-4 w-full rounded-xl bg-[#101020]/70 py-3 text-sm font-bold text-[#c6fff8] ring-1 ring-[#34354f]/50"
+              className="mt-4 w-full rounded-xl bg-[#0a0a0a]/70 py-3 text-sm font-bold text-[#ffffff] "
             >
               Try again
             </button>
@@ -117,17 +117,17 @@ function Transactions() {
         ) : (
           <>
             <SoftPanel className="animate-deposit-panel mb-4">
-              <p className="mb-1 text-center text-xs font-extrabold uppercase tracking-[0.18em] text-[#8a8ca0]">
+              <p className="mb-1 text-center text-xs font-extrabold uppercase tracking-[0.18em] text-[rgba(255,255,255,0.72)]">
                 Wallet activity
               </p>
-              <p className="m-0 text-center text-[11px] text-[#6b6d8a]">
+              <p className="m-0 text-center text-[11px] text-[rgba(255,255,255,0.5)]">
                 Deposits, withdrawals, bets, and bonuses posted to your balance.
               </p>
             </SoftPanel>
 
             {items.length === 0 ? (
               <SoftPanel className="animate-deposit-panel">
-                <p className="m-0 text-center text-sm font-semibold text-[#8a8ca0]">
+                <p className="m-0 text-center text-sm font-semibold text-[rgba(255,255,255,0.72)]">
                   No transactions yet.
                 </p>
               </SoftPanel>
@@ -152,15 +152,15 @@ function Transactions() {
                     <div key={tx.id} className={insetRow}>
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-2">
-                          <span className="text-xs font-extrabold uppercase tracking-wide text-[#a3a5bf]">
+                          <span className="text-xs font-extrabold uppercase tracking-wide text-[rgba(255,255,255,0.72)]">
                             {formatTypeLabel(tx.type)}
                           </span>
-                          <span className="text-[10px] text-[#6b6d8a]">
+                          <span className="text-[10px] text-[rgba(255,255,255,0.5)]">
                             {created}
                           </span>
                         </div>
                         <p
-                          className="mt-1 truncate text-[11px] text-[#6b6d8a]"
+                          className="mt-1 truncate text-[11px] text-[rgba(255,255,255,0.5)]"
                           title={refText}
                         >
                           {refText}
@@ -172,7 +172,7 @@ function Transactions() {
                         >
                           {Number.isFinite(amt) ? `${amt.toLocaleString()} ETB` : "—"}
                         </p>
-                        <p className="text-[10px] text-[#6b6d8a]">
+                        <p className="text-[10px] text-[rgba(255,255,255,0.5)]">
                           Bal{" "}
                           {tx.balanceAfter != null && Number.isFinite(Number(tx.balanceAfter))
                             ? Number(tx.balanceAfter).toLocaleString()
@@ -195,7 +195,7 @@ function Transactions() {
                 >
                   Previous
                 </button>
-                <span className="flex-1 text-center text-xs font-bold text-[#8a8ca0]">
+                <span className="flex-1 text-center text-xs font-bold text-[rgba(255,255,255,0.72)]">
                   Page {page} / {totalPages}
                 </span>
                 <button

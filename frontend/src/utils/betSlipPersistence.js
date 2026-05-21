@@ -1,6 +1,6 @@
 import { normalizeApiFixtureId } from "./fixtureId";
 
-const STORAGE_KEY = "michubet_betslips_v1";
+const STORAGE_KEY = "michotbet_betslips_v1";
 
 const EMPTY_SLIPS = {
   betslip1: [],

@@ -1,34 +1,37 @@
-@import url('https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700;800&display=swap');
+@import url("https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700;800&display=swap");
 @import "tailwindcss";
 
 @layer base {
   :root {
-    font-family: 'Barlow', sans-serif;
+    font-family: "Barlow", sans-serif;
     font-synthesis: none;
     text-rendering: optimizeLegibility;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    --sb-bg-0: #060b17;
-    --sb-bg-1: #091023;
-    --sb-bg-2: #0c1529;
-    --sb-surface: #0f172b;
-    --sb-surface-soft: #131e35;
-    --sb-border: #1f2a40;
-    --sb-border-strong: #2a3754;
-    --sb-text: #e9edf8;
-    --sb-text-muted: #8e9bb8;
-    --sb-accent: #38cbbf;
-    --sb-accent-soft: #9af5ec;
-    --sb-positive: #5fe3d6;
-    --sb-accent-fill: #4fdccc;
-    --sb-accent-fill-hover: #36cfc2;
-    --sb-accent-border: #248f84;
-    --sb-accent-surface: #0f4a45;
-    --sb-accent-surface-deep: #0a3633;
-    --sb-accent-surface-alt: #115c55;
-    --sb-accent-text-on-dark: #ecfffc;
-    --sb-accent-text-muted: #8aece3;
-    --sb-accent-text-soft: #c6fff8;
+    --sb-bg-0: #000000;
+    --sb-bg-1: #000000;
+    --sb-bg-2: #111111;
+    --sb-bg-page: #000000;
+    --sb-bg-card: #141414;
+    --sb-bg-card-elevated: #1a1a1a;
+    --sb-surface: #141414;
+    --sb-surface-soft: #1a1a1a;
+    --sb-border: rgba(255, 255, 255, 0.08);
+    --sb-border-strong: rgba(255, 255, 255, 0.14);
+    --sb-text: #ffffff;
+    --sb-text-muted: rgba(255, 255, 255, 0.72);
+    --sb-accent: #f6af01;
+    --sb-accent-soft: #ffe8a3;
+    --sb-positive: #f6af01;
+    --sb-accent-fill: #f6af01;
+    --sb-accent-fill-hover: #e09e01;
+    --sb-accent-border: #f6af01;
+    --sb-accent-surface: #1a1400;
+    --sb-accent-surface-deep: #111111;
+    --sb-accent-surface-alt: #2a2000;
+    --sb-accent-text-on-dark: #ffffff;
+    --sb-accent-text-muted: rgba(255, 255, 255, 0.72);
+    --sb-accent-text-soft: #ffe8a3;
   }
 
   html,
@@ -40,8 +43,12 @@
   body {
     @apply overflow-x-clip;
     background:
-      radial-gradient(1200px 680px at 55% -120px, rgba(56, 203, 191, 0.24), transparent 66%),
-      linear-gradient(180deg, var(--sb-bg-1) 0%, var(--sb-bg-0) 58%);
+      radial-gradient(
+        1200px 680px at 55% -120px,
+        rgba(246, 175, 1, 0.12),
+        transparent 66%
+      ),
+      linear-gradient(180deg, var(--sb-bg-page) 0%, var(--sb-bg-0) 58%);
     color: var(--sb-text);
   }
 
@@ -51,10 +58,23 @@
 }
 
 @layer components {
+  .sb-card {
+    background: linear-gradient(
+      180deg,
+      var(--sb-bg-card-elevated) 0%,
+      var(--sb-bg-card) 100%
+    );
+    box-shadow: 0 12px 32px -12px rgba(0, 0, 0, 0.42);
+  }
+
   .sportsbook-surface {
-    background: linear-gradient(180deg, var(--sb-surface) 0%, var(--sb-bg-1) 100%);
+    background: linear-gradient(
+      180deg,
+      var(--sb-bg-card-elevated) 0%,
+      var(--sb-bg-card) 100%
+    );
     border: 1px solid var(--sb-border);
-    box-shadow: 0 0 0 1px rgba(14, 24, 43, 0.35), 0 18px 32px rgba(3, 7, 16, 0.48);
+    box-shadow: 0 18px 32px rgba(0, 0, 0, 0.48);
   }
 }
 

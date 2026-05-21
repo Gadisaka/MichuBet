@@ -10,15 +10,14 @@ test("getAllowedCorsOrigins merges CORS_ORIGINS and legacy vars", () => {
     FRONTEND_ORIGIN: process.env.FRONTEND_ORIGIN,
   };
 
-  process.env.CORS_ORIGINS =
-    "https://michubet.com,https://admin.michubet.com";
-  process.env.ADMIN_ORIGIN = "https://admin.michubet.com";
-  process.env.FRONTEND_ORIGIN = "https://michubet.com";
+  process.env.CORS_ORIGINS = "https://michot.bet,https://admin.michot.bet";
+  process.env.ADMIN_ORIGIN = "https://admin.michot.bet";
+  process.env.FRONTEND_ORIGIN = "https://michot.bet";
   delete process.env.CORS_ORIGIN;
 
   const origins = getAllowedCorsOrigins();
-  assert.ok(origins.includes("https://michubet.com"));
-  assert.ok(origins.includes("https://admin.michubet.com"));
+  assert.ok(origins.includes("https://michot.bet"));
+  assert.ok(origins.includes("https://admin.michot.bet"));
 
   for (const [key, value] of Object.entries(prev)) {
     if (value === undefined) delete process.env[key];

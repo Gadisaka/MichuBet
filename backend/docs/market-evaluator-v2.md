@@ -1,6 +1,6 @@
 # Market Evaluator V2 — Production Design
 
-A complete redesign of the betting settlement engine for the Michubet
+A complete redesign of the betting settlement engine for the Michotbet
 sportsbook, replacing the ad-hoc handler set in
 `backend/services/marketEvaluator.js` and tightening the integration
 with `backend/services/ticketSettlementService.js`.
@@ -15,7 +15,7 @@ contracts:
   odds) plus a normalized `MatchResultV2` (final scores, HT scores,
   events, status flags).
 - **Out:** a strict outcome record `{ result, reason, engineVersion,
-  marketVersion }` — and **never `PENDING` once the match is in a
+marketVersion }` — and **never `PENDING` once the match is in a
   final state**.
 
 ### Goals
@@ -34,14 +34,14 @@ contracts:
 
 ## 2. Core Architecture
 
-| Layer | Responsibility | Lives in |
-|-------|----------------|----------|
-| **Engine** | Orchestrates: load module, gate on match state, call `evaluate`, enforce universal rules | `services/marketEvaluatorV2.js` |
-| **Market modules** | Per-market `validate`, `canEvaluate`, `evaluate`, `settlePolicy` | `services/markets/<code>.js` |
-| **Registry** | Code → Module lookup, alias resolution, version pinning | `services/markets/registry.js` |
-| **Result model** | `MatchResultV2` builders + types | `services/matchResult/v2.js` |
-| **Settlement** | DB transactions, ticket recompute, payouts, idempotency | `services/ticketSettlementService.js` |
-| **Placement validation** | `MARKET_REGISTRY.validate(code, params, ctx)` | called from `controllers/ticketsController.js` |
+| Layer                    | Responsibility                                                                           | Lives in                                       |
+| ------------------------ | ---------------------------------------------------------------------------------------- | ---------------------------------------------- |
+| **Engine**               | Orchestrates: load module, gate on match state, call `evaluate`, enforce universal rules | `services/marketEvaluatorV2.js`                |
+| **Market modules**       | Per-market `validate`, `canEvaluate`, `evaluate`, `settlePolicy`                         | `services/markets/<code>.js`                   |
+| **Registry**             | Code → Module lookup, alias resolution, version pinning                                  | `services/markets/registry.js`                 |
+| **Result model**         | `MatchResultV2` builders + types                                                         | `services/matchResult/v2.js`                   |
+| **Settlement**           | DB transactions, ticket recompute, payouts, idempotency                                  | `services/ticketSettlementService.js`          |
+| **Placement validation** | `MARKET_REGISTRY.validate(code, params, ctx)`                                            | called from `controllers/ticketsController.js` |
 
 ### Deterministic rules
 
@@ -76,7 +76,10 @@ interface MatchResultV2 {
   };
 
   stats: {
-    cards: { home: { yellow: number; red: number }; away: { yellow: number; red: number } };
+    cards: {
+      home: { yellow: number; red: number };
+      away: { yellow: number; red: number };
+    };
     corners: { home: number; away: number };
     shotsOnTarget?: { home: number; away: number };
   };
@@ -110,9 +113,9 @@ interface MarketModule {
   requiredResultFields: string[];
   settlePolicy: SettlePolicy;
 
-  validate(params, ctx): NormalizedParams;   // placement-time
-  canEvaluate(mr): boolean;                  // runtime gate
-  evaluate(sel, mr): { result, reason? };    // pure grader
+  validate(params, ctx): NormalizedParams; // placement-time
+  canEvaluate(mr): boolean; // runtime gate
+  evaluate(sel, mr): { result; reason? }; // pure grader
 }
 ```
 

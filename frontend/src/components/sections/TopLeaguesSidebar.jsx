@@ -10,7 +10,7 @@ function SelectStub({ label }) {
   return (
     <button
       type="button"
-      className="flex h-8 w-full cursor-pointer items-center justify-between rounded border border-[#1f2a40] bg-[#0b1326] px-2.5 text-[11px] font-semibold text-[#9ba7c7]"
+      className="flex h-8 w-full cursor-pointer items-center justify-between rounded bg-[#0a0a0a] px-2.5 text-[11px] font-semibold text-[rgba(255,255,255,0.72)]"
     >
       <span>{label}</span>
       <AppIcon name="chevronDown" size={12} />
@@ -19,7 +19,7 @@ function SelectStub({ label }) {
 }
 
 const selectClassName =
-  "h-8 w-full cursor-pointer rounded border border-[#1f2a40] bg-[#0b1326] px-2 text-[11px] font-semibold text-[#c9d2ea] outline-none";
+  "h-8 w-full cursor-pointer rounded bg-[#0a0a0a] px-2 text-[11px] font-semibold text-[#ffffff] outline-none";
 
 function isCalendarDayTimeId(id) {
   return (
@@ -156,7 +156,7 @@ function TopLeaguesSidebar({
       {!leaguesListOnly ? (
         <>
           <div className="grid grid-cols-[1fr_auto] gap-2">
-            <div className="flex h-8 items-center rounded border border-[#1f2a40] bg-[#050914] px-2.5">
+            <div className="flex h-8 items-center rounded bg-[#0a0a0a] px-2.5">
               <AppIcon
                 name="search"
                 size={12}
@@ -174,7 +174,7 @@ function TopLeaguesSidebar({
             </div>
             <button
               type="button"
-              className="h-8 shrink-0 rounded border border-emerald-700 bg-emerald-600 px-2 text-[10px] font-bold uppercase tracking-wide text-emerald-950 shadow-[0_4px_14px_rgba(16,185,129,0.55)] transition-colors hover:bg-emerald-500 hover:shadow-[0_6px_18px_rgba(16,185,129,0.65)] active:bg-emerald-700"
+              className="h-8 shrink-0 rounded border-0 bg-[#F6AF01] px-2 text-[10px] font-bold uppercase tracking-wide text-[#000000] shadow-[0_4px_14px_rgba(246,175,1,0.45)] transition-colors hover:bg-(--sb-accent-fill-hover) hover:shadow-[0_6px_18px_rgba(246,175,1,0.55)] active:brightness-95"
               onClick={() => searchRef.current?.focus()}
             >
               {t("sidebar.searchButton")}
@@ -189,8 +189,8 @@ function TopLeaguesSidebar({
               onClick={() => todayOption?.id && onTimeChange?.(todayOption.id)}
               className={`h-7 cursor-pointer rounded border text-[11px] font-bold ${
                 selectedTimeId === todayOption?.id
-                  ? "border-(--sb-accent-border) bg-(--sb-accent-surface-alt) text-(--sb-accent-text-on-dark)"
-                  : "border-[#202b44] bg-[#101a30] text-[#9ba7c7]"
+                  ? "border-transparent bg-[#F6AF01] text-[#000000]"
+                  : "border-transparent bg-[#111111] text-[rgba(255,255,255,0.72)]"
               }`}
             >
               {timeOptionDisplayLabel(todayOption, t) || t("time.today")}
@@ -202,8 +202,8 @@ function TopLeaguesSidebar({
               }
               className={`h-7 cursor-pointer rounded border text-[11px] font-bold ${
                 selectedTimeId === tomorrowOption?.id
-                  ? "border-(--sb-accent-border) bg-(--sb-accent-surface-alt) text-(--sb-accent-text-on-dark)"
-                  : "border-[#202b44] bg-[#101a30] text-[#9ba7c7]"
+                  ? "border-transparent bg-[#F6AF01] text-[#000000]"
+                  : "border-transparent bg-[#111111] text-[rgba(255,255,255,0.72)]"
               }`}
             >
               {timeOptionDisplayLabel(tomorrowOption, t) || t("time.tomorrow")}
@@ -254,7 +254,7 @@ function TopLeaguesSidebar({
       <button
         type="button"
         onClick={() => onSelectLeague?.(allLeaguesId)}
-        className={`flex w-full cursor-pointer items-center justify-between border-b border-[#1b2842] pb-1 text-left text-[11px] font-bold uppercase tracking-wide ${
+        className={`flex w-full cursor-pointer items-center justify-between border-b border-white/8 pb-1 text-left text-[11px] font-bold uppercase tracking-wide ${
           selectedLeagueId === allLeaguesId
             ? "text-(--sb-accent-text-on-dark)"
             : "text-[#8f9ab7] hover:text-[#bac5df]"
@@ -276,10 +276,10 @@ function TopLeaguesSidebar({
                 key={item.id}
                 type="button"
                 onClick={() => onSelectLeague?.(item.id)}
-                className={`flex w-full cursor-pointer items-center justify-between gap-1.5 rounded border border-[#1a2740] bg-[#0b1326] px-2 py-1.5 text-left text-[10px] font-semibold ${
+                className={`flex w-full cursor-pointer items-center justify-between gap-1.5 rounded bg-[#0a0a0a] px-2 py-1.5 text-left text-[10px] font-semibold ${
                   item.id === selectedLeagueId
-                    ? "border-(--sb-accent-border) bg-(--sb-accent-surface) text-(--sb-accent-text-on-dark)"
-                    : "text-[#9aa7c6] hover:bg-[#0f1930]"
+                    ? "bg-[#F6AF01] text-[#000000]"
+                    : "text-[rgba(255,255,255,0.72)] hover:bg-[#111111]"
                 }`}
               >
                 <span className="flex min-w-0 flex-1 items-center gap-1.5">
@@ -288,10 +288,10 @@ function TopLeaguesSidebar({
                       src={item.leagueLogo}
                       alt=""
                       size={16}
-                      className="border border-[#1f2a40] bg-[#0a1225]"
+                      className="border border-transparent bg-[#000000]"
                     />
                   ) : (
-                    <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded border border-[#1f2a40] bg-[#0a1225]">
+                    <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded border border-transparent bg-[#000000]">
                       <AppIcon
                         name="circleDot"
                         size={8}
@@ -318,12 +318,12 @@ function TopLeaguesSidebar({
           return (
             <div
               key={group.region}
-              className="rounded border border-[#1a2740] bg-[#0b1326]"
+              className="rounded border border-transparent bg-[#000000]"
             >
               <button
                 type="button"
                 onClick={() => toggleSection(group.region)}
-                className="flex w-full cursor-pointer items-center justify-between px-2 py-1.5 text-left text-[11px] font-semibold text-[#c9d2ea] hover:bg-[#0f1930]"
+                className="flex w-full cursor-pointer items-center justify-between px-2 py-1.5 text-left text-[11px] font-semibold text-[#ffffff] hover:bg-[#0f1930]"
               >
                 <span className="flex min-w-0 flex-1 items-center gap-1.5">
                   <AppIcon
@@ -331,7 +331,7 @@ function TopLeaguesSidebar({
                     size={11}
                     className="shrink-0 text-[#5b6a8f]"
                   />
-                  <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-[2px] border border-[#1f2a40] bg-[#0a1225]">
+                  <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-[2px] border border-transparent bg-[#000000]">
                     <AppIcon
                       name={icon}
                       size={10}
@@ -345,7 +345,7 @@ function TopLeaguesSidebar({
                 </span>
               </button>
               {open ? (
-                <div className="border-t border-[#1b2842] px-1 pb-1 pt-0.5">
+                <div className="border-t border-white/8 px-1 pb-1 pt-0.5">
                   {leagues.map((item) => (
                     <button
                       key={item.id}
@@ -354,7 +354,7 @@ function TopLeaguesSidebar({
                       className={`flex w-full cursor-pointer items-center justify-between gap-1.5 rounded px-2 py-1 text-left text-[10px] font-semibold ${
                         item.id === selectedLeagueId
                           ? "border border-(--sb-accent-border) bg-(--sb-accent-surface) text-(--sb-accent-text-on-dark)"
-                          : "border border-transparent text-[#9aa7c6] hover:bg-[#0f1930]"
+                          : "border border-transparent text-[rgba(255,255,255,0.72)] hover:bg-[#0f1930]"
                       }`}
                     >
                       <span className="flex min-w-0 flex-1 items-center gap-1.5">
@@ -363,10 +363,10 @@ function TopLeaguesSidebar({
                             src={item.leagueLogo}
                             alt=""
                             size={16}
-                            className="border border-[#1f2a40] bg-[#0a1225]"
+                            className="border border-transparent bg-[#000000]"
                           />
                         ) : (
-                          <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded border border-[#1f2a40] bg-[#0a1225]">
+                          <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded border border-transparent bg-[#000000]">
                             <AppIcon
                               name="circleDot"
                               size={8}
@@ -404,12 +404,12 @@ function TopLeaguesSidebar({
               return (
                 <div
                   key={group.country}
-                  className="rounded border border-[#1a2740] bg-[#0b1326]"
+                  className="rounded border border-transparent bg-[#000000]"
                 >
                   <button
                     type="button"
                     onClick={() => toggleSection(group.country)}
-                    className="flex w-full cursor-pointer items-center justify-between px-2 py-1.5 text-left text-[11px] font-semibold text-[#c9d2ea] hover:bg-[#0f1930]"
+                    className="flex w-full cursor-pointer items-center justify-between px-2 py-1.5 text-left text-[11px] font-semibold text-[#ffffff] hover:bg-[#0f1930]"
                   >
                     <span className="flex min-w-0 flex-1 items-center gap-1.5">
                       <AppIcon
@@ -422,11 +422,11 @@ function TopLeaguesSidebar({
                           src={group.countryFlag}
                           alt=""
                           size={16}
-                          className="border border-[#1f2a40] bg-[#0a1225]"
+                          className="border border-transparent bg-[#000000]"
                           rounded="rounded-[2px]"
                         />
                       ) : (
-                        <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-[2px] border border-[#1f2a40] bg-[#0a1225]">
+                        <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-[2px] border border-transparent bg-[#000000]">
                           <AppIcon
                             name="flag"
                             size={10}
@@ -441,7 +441,7 @@ function TopLeaguesSidebar({
                     </span>
                   </button>
                   {open ? (
-                    <div className="border-t border-[#1b2842] px-1 pb-1 pt-0.5">
+                    <div className="border-t border-white/8 px-1 pb-1 pt-0.5">
                       {leagues.map((item) => (
                         <button
                           key={item.id}
@@ -450,7 +450,7 @@ function TopLeaguesSidebar({
                           className={`flex w-full cursor-pointer items-center justify-between gap-1.5 rounded px-2 py-1 text-left text-[10px] font-semibold ${
                             item.id === selectedLeagueId
                               ? "border border-(--sb-accent-border) bg-(--sb-accent-surface) text-(--sb-accent-text-on-dark)"
-                              : "border border-transparent text-[#9aa7c6] hover:bg-[#0f1930]"
+                              : "border border-transparent text-[rgba(255,255,255,0.72)] hover:bg-[#0f1930]"
                           }`}
                         >
                           <span className="flex min-w-0 flex-1 items-center gap-1.5">
@@ -459,10 +459,10 @@ function TopLeaguesSidebar({
                                 src={item.leagueLogo}
                                 alt=""
                                 size={16}
-                                className="border border-[#1f2a40] bg-[#0a1225]"
+                                className="border border-transparent bg-[#000000]"
                               />
                             ) : (
-                              <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded border border-[#1f2a40] bg-[#0a1225]">
+                              <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded border border-transparent bg-[#000000]">
                                 <AppIcon
                                   name="circleDot"
                                   size={8}

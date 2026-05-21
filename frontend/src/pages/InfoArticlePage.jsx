@@ -83,23 +83,23 @@ function InfoArticlePage() {
 
       <div className="relative mx-auto w-full max-w-2xl px-4 pb-28 pt-2 sm:px-5 sm:pt-4">
         <div
-          className="pointer-events-none absolute -top-4 left-1/2 h-64 w-[min(100%,36rem)] -translate-x-1/2 rounded-full bg-[radial-gradient(ellipse_at_center,rgba(79,220,204,0.12),transparent_68%)] blur-xl"
+          className="pointer-events-none absolute -top-4 left-1/2 h-64 w-[min(100%,36rem)] -translate-x-1/2 rounded-full bg-[radial-gradient(ellipse_at_center,rgba(246,175,1,0.12),transparent_68%)] blur-xl"
           aria-hidden
         />
 
         <header className="relative mb-6 flex items-center gap-4">
           <Link
             to="/"
-            className="flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-full bg-[#2f3050]/90 text-[#eceefd] shadow-lg shadow-black/20 ring-1 ring-[#4a4d6e]/40 transition-transform duration-300 hover:scale-105 hover:bg-[#3f4070] hover:ring-(--sb-accent-fill)/30 active:scale-95"
+            className="flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-full bg-[#111111]/90 text-[#ffffff] shadow-lg shadow-black/20  transition-transform duration-300 hover:scale-105 hover:bg-[#111111] hover:ring-(--sb-accent-fill)/30 active:scale-95"
             aria-label={t("article.backHome")}
           >
             <AppIcon name="chevronDown" size={18} className="rotate-90" />
           </Link>
           <div>
-            <p className="m-0 text-[11px] font-extrabold uppercase tracking-[0.2em] text-[#8a8ca0]">
+            <p className="m-0 text-[11px] font-extrabold uppercase tracking-[0.2em] text-[rgba(255,255,255,0.72)]">
               {t("sidebar.infoSection")}
             </p>
-            <h1 className="m-0 bg-gradient-to-r from-[#f4f5ff] via-[#c6fff8] to-[#f4f5ff] bg-clip-text text-xl font-black tracking-tight text-transparent sm:text-2xl">
+            <h1 className="m-0 text-xl font-black tracking-tight text-[#ffffff] sm:text-2xl">
               {title}
             </h1>
           </div>
@@ -107,7 +107,7 @@ function InfoArticlePage() {
 
         <SoftPanel>
           {loading ? (
-            <p className="m-0 text-center text-sm text-[#8a8ca0]">{t("article.loading")}</p>
+            <p className="m-0 text-center text-sm text-[rgba(255,255,255,0.72)]">{t("article.loading")}</p>
           ) : error ? (
             <p className="m-0 text-center text-sm text-red-400">{error}</p>
           ) : slug === FAQ_PAGE_SLUG ? (
@@ -116,7 +116,7 @@ function InfoArticlePage() {
               style={{ scrollbarGutter: "stable" }}
             >
               {!hasFaqContent ? (
-                <p className="m-0 text-center text-sm text-[#6b6d8a]">
+                <p className="m-0 text-center text-sm text-[rgba(255,255,255,0.5)]">
                   {t("article.emptyTopic")}
                 </p>
               ) : (
@@ -126,13 +126,13 @@ function InfoArticlePage() {
                     className="rounded-lg bg-[#0d1429]/65 ring-1 ring-[#253055]/85 open:bg-[#0d1429]/80 open:ring-[#33406a] open:[&_.faq-chevron]:rotate-180"
                   >
                     <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-left [&::-webkit-details-marker]:hidden">
-                      <span className="text-sm font-extrabold text-[#d6def2]">
+                      <span className="text-sm font-extrabold text-[#ffffff]">
                         {item.question}
                       </span>
                       <AppIcon
                         name="chevronDown"
                         size={18}
-                        className="faq-chevron shrink-0 text-[#6b6d8a] transition-transform duration-200"
+                        className="faq-chevron shrink-0 text-[rgba(255,255,255,0.5)] transition-transform duration-200"
                       />
                     </summary>
                     <div className="border-t border-[#253055]/60 px-4 pb-4 pt-1">
@@ -150,7 +150,7 @@ function InfoArticlePage() {
               style={{ scrollbarGutter: "stable" }}
             >
               {!hasContactContent ? (
-                <p className="m-0 text-center text-sm text-[#6b6d8a]">
+                <p className="m-0 text-center text-sm text-[rgba(255,255,255,0.5)]">
                   {t("article.emptyTopic")}
                 </p>
               ) : (
@@ -170,13 +170,13 @@ function InfoArticlePage() {
                             className="h-12 w-12 shrink-0 rounded-lg object-cover ring-1 ring-[#33406a]"
                           />
                         ) : null}
-                        <span className="text-sm font-bold text-[#d6def2]">
+                        <span className="text-sm font-bold text-[#ffffff]">
                           {entry.name}
                         </span>
                         <AppIcon
                           name="chevronRight"
                           size={14}
-                          className="ml-auto shrink-0 text-[#6b6d8a]"
+                          className="ml-auto shrink-0 text-[rgba(255,255,255,0.5)]"
                         />
                       </a>
                     </li>
@@ -192,7 +192,7 @@ function InfoArticlePage() {
               {bodyText}
             </div>
           ) : (
-            <p className="m-0 text-center text-sm text-[#6b6d8a]">
+            <p className="m-0 text-center text-sm text-[rgba(255,255,255,0.5)]">
               {t("article.emptyTopic")}
             </p>
           )}

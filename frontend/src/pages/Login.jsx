@@ -69,22 +69,22 @@ function Login() {
 
       <div className="relative mx-auto w-full max-w-lg px-4 pb-16 pt-2 sm:px-5 sm:pt-6">
         <div
-          className="pointer-events-none absolute -top-4 left-1/2 h-64 w-[min(100%,28rem)] -translate-x-1/2 rounded-full bg-[radial-gradient(ellipse_at_center,rgba(79,220,204,0.14),transparent_68%)] blur-xl"
+          className="pointer-events-none absolute -top-4 left-1/2 h-64 w-[min(100%,28rem)] -translate-x-1/2 rounded-full bg-[radial-gradient(ellipse_at_center,rgba(246,175,1,0.14),transparent_68%)] blur-xl"
           aria-hidden
         />
 
         <header className="relative mb-8 flex items-center gap-4">
           <Link
             to="/"
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#2f3050]/90 text-[#eceefd] no-underline shadow-lg shadow-black/20 ring-1 ring-[#4a4d6e]/40 transition-transform duration-300 hover:scale-105 hover:bg-[#3f4070] hover:ring-(--sb-accent-fill)/30 active:scale-95"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#111111]/90 text-[#ffffff] no-underline shadow-lg shadow-black/20  transition-transform duration-300 hover:scale-105 hover:bg-[#111111] hover:ring-(--sb-accent-fill)/30 active:scale-95"
           >
             <AppIcon name="chevronDown" size={18} className="rotate-90" />
           </Link>
           <div>
-            <p className="m-0 text-[11px] font-extrabold uppercase tracking-[0.2em] text-[#8a8ca0]">
+            <p className="m-0 text-[11px] font-extrabold uppercase tracking-[0.2em] text-[rgba(255,255,255,0.72)]">
               Welcome back
             </p>
-            <h1 className="m-0 bg-gradient-to-r from-[#f4f5ff] via-[#c6fff8] to-[#f4f5ff] bg-clip-text text-2xl font-black tracking-tight text-transparent sm:text-3xl">
+            <h1 className="m-0 text-2xl font-black tracking-tight text-[#ffffff] sm:text-3xl">
               Log in
             </h1>
           </div>
@@ -93,7 +93,7 @@ function Login() {
         <SoftPanel className="animate-deposit-panel">
           <form onSubmit={handleSubmit} className="flex flex-col gap-5">
             <label className="block">
-              <span className="mb-2 block text-xs font-semibold text-[#a3a5bf]">
+              <span className="mb-2 block text-xs font-semibold text-[rgba(255,255,255,0.72)]">
                 Phone number
               </span>
               <input
@@ -107,7 +107,7 @@ function Login() {
             </label>
 
             <label className="block">
-              <span className="mb-2 block text-xs font-semibold text-[#a3a5bf]">
+              <span className="mb-2 block text-xs font-semibold text-[rgba(255,255,255,0.72)]">
                 Password
               </span>
               <input
@@ -120,8 +120,8 @@ function Login() {
               />
             </label>
 
-            <div className="flex items-center justify-between rounded-2xl bg-[#101020]/45 px-4 py-3 ring-1 ring-[#34354f]/40">
-              <span className="text-sm font-semibold text-[#d5d8ea]">
+            <div className="flex items-center justify-between rounded-2xl bg-[#0a0a0a]/45 px-4 py-3 ">
+              <span className="text-sm font-semibold text-[#ffffff]">
                 Remember me
               </span>
               <button
@@ -130,7 +130,7 @@ function Login() {
                 aria-checked={remember}
                 onClick={() => setRemember((p) => !p)}
                 className={`relative h-[26px] w-[46px] shrink-0 cursor-pointer rounded-full border-0 transition-all duration-300 ${
-                  remember ? "bg-(--sb-accent-fill)" : "bg-[#3d3f5c]"
+                  remember ? "bg-(--sb-accent-fill)" : "bg-[#F6AF01]"
                 }`}
               >
                 <span
@@ -158,14 +158,14 @@ function Login() {
             <div className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-center text-xs">
               <a
                 href="#"
-                className="font-bold text-[#c6fff8] no-underline transition-opacity hover:opacity-80"
+                className="font-bold text-[#ffffff] no-underline transition-opacity hover:opacity-80"
               >
                 Restore password
               </a>
-              <span className="text-[#6b6d8a]">·</span>
+              <span className="text-[rgba(255,255,255,0.5)]">·</span>
               <a
                 href="#"
-                className="font-bold text-[#c6fff8] no-underline transition-opacity hover:opacity-80"
+                className="font-bold text-[#ffffff] no-underline transition-opacity hover:opacity-80"
               >
                 Contact us
               </a>
@@ -173,10 +173,10 @@ function Login() {
 
             <div className="relative py-2">
               <div
-                className="absolute inset-x-0 top-1/2 h-px bg-[#34354f]/80"
+                className="absolute inset-x-0 top-1/2 h-px bg-[#F6AF01]/80"
                 aria-hidden
               />
-              <p className="relative mx-auto w-fit bg-[#18182a] px-3 text-center text-[11px] font-extrabold uppercase tracking-wider text-[#6b6d8a]">
+              <p className="relative mx-auto w-fit bg-[#111111] px-3 text-center text-[11px] font-extrabold uppercase tracking-wider text-[rgba(255,255,255,0.5)]">
                 New here?
               </p>
             </div>

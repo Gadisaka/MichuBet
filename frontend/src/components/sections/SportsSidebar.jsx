@@ -11,9 +11,9 @@ function SportsSidebar({
 }) {
   const { t } = useTranslation();
   return (
-    <Panel as="footer" className="shrink-0 border-t border-[#1b2842]/80">
+    <Panel as="footer" className="shrink-0 border-t border-white/8">
       <nav className="px-2.5 py-2.5" aria-label={t("common.helpLegalNav")}>
-        <p className="m-0 mb-1.5 text-[9px] font-extrabold uppercase tracking-[0.18em] text-[#5b6a8f]">
+        <p className="m-0 mb-1.5 text-[9px] font-extrabold uppercase tracking-[0.18em] text-[rgba(255,255,255,0.5)]">
           {t("sidebar.infoSection")}
         </p>
         <ul className="m-0 list-none space-y-1 p-0">
@@ -21,7 +21,7 @@ function SportsSidebar({
             <li key={slug} className="m-0 p-0">
               <Link
                 to={`/info/${slug}`}
-                className="flex w-full cursor-pointer items-center justify-between gap-2 rounded-md border-0 bg-transparent px-0 py-1 text-left text-[10px] font-semibold text-[#7f8dad] no-underline transition-colors hover:bg-[#1b2842]/50 hover:text-[#bac5df]"
+                className="flex w-full cursor-pointer items-center justify-between gap-2 rounded-md border-0 bg-transparent px-0 py-1 text-left text-[10px] font-semibold text-[rgba(255,255,255,0.72)] no-underline transition-colors hover:bg-[#111111] hover:text-[#ffffff]"
               >
                 <span>{t(`infoPage.${slug}`)}</span>
                 <AppIcon

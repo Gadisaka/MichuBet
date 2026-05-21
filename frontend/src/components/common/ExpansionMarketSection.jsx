@@ -76,8 +76,8 @@ function ExpansionMarketSection({
 
   if (!collapsible) {
     return (
-      <section className="overflow-hidden rounded-xl bg-[#101020]/45 ring-1 ring-[#34354f]/45">
-        <header className="border-b border-[#2a3754]/55 px-3 py-2 text-xs font-bold uppercase tracking-wide text-[#d6daea]">
+      <section className="overflow-hidden rounded-xl bg-[#0a0a0a]/45 ">
+        <header className="border-b border-white/8 px-3 py-2 text-xs font-bold uppercase tracking-wide text-[#d6daea]">
           {marketLabel}
         </header>
         <OddsGrid
@@ -96,12 +96,12 @@ function ExpansionMarketSection({
   }
 
   return (
-    <section className="overflow-hidden rounded-xl bg-[#101020]/45 ring-1 ring-[#34354f]/45">
+    <section className="overflow-hidden rounded-xl bg-[#0a0a0a]/45 ">
       <button
         type="button"
         aria-expanded={open}
         onClick={() => setOpen((prev) => !prev)}
-        className="flex w-full cursor-pointer items-center justify-between gap-2 border-0 bg-transparent px-3 py-2 text-left transition-colors hover:bg-[#101020]/55"
+        className="flex w-full cursor-pointer items-center justify-between gap-2 border-0 bg-transparent px-3 py-2 text-left transition-colors hover:bg-[#0a0a0a]/55"
       >
         <span className="text-xs font-bold uppercase tracking-wide text-[#d6daea]">
           {marketLabel}
@@ -114,7 +114,7 @@ function ExpansionMarketSection({
             name={open ? "chevronUp" : "chevronDown"}
             size={14}
             strokeWidth={2.5}
-            className="text-[#8a8ca0]"
+            className="text-[rgba(255,255,255,0.72)]"
           />
         </span>
       </button>

@@ -124,7 +124,7 @@ function Withdraw() {
 
       <div className="relative mx-auto w-full max-w-lg px-4 pb-28 pt-2 sm:px-5 sm:pt-4">
         <div
-          className="pointer-events-none absolute -top-4 left-1/2 h-64 w-[min(100%,28rem)] -translate-x-1/2 rounded-full bg-[radial-gradient(ellipse_at_center,rgba(79,220,204,0.14),transparent_68%)] blur-xl"
+          className="pointer-events-none absolute -top-4 left-1/2 h-64 w-[min(100%,28rem)] -translate-x-1/2 rounded-full bg-[radial-gradient(ellipse_at_center,rgba(246,175,1,0.14),transparent_68%)] blur-xl"
           aria-hidden
         />
 
@@ -132,26 +132,26 @@ function Withdraw() {
           <button
             type="button"
             onClick={() => navigate("/profile")}
-            className="flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-full bg-[#2f3050]/90 text-[#eceefd] shadow-lg shadow-black/20 ring-1 ring-[#4a4d6e]/40 transition-transform duration-300 hover:scale-105 hover:bg-[#3f4070] hover:ring-(--sb-accent-fill)/30 active:scale-95"
+            className="flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-full bg-[#111111]/90 text-[#ffffff] shadow-lg shadow-black/20  transition-transform duration-300 hover:scale-105 hover:bg-[#111111] hover:ring-(--sb-accent-fill)/30 active:scale-95"
           >
             <AppIcon name="chevronDown" size={18} className="rotate-90" />
           </button>
           <div>
-            <p className="m-0 text-[11px] font-extrabold uppercase tracking-[0.2em] text-[#8a8ca0]">
+            <p className="m-0 text-[11px] font-extrabold uppercase tracking-[0.2em] text-[rgba(255,255,255,0.72)]">
               Shop withdrawal
             </p>
-            <h1 className="m-0 bg-gradient-to-r from-[#f4f5ff] via-[#c6fff8] to-[#f4f5ff] bg-clip-text text-2xl font-black tracking-tight text-transparent sm:text-3xl">
+            <h1 className="m-0 text-2xl font-black tracking-tight text-[#ffffff] sm:text-3xl">
               Withdraw
             </h1>
           </div>
         </header>
 
         {loading ? (
-          <div className="flex flex-col items-center justify-center gap-4 py-24 text-[#8a8ca0]">
+          <div className="flex flex-col items-center justify-center gap-4 py-24 text-[rgba(255,255,255,0.72)]">
             <div className="relative h-14 w-14">
               <div className="absolute inset-0 animate-ping rounded-full bg-(--sb-accent-fill)/25" />
-              <div className="relative flex h-14 w-14 items-center justify-center rounded-full bg-[#1f2038] ring-2 ring-(--sb-accent-fill)/40">
-                <div className="h-7 w-7 animate-spin rounded-full border-2 border-[#34354f] border-t-(--sb-accent-fill)" />
+              <div className="relative flex h-14 w-14 items-center justify-center rounded-full bg-[#111111] ring-2 ring-(--sb-accent-fill)/40">
+                <div className="h-7 w-7 animate-spin rounded-full border-2 border-[#F6AF01] border-t-(--sb-accent-fill)" />
               </div>
             </div>
             <span className="text-sm font-semibold">Loading…</span>
@@ -165,10 +165,10 @@ function Withdraw() {
         ) : (
           <div className="flex flex-col gap-4">
             <SoftPanel className="animate-deposit-panel">
-              <p className="m-0 text-center text-sm leading-relaxed text-[#8a8ca0]">
+              <p className="m-0 text-center text-sm leading-relaxed text-[rgba(255,255,255,0.72)]">
                 Enter how much you want to take out. We&apos;ll give you a
                 one-time code to show at a shop cashier. The code works{" "}
-                <span className="font-bold text-[#d5d8ea]">once</span>
+                <span className="font-bold text-[#ffffff]">once</span>
                 {result?.expiresAt
                   ? " — see expiry below after you generate a code."
                   : " and may expire if unused."}
@@ -176,7 +176,7 @@ function Withdraw() {
             </SoftPanel>
 
             <SoftPanel className="animate-deposit-panel">
-              <p className="mb-3 text-center text-xs font-extrabold uppercase tracking-[0.18em] text-[#8a8ca0]">
+              <p className="mb-3 text-center text-xs font-extrabold uppercase tracking-[0.18em] text-[rgba(255,255,255,0.72)]">
                 Your balance
               </p>
               <p className="m-0 text-center text-3xl font-black tabular-nums text-(--sb-positive) sm:text-4xl">
@@ -190,16 +190,16 @@ function Withdraw() {
             >
               <SoftPanel>
                 <label className="block">
-                  <span className="mb-2 block text-center text-xs font-extrabold uppercase tracking-[0.15em] text-[#8a8ca0]">
+                  <span className="mb-2 block text-center text-xs font-extrabold uppercase tracking-[0.15em] text-[rgba(255,255,255,0.72)]">
                     Amount (ETB)
                   </span>
                   {limitHint ? (
-                    <p className="mb-3 text-center text-[11px] text-[#6b6d8a]">
+                    <p className="mb-3 text-center text-[11px] text-[rgba(255,255,255,0.5)]">
                       {limitHint}
                     </p>
                   ) : null}
                   <div className="relative">
-                    <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-sm font-bold text-[#6b6d8a]">
+                    <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-sm font-bold text-[rgba(255,255,255,0.5)]">
                       Br
                     </span>
                     <input
@@ -246,17 +246,17 @@ function Withdraw() {
                 <p className="m-0 text-center text-xs font-extrabold uppercase tracking-[0.18em] text-[#86efac]">
                   Your one-time code
                 </p>
-                <p className="mt-4 text-center font-mono text-3xl font-black tracking-[0.2em] text-[#f4f5ff] sm:text-4xl sm:tracking-[0.25em]">
+                <p className="mt-4 text-center font-mono text-3xl font-black tracking-[0.2em] text-[#ffffff] sm:text-4xl sm:tracking-[0.25em]">
                   {result.code}
                 </p>
-                <p className="mt-3 text-center text-sm text-[#a3a3b8]">
+                <p className="mt-3 text-center text-sm text-[rgba(255,255,255,0.72)]">
                   Amount:{" "}
-                  <span className="font-bold text-[#f4f5ff]">
+                  <span className="font-bold text-[#ffffff]">
                     {Number(result.amount).toLocaleString()} ETB
                   </span>
                 </p>
                 {result.expiresAt ? (
-                  <p className="mt-2 text-center text-xs text-[#8a8ca0]">
+                  <p className="mt-2 text-center text-xs text-[rgba(255,255,255,0.72)]">
                     Unused codes expire after:{" "}
                     {new Date(result.expiresAt).toLocaleString()}
                   </p>
@@ -264,7 +264,7 @@ function Withdraw() {
                 <button
                   type="button"
                   onClick={copyCode}
-                  className="mt-6 w-full rounded-2xl bg-[#101020]/50 py-3.5 text-sm font-extrabold text-[#86efac] ring-1 ring-[#5f9f6f]/50 transition-all duration-300 hover:bg-[#0f4a45]/40 hover:ring-[#86efac]/40"
+                  className="mt-6 w-full rounded-2xl bg-[#0a0a0a]/50 py-3.5 text-sm font-extrabold text-[#86efac] ring-1 ring-[#5f9f6f]/50 transition-all duration-300 hover:bg-(--sb-accent-surface)/40 hover:ring-[#86efac]/40"
                 >
                   Copy code
                 </button>

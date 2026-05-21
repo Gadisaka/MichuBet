@@ -54,10 +54,10 @@ function StepDots({ step, total = 4 }) {
             key={n}
             className={`h-2.5 rounded-full transition-all duration-500 ease-out ${
               active
-                ? "w-9 bg-(--sb-accent-fill) shadow-[0_0_14px_rgba(79,220,204,0.45)]"
+                ? "w-9 bg-(--sb-accent-fill) shadow-[0_0_14px_rgba(246,175,1,0.45)]"
                 : done
                   ? "w-2.5 bg-(--sb-accent-fill)/55"
-                  : "w-2.5 bg-[#34354f]/80"
+                  : "w-2.5 bg-[#F6AF01]/80"
             }`}
             aria-hidden
           />
@@ -96,22 +96,22 @@ function OnlineDepositAmharicBlock({ methodKey, receivers, minD, maxD }) {
   }
 
   return (
-    <div className="mt-5 rounded-2xl bg-[#101020]/55 px-4 py-4 text-sm leading-relaxed text-[#c8cad8] ring-1 ring-[#34354f]/35 transition-colors duration-300">
-      <p className="m-0 font-semibold tracking-tight text-[#e8eafa]">
+    <div className="mt-5 rounded-2xl bg-[#0a0a0a]/55 px-4 py-4 text-sm leading-relaxed text-[#c8cad8]  transition-colors duration-300">
+      <p className="m-0 font-semibold tracking-tight text-[#ffffff]">
         {label} አካውንት
       </p>
       <p className="mt-2 m-0">
         ስልክ / አካውንት:{" "}
-        <span className="font-semibold text-[#f4f5ff]">{accountDisplay}</span>
+        <span className="font-semibold text-[#ffffff]">{accountDisplay}</span>
       </p>
       <p className="mt-1 m-0">
         ስም:{" "}
-        <span className="font-semibold text-[#f4f5ff]">{nameDisplay}</span>
+        <span className="font-semibold text-[#ffffff]">{nameDisplay}</span>
       </p>
-      <p className="mt-3 m-0 text-xs font-semibold uppercase tracking-wider text-[#8a8ca0]">
+      <p className="mt-3 m-0 text-xs font-semibold uppercase tracking-wider text-[rgba(255,255,255,0.72)]">
         መመሪያ
       </p>
-      <ol className="mt-2 list-decimal space-y-2 pl-5 text-[#a3a5bf]">
+      <ol className="mt-2 list-decimal space-y-2 pl-5 text-[rgba(255,255,255,0.72)]">
         <li>ከላይ ባለው የ {label} አካውንት ገንዘቡን ያስገቡ</li>
         <li>
           ብሩን ስትልኩ የከፈላችሁበትን መረጃ የያዘ አጭር የጹሁፍ መልክት (SMS) ይደርሳችኋል
@@ -120,7 +120,7 @@ function OnlineDepositAmharicBlock({ methodKey, receivers, minD, maxD }) {
           የደረሳችሁን SMS ሙሉውን ኮፒ አድርጋችሁ በሚቀጥለው ምዕራፍ ውስጥ ፔስት አድርጋችሁ ላኩት
         </li>
       </ol>
-      <p className="mt-3 m-0 text-xs text-[#8a8ca0]">{limitLine}</p>
+      <p className="mt-3 m-0 text-xs text-[rgba(255,255,255,0.72)]">{limitLine}</p>
     </div>
   );
 }
@@ -273,7 +273,7 @@ function Deposit() {
 
       <div className="relative mx-auto w-full max-w-lg px-4 pb-28 pt-2 sm:px-5 sm:pt-4">
         <div
-          className="pointer-events-none absolute -top-4 left-1/2 h-64 w-[min(100%,28rem)] -translate-x-1/2 rounded-full bg-[radial-gradient(ellipse_at_center,rgba(79,220,204,0.14),transparent_68%)] blur-xl"
+          className="pointer-events-none absolute -top-4 left-1/2 h-64 w-[min(100%,28rem)] -translate-x-1/2 rounded-full bg-[radial-gradient(ellipse_at_center,rgba(246,175,1,0.14),transparent_68%)] blur-xl"
           aria-hidden
         />
 
@@ -281,23 +281,23 @@ function Deposit() {
           <button
             type="button"
             onClick={() => navigate("/profile")}
-            className="flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-full bg-[#2f3050]/90 text-[#eceefd] shadow-lg shadow-black/20 ring-1 ring-[#4a4d6e]/40 transition-transform duration-300 hover:scale-105 hover:bg-[#3f4070] hover:ring-(--sb-accent-fill)/30 active:scale-95"
+            className="flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-full bg-[#111111]/90 text-[#ffffff] shadow-lg shadow-black/20  transition-transform duration-300 hover:scale-105 hover:bg-[#111111] hover:ring-(--sb-accent-fill)/30 active:scale-95"
           >
             <AppIcon name="chevronDown" size={18} className="rotate-90" />
           </button>
           <div>
-            <p className="m-0 text-[11px] font-extrabold uppercase tracking-[0.2em] text-[#8a8ca0]">
+            <p className="m-0 text-[11px] font-extrabold uppercase tracking-[0.2em] text-[rgba(255,255,255,0.72)]">
               Wallet top-up
             </p>
-            <h1 className="m-0 bg-gradient-to-r from-[#f4f5ff] via-[#c6fff8] to-[#f4f5ff] bg-clip-text text-2xl font-black tracking-tight text-transparent sm:text-3xl">
+            <h1 className="m-0 text-2xl font-black tracking-tight text-[#ffffff] sm:text-3xl">
               Deposit
             </h1>
           </div>
         </header>
 
-        <div className="relative mb-8 flex rounded-full bg-[#101020]/85 p-1.5 shadow-inner shadow-black/30 ring-1 ring-[#34354f]/50 backdrop-blur-md">
+        <div className="relative mb-8 flex rounded-full bg-[#0a0a0a]/85 p-1.5 shadow-inner shadow-black/30  backdrop-blur-md">
           <div
-            className={`absolute inset-y-1.5 w-[calc(50%-6px)] rounded-full bg-(--sb-accent-fill) shadow-[0_8px_24px_rgba(79,220,204,0.35)] transition-all duration-500 ease-out ${
+            className={`absolute inset-y-1.5 w-[calc(50%-6px)] rounded-full bg-(--sb-accent-fill) shadow-[0_8px_24px_rgba(246,175,1,0.35)] transition-all duration-500 ease-out ${
               depositTab === "online" ? "left-1.5" : "left-[calc(50%+3px)]"
             }`}
             aria-hidden
@@ -306,8 +306,8 @@ function Deposit() {
             type="button"
             className={`relative z-10 flex-1 rounded-full py-3 text-center text-sm font-extrabold tracking-wide transition-colors duration-300 ${
               depositTab === "online"
-                ? "text-[#101012]"
-                : "text-[#a3a5bf] hover:text-[#d5d8ea]"
+                ? "text-white"
+                : "text-[rgba(255,255,255,0.72)] hover:text-[#ffffff]"
             }`}
             onClick={() => {
               if (depositTab === "shop") resetOnlineWizard();
@@ -320,8 +320,8 @@ function Deposit() {
             type="button"
             className={`relative z-10 flex-1 rounded-full py-3 text-center text-sm font-extrabold tracking-wide transition-colors duration-300 ${
               depositTab === "shop"
-                ? "text-[#101012]"
-                : "text-[#a3a5bf] hover:text-[#d5d8ea]"
+                ? "text-white"
+                : "text-[rgba(255,255,255,0.72)] hover:text-[#ffffff]"
             }`}
             onClick={() => setDepositTab("shop")}
           >
@@ -331,11 +331,11 @@ function Deposit() {
 
         {depositTab === "shop" ? (
           <SoftPanel className="animate-deposit-panel">
-            <p className="m-0 text-sm leading-relaxed text-[#8a8ca0]">
+            <p className="m-0 text-sm leading-relaxed text-[rgba(255,255,255,0.72)]">
               Use your phone to deposit your account at the nearest shop.
             </p>
             {limitsLine ? (
-              <p className="mt-4 border-t border-[#34354f]/40 pt-4 text-sm leading-relaxed text-[#a3a5bf]">
+              <p className="mt-4 border-t border-white/8 pt-4 text-sm leading-relaxed text-[rgba(255,255,255,0.72)]">
                 {limitsLine}
               </p>
             ) : null}
@@ -344,11 +344,11 @@ function Deposit() {
           <div className="flex flex-col items-center justify-center gap-5 py-24">
             <div className="relative h-14 w-14">
               <div className="absolute inset-0 animate-ping rounded-full bg-(--sb-accent-fill)/25" />
-              <div className="relative flex h-14 w-14 items-center justify-center rounded-full bg-[#1f2038] ring-2 ring-(--sb-accent-fill)/40">
-                <div className="h-7 w-7 animate-spin rounded-full border-2 border-[#34354f] border-t-(--sb-accent-fill)" />
+              <div className="relative flex h-14 w-14 items-center justify-center rounded-full bg-[#111111] ring-2 ring-(--sb-accent-fill)/40">
+                <div className="h-7 w-7 animate-spin rounded-full border-2 border-[#F6AF01] border-t-(--sb-accent-fill)" />
               </div>
             </div>
-            <span className="text-sm font-semibold text-[#8a8ca0]">
+            <span className="text-sm font-semibold text-[rgba(255,255,255,0.72)]">
               Loading your session…
             </span>
           </div>
@@ -360,7 +360,7 @@ function Deposit() {
           </SoftPanel>
         ) : (
           <div className="flex flex-col gap-2">
-            <p className="mb-2 px-1 text-center text-sm leading-relaxed text-[#8a8ca0]">
+            <p className="mb-2 px-1 text-center text-sm leading-relaxed text-[rgba(255,255,255,0.72)]">
               Pay in your banking app, then paste the SMS. The amount must match
               the verified transfer.
             </p>
@@ -375,7 +375,7 @@ function Deposit() {
             >
               {onlineStep === 1 && (
                 <SoftPanel>
-                  <p className="mb-4 text-center text-xs font-extrabold uppercase tracking-[0.18em] text-[#8a8ca0]">
+                  <p className="mb-4 text-center text-xs font-extrabold uppercase tracking-[0.18em] text-[rgba(255,255,255,0.72)]">
                     Choose payment method
                   </p>
                   <div className="flex flex-col gap-3">
@@ -391,8 +391,8 @@ function Deposit() {
                           }}
                           className={`group relative flex w-full items-center gap-4 overflow-hidden rounded-2xl px-4 py-3.5 text-left transition-all duration-300 ${
                             sel
-                              ? "scale-[1.02] bg-gradient-to-r from-[#0f4a45]/90 via-[#18182a] to-[#18182a] shadow-[0_12px_32px_-12px_rgba(79,220,204,0.35)] ring-2 ring-(--sb-accent-fill)/70"
-                              : "bg-[#101020]/70 ring-1 ring-[#34354f]/60 hover:ring-[#5fe3d6]/25 hover:shadow-lg hover:shadow-black/20"
+                              ? "scale-[1.02] bg-gradient-to-r from-(--sb-accent-surface)/90 via-[#111111] to-[#111111] shadow-[0_12px_32px_-12px_rgba(246,175,1,0.35)] ring-2 ring-(--sb-accent-fill)/70"
+                              : "bg-[#0a0a0a]/70 ring-1 ring-white/10 hover:shadow-lg hover:shadow-black/20"
                           }`}
                         >
                           <img
@@ -406,17 +406,17 @@ function Deposit() {
                           <div className="min-w-0 flex-1 pr-2">
                             <span
                               className={`block text-base font-bold transition-colors ${
-                                sel ? "text-[#f4f5ff]" : "text-[#a3a5bf] group-hover:text-[#e8eaf5]"
+                                sel ? "text-[#ffffff]" : "text-[rgba(255,255,255,0.72)] group-hover:text-[#e8eaf5]"
                               }`}
                             >
                               {m.label}
                             </span>
-                            <span className="mt-0.5 block text-xs font-medium text-[#6b6d8a] transition-colors group-hover:text-[#8a8ca0]">
+                            <span className="mt-0.5 block text-xs font-medium text-[rgba(255,255,255,0.5)] transition-colors group-hover:text-[rgba(255,255,255,0.72)]">
                               {m.hint}
                             </span>
                           </div>
                           {sel ? (
-                            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-(--sb-accent-fill)/90 text-[#101012] text-xs font-black transition-transform duration-300">
+                            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-(--sb-accent-fill)/90 text-[#000000] text-xs font-black transition-transform duration-300">
                               ✓
                             </span>
                           ) : null}
@@ -452,17 +452,17 @@ function Deposit() {
                         draggable={false}
                       />
                     ) : null}
-                    <p className="m-0 text-center text-xs font-extrabold uppercase tracking-[0.18em] text-[#8a8ca0]">
+                    <p className="m-0 text-center text-xs font-extrabold uppercase tracking-[0.18em] text-[rgba(255,255,255,0.72)]">
                       Amount
                     </p>
                   </div>
-                  <p className="mb-4 text-center text-[11px] text-[#6b6d8a]">
+                  <p className="mb-4 text-center text-[11px] text-[rgba(255,255,255,0.5)]">
                     {minD != null || maxD != null
                       ? `Platform range${minD != null ? ` · min ${minD}` : ""}${maxD != null ? ` · max ${maxD}` : ""} ETB`
                       : "Enter amount in ETB"}
                   </p>
                   <div className="relative">
-                    <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-sm font-bold text-[#6b6d8a]">
+                    <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-sm font-bold text-[rgba(255,255,255,0.5)]">
                       Br
                     </span>
                     <input
@@ -525,7 +525,7 @@ function Deposit() {
                         draggable={false}
                       />
                     ) : null}
-                    <p className="m-0 text-center text-xs font-extrabold uppercase tracking-[0.18em] text-[#8a8ca0]">
+                    <p className="m-0 text-center text-xs font-extrabold uppercase tracking-[0.18em] text-[rgba(255,255,255,0.72)]">
                       SMS from bank
                     </p>
                   </div>
@@ -533,7 +533,7 @@ function Deposit() {
                     method === "cbe" ||
                     method === "cbebirr") && (
                     <label className="block">
-                      <span className="mb-2 block text-xs font-semibold text-[#a3a5bf]">
+                      <span className="mb-2 block text-xs font-semibold text-[rgba(255,255,255,0.72)]">
                         Full message
                       </span>
                       <textarea
@@ -603,18 +603,18 @@ function Deposit() {
                       <p className="m-0 text-center text-xs font-extrabold uppercase tracking-[0.2em] text-[#86efac]">
                         Deposit successful
                       </p>
-                      <p className="mt-4 text-center text-sm text-[#d5d8ea]">
+                      <p className="mt-4 text-center text-sm text-[#ffffff]">
                         Credited{" "}
-                        <span className="text-lg font-bold text-[#f4f5ff]">
+                        <span className="text-lg font-bold text-[#ffffff]">
                           {Number(
                             onlineResult.data.creditedAmount ?? 0,
                           ).toLocaleString()}{" "}
                           ETB
                         </span>
                       </p>
-                      <p className="mt-2 text-center text-sm text-[#a3a3b8]">
+                      <p className="mt-2 text-center text-sm text-[rgba(255,255,255,0.72)]">
                         New balance{" "}
-                        <span className="font-semibold text-[#f4f5ff]">
+                        <span className="font-semibold text-[#ffffff]">
                           {Number(
                             onlineResult.data.newBalance ?? 0,
                           ).toLocaleString()}{" "}
@@ -632,7 +632,7 @@ function Deposit() {
                       <p className="m-0 text-center text-xs font-extrabold uppercase tracking-[0.2em] text-[#ff6b6b]">
                         Deposit failed
                       </p>
-                      <p className="mt-4 text-center text-sm leading-relaxed text-[#f4f5ff]">
+                      <p className="mt-4 text-center text-sm leading-relaxed text-[#ffffff]">
                         {onlineResult.message}
                       </p>
                     </>

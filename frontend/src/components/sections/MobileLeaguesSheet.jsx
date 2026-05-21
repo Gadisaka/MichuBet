@@ -32,21 +32,21 @@ function MobileLeaguesSheet({ open, onClose, sidebarProps }) {
         aria-label="Close leagues"
       />
       <div
-        className={`absolute inset-x-0 bottom-16 flex h-[min(68vh,520px)] max-h-[85vh] flex-col overflow-hidden rounded-t-2xl border border-b-0 border-[#1b2842] bg-[#091025] shadow-[0_-12px_40px_rgba(0,0,0,0.45)] transition-transform duration-300 ease-out ${
+        className={`absolute inset-x-0 bottom-16 flex h-[min(68vh,520px)] max-h-[85vh] flex-col overflow-hidden rounded-t-2xl bg-[#000000] shadow-[0_-12px_40px_rgba(0,0,0,0.45)] transition-transform duration-300 ease-out ${
           open ? "translate-y-0" : "translate-y-full"
         }`}
         role="dialog"
         aria-modal="true"
         aria-label="Leagues"
       >
-        <div className="flex shrink-0 items-center justify-between border-b border-[#1b2842] px-3 py-2.5">
-          <span className="text-sm font-bold uppercase tracking-wide text-[#e9eef9]">
+        <div className="flex shrink-0 items-center justify-between border-b border-white/8 px-3 py-2.5">
+          <span className="text-sm font-bold uppercase tracking-wide text-[#ffffff]">
             Leagues
           </span>
           <button
             type="button"
             onClick={onClose}
-            className="flex cursor-pointer items-center gap-1 border-0 bg-transparent py-1 pl-2 text-[11px] font-bold uppercase tracking-wide text-[#9ba7c7]"
+            className="flex cursor-pointer items-center gap-1 border-0 bg-transparent py-1 pl-2 text-[11px] font-bold uppercase tracking-wide text-[rgba(255,255,255,0.72)]"
             aria-label="Close"
           >
             <AppIcon name="chevronDown" size={20} strokeWidth={2} />

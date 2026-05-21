@@ -71,12 +71,7 @@ function buildSelectionLines(ticket) {
 }
 
 const TicketTemplate = forwardRef(function TicketTemplate(
-  {
-    ticket,
-    width = "80mm",
-    barcodeDataUrl = "",
-    platformWinningsTax = null,
-  },
+  { ticket, width = "80mm", barcodeDataUrl = "", platformWinningsTax = null },
   ref,
 ) {
   if (!ticket) return null;
@@ -224,7 +219,6 @@ const TicketTemplate = forwardRef(function TicketTemplate(
           bold
         />
       )}
-
     </div>
   );
 });

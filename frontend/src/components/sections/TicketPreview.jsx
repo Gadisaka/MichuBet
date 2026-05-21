@@ -100,7 +100,7 @@ function TicketPreview({ selections, stake, onClose, onPlaceBet, placing }) {
               onPlaceBet?.();
               onClose();
             }}
-            className="w-full cursor-pointer rounded-full border-0 bg-(--sb-accent-fill) py-3.5 text-base font-extrabold text-[#101012] disabled:opacity-60"
+            className="w-full cursor-pointer rounded-full border-0 bg-(--sb-accent-fill) py-3.5 text-base font-extrabold text-[#000000] disabled:opacity-60"
           >
             {placing ? "PLACING..." : "PLACE BET ONLINE"}
           </button>

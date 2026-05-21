@@ -203,7 +203,7 @@ export default function AdminShell({ user, onLogout, children }) {
         }`}
       >
         <div className="flex h-14 shrink-0 items-center gap-2 border-b border-[var(--border)] px-5">
-          <span className="text-base font-bold tracking-tight">Michubet</span>
+          <span className="text-base font-bold tracking-tight">Michotbet</span>
           <span className="text-[0.65rem] font-semibold uppercase tracking-widest text-[var(--muted)]">
             Admin
           </span>

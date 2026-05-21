@@ -44,13 +44,13 @@ function DesktopUserSidebar({ open, onClose }) {
         aria-label={t("common.closeMenu")}
       />
       <div
-        className="animate-deposit-panel fixed right-3 top-[3.75rem] z-[90] w-[min(calc(100vw-1.5rem),17.5rem)] origin-top-right overflow-hidden rounded-[1.35rem] bg-gradient-to-br from-[#1f2038]/98 via-[#18182a]/98 to-[#12121f]/98 py-2 shadow-[0_24px_60px_-12px_rgba(0,0,0,0.65)] ring-1 ring-[#3d3f5c]/50 backdrop-blur-md transition-shadow duration-300 max-lg:hidden"
+        className="animate-deposit-panel fixed right-3 top-[3.75rem] z-[90] w-[min(calc(100vw-1.5rem),17.5rem)] origin-top-right overflow-hidden rounded-[1.35rem] bg-gradient-to-br from-[#111111]/98 via-[#111111]/98 to-[#000000]/98 py-2 shadow-[0_24px_60px_-12px_rgba(0,0,0,0.65)]  backdrop-blur-md transition-shadow duration-300 max-lg:hidden"
         role="dialog"
         aria-label={t("common.accountMenu")}
       >
-        <div className="pointer-events-none absolute -right-8 -top-12 h-28 w-40 rounded-full bg-[radial-gradient(ellipse_at_center,rgba(79,220,204,0.18),transparent_70%)] blur-2xl" />
+        <div className="pointer-events-none absolute -right-8 -top-12 h-28 w-40 rounded-full bg-[radial-gradient(ellipse_at_center,rgba(246,175,1,0.18),transparent_70%)] blur-2xl" />
         <div className="relative px-2 pt-1 pb-2">
-          <p className="px-3 pb-2 text-[10px] font-extrabold uppercase tracking-[0.22em] text-[#6b6d8a]">
+          <p className="px-3 pb-2 text-[10px] font-extrabold uppercase tracking-[0.22em] text-[rgba(255,255,255,0.5)]">
             {t("menu.title")}
           </p>
           <nav className="flex flex-col gap-1">
@@ -69,23 +69,23 @@ function DesktopUserSidebar({ open, onClose }) {
                   }}
                   className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-bold transition-all duration-200 ${
                     enabled
-                      ? "text-[#e8eafa] hover:translate-x-0.5 hover:bg-[#101020]/75 hover:shadow-[inset_0_0_0_1px_rgba(95,227,214,0.18)]"
-                      : "cursor-not-allowed text-[#5a5c78] opacity-60"
+                      ? "text-[#ffffff] hover:translate-x-0.5 hover:bg-[#0a0a0a]/75 hover:shadow-[inset_0_0_0_1px_rgba(95,227,214,0.18)]"
+                      : "cursor-not-allowed text-[rgba(255,255,255,0.5)] opacity-60"
                   }`}
                 >
                   {item.icon ? (
-                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#101020]/80 text-[#8a8ca0] ring-1 ring-[#34354f]/50">
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#0a0a0a]/80 text-[rgba(255,255,255,0.72)] ">
                       <AppIcon name={item.icon} size={16} />
                     </span>
                   ) : (
-                    <span className="h-8 w-8 shrink-0 rounded-lg bg-[#101020]/40 ring-1 ring-[#34354f]/30" />
+                    <span className="h-8 w-8 shrink-0 rounded-lg bg-[#0a0a0a]/40 ring-1 ring-[#F6AF01]/30" />
                   )}
                   <span className="min-w-0 flex-1 leading-tight">{t(item.tKey)}</span>
                   {enabled ? (
                     <AppIcon
                       name="chevronDown"
                       size={14}
-                      className="shrink-0 -rotate-90 text-[#6b6d8a]"
+                      className="shrink-0 -rotate-90 text-[rgba(255,255,255,0.5)]"
                     />
                   ) : null}
                 </button>
@@ -93,7 +93,7 @@ function DesktopUserSidebar({ open, onClose }) {
             })}
           </nav>
         </div>
-        <div className="relative mx-2 mb-2 h-px bg-[#34354f]/60" />
+        <div className="relative mx-2 mb-2 h-px bg-[#F6AF01]/60" />
         <button
           type="button"
           onClick={handleSignOut}

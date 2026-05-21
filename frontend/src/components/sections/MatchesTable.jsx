@@ -37,8 +37,8 @@ function TableOddButton({ value, selected, onClick }) {
       onClick={onClick}
       className={`flex h-full min-h-[36px] w-full items-center justify-center rounded-xl border text-[14px] font-semibold transition-all duration-200 ${
         selected
-          ? "border-(--sb-accent) bg-(--sb-accent-surface-deep) text-(--sb-accent-text-muted) shadow-[0_0_12px_rgba(56,203,191,0.35)]"
-          : "border-[#2f3f55]/90 bg-[#101020]/55 text-[#e7ecfb] hover:bg-[#131d32] hover:ring-1 hover:ring-[#3d4f6c]/35"
+          ? "border-[#F6AF01] bg-(--sb-accent-surface-deep) text-[#F6AF01] shadow-[0_0_12px_rgba(246,175,1,0.35)]"
+          : "border-transparent bg-(--sb-bg-page) text-[#ffffff] hover:bg-(--sb-bg-card)"
       }`.trim()}
     >
       {value ?? "-"}
@@ -71,8 +71,8 @@ function MatchRow({
       ref={rowRef}
       className={`overflow-hidden rounded-xl transition-all duration-300 ${
         isExpanded
-          ? "bg-[#0c1528]/80 ring-2 ring-(--sb-accent-fill)/40 shadow-[0_8px_28px_-8px_rgba(56,203,191,0.22)]"
-          : "bg-[#0a1122]/88 ring-1 ring-[#3d3f5c]/32 shadow-[0_4px_14px_-6px_rgba(0,0,0,0.35)] hover:ring-[#5fe3d6]/18"
+          ? "bg-(--sb-bg-card-elevated) shadow-[0_8px_28px_-8px_rgba(246,175,1,0.12)]"
+          : "bg-(--sb-bg-page) shadow-[0_4px_14px_-6px_rgba(0,0,0,0.35)] hover:bg-(--sb-bg-card)"
       }`}
     >
       <div
@@ -85,7 +85,7 @@ function MatchRow({
             onToggle();
           }
         }}
-        className="cursor-pointer border-b border-[#2a3754]/45 px-2.5 py-2 md:hidden hover:bg-[#101020]/35"
+        className="cursor-pointer border-b border-white/8 px-2.5 py-2 md:hidden hover:bg-[#0a0a0a]/35"
       >
         <div className="flex items-start gap-2.5">
           <div className="flex min-w-[46px] flex-col text-[10px]">
@@ -99,10 +99,10 @@ function MatchRow({
                   src={match.homeTeamLogo}
                   alt=""
                   size={20}
-                  className="border border-[#1f2a40] bg-[#0a1225]"
+                  className="border border-transparent bg-[#000000]"
                 />
               ) : (
-                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded border border-[#2b3656] bg-[#101a33]">
+                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded border border-transparent bg-[#111111]">
                   <AppIcon name="flag" size={11} className="text-[#6f7895]" />
                 </span>
               )}
@@ -116,10 +116,10 @@ function MatchRow({
                   src={match.awayTeamLogo}
                   alt=""
                   size={20}
-                  className="border border-[#1f2a40] bg-[#0a1225]"
+                  className="border border-transparent bg-[#000000]"
                 />
               ) : (
-                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded border border-[#2b3656] bg-[#101a33]">
+                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded border border-transparent bg-[#111111]">
                   <AppIcon name="flag" size={11} className="text-[#6f7895]" />
                 </span>
               )}
@@ -183,20 +183,20 @@ function MatchRow({
             onToggle();
           }
         }}
-        className={`hidden md:grid ${TABLE_GRID_COLS} min-h-[46px] min-w-[860px] cursor-pointer items-stretch border-b border-[#2a3754]/45 px-2 py-1 hover:bg-[#101020]/35`}
+        className={`hidden md:grid ${TABLE_GRID_COLS} min-h-[46px] min-w-[860px] cursor-pointer items-stretch border-b border-white/8 px-2 py-1 hover:bg-[#0a0a0a]/35`}
       >
-        <div className="flex flex-col justify-center border-r border-[#2a3754]/45 pr-2 text-center text-[10px]">
+        <div className="flex flex-col justify-center border-r border-white/8 pr-2 text-center text-[10px]">
           <span className="font-medium text-[#6f7895]">{datePart}</span>
           <span className="font-bold text-(--sb-positive)">{timePart}</span>
         </div>
-        <div className="flex flex-col justify-center gap-0.5 border-r border-[#2a3754]/45 px-2 py-0.5 text-[14px] font-semibold text-[#f3f4ff]">
+        <div className="flex flex-col justify-center gap-0.5 border-r border-white/8 px-2 py-0.5 text-[14px] font-semibold text-[#f3f4ff]">
           <div className="flex min-h-[22px] items-center gap-2">
             {match.homeTeamLogo ? (
               <LogoImg
                 src={match.homeTeamLogo}
                 alt=""
                 size={18}
-                className="border border-[#1f2a40] bg-[#0a1225]"
+                className="border border-transparent bg-[#000000]"
               />
             ) : null}
             <span className="truncate">{home}</span>
@@ -207,7 +207,7 @@ function MatchRow({
                 src={match.awayTeamLogo}
                 alt=""
                 size={18}
-                className="border border-[#1f2a40] bg-[#0a1225]"
+                className="border border-transparent bg-[#000000]"
               />
             ) : null}
             <span className="truncate">{away}</span>
@@ -263,11 +263,11 @@ function matchHasExpansionCategories(match) {
 function MatchExpansionSkeleton({ onClose }) {
   return (
     <div
-      className="border-t border-[#2f3f5c]/55 bg-gradient-to-b from-[#060d1b]/98 to-[#050a14]/98"
+      className="border-t border-white/6 bg-gradient-to-b from-[#000000]/98 to-[#0a0a0a]/98"
       aria-busy="true"
       aria-label="Loading odds"
     >
-      <div className="flex items-center justify-between border-b border-[#2a3754]/60 px-3 py-2.5">
+      <div className="flex items-center justify-between border-b border-white/8 px-3 py-2.5">
         <div className="flex min-w-0 flex-1 items-center gap-2">
           <div className="h-5 w-24 shrink-0 animate-pulse rounded bg-[#1a243c]" />
           <div className="h-4 w-40 max-w-[50%] animate-pulse rounded bg-[#1a243c]" />
@@ -275,13 +275,13 @@ function MatchExpansionSkeleton({ onClose }) {
         <button
           type="button"
           onClick={onClose}
-          className="flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-xl border border-[#3d4f6c]/50 bg-[#101a2e]/80 text-[#b6bfd8] transition-all duration-200 hover:bg-[#1a2440] hover:ring-1 hover:ring-(--sb-accent-fill)/25"
+          className="flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-xl bg-[#0a0a0a]/80 text-[rgba(255,255,255,0.72)] transition-all duration-200 hover:bg-[#111111]"
         >
           <AppIcon name="x" size={14} />
         </button>
       </div>
 
-      <div className="border-b border-[#2a3754]/50 bg-[#081128]/92 px-3 py-3">
+      <div className="border-b border-white/8 bg-[#000000]/92 px-3 py-3">
         <div className="mx-auto mb-2 h-3 w-24 animate-pulse rounded bg-[#1a243c]" />
         <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
           <div className="flex flex-col items-center gap-2">
@@ -296,7 +296,7 @@ function MatchExpansionSkeleton({ onClose }) {
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-1 border-b border-[#2a3754]/55 px-3 py-2">
+      <div className="flex flex-wrap gap-1 border-b border-white/8 px-3 py-2">
         {[1, 2, 3, 4].map((i) => (
           <div
             key={i}
@@ -309,9 +309,9 @@ function MatchExpansionSkeleton({ onClose }) {
         {[1, 2, 3].map((block) => (
           <div
             key={block}
-            className="overflow-hidden rounded-xl ring-1 ring-[#34354f]/40 bg-[#101020]/35"
+            className="overflow-hidden rounded-xl bg-[#0a0a0a]/35"
           >
-            <div className="border-b border-[#2a3754]/50 px-3 py-2">
+            <div className="border-b border-white/8 px-3 py-2">
               <div className="h-3 w-28 animate-pulse rounded bg-[#1a243c]" />
             </div>
             <div className="grid grid-cols-2 gap-1.5 p-2 sm:grid-cols-3 lg:grid-cols-4">
@@ -332,15 +332,15 @@ function MatchExpansionSkeleton({ onClose }) {
 function MatchExpansionEmpty({ match, onClose }) {
   const { datePart, timePart } = parseDate(match.date);
   return (
-    <div className="border-t border-[#2f3f5c]/55 bg-gradient-to-b from-[#060d1b]/98 to-[#050a14]/98">
-      <div className="flex items-center justify-between border-b border-[#2a3754]/60 px-3 py-2.5">
+    <div className="border-t border-white/6 bg-gradient-to-b from-[#000000]/98 to-[#0a0a0a]/98">
+      <div className="flex items-center justify-between border-b border-white/8 px-3 py-2.5">
         <span className="text-[11px] font-semibold text-[#7f89a4]">
           {datePart} {timePart}
         </span>
         <button
           type="button"
           onClick={onClose}
-          className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-xl border border-[#3d4f6c]/50 bg-[#101a2e]/80 text-[#b6bfd8] transition-all duration-200 hover:bg-[#1a2440] hover:ring-1 hover:ring-(--sb-accent-fill)/25"
+          className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-xl bg-[#0a0a0a]/80 text-[rgba(255,255,255,0.72)] transition-all duration-200 hover:bg-[#111111]"
         >
           <AppIcon name="x" size={14} />
         </button>
@@ -380,8 +380,8 @@ function MatchExpansion({ match, onClose, onOddsClick, selectedOdds }) {
   }
 
   return (
-    <div className="border-t border-[#2f3f5c]/55 bg-gradient-to-b from-[#060d1b]/98 to-[#050a14]/98">
-      <div className="flex items-center justify-between border-b border-[#2a3754]/60 px-3 py-2.5">
+    <div className="border-t border-white/6 bg-gradient-to-b from-[#000000]/98 to-[#0a0a0a]/98">
+      <div className="flex items-center justify-between border-b border-white/8 px-3 py-2.5">
         <div className="flex min-w-0 items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-[#7f89a4]">
           {match.countryFlag ? (
             <LogoImg
@@ -389,7 +389,7 @@ function MatchExpansion({ match, onClose, onOddsClick, selectedOdds }) {
               alt=""
               size={18}
               rounded="rounded-[2px]"
-              className="border border-[#1f2a40]"
+              className="border border-transparent"
             />
           ) : null}
           {match.leagueLogo ? (
@@ -397,7 +397,7 @@ function MatchExpansion({ match, onClose, onOddsClick, selectedOdds }) {
               src={match.leagueLogo}
               alt=""
               size={20}
-              className="border border-[#1f2a40] bg-[#0a1225]"
+              className="border border-transparent bg-[#000000]"
             />
           ) : null}
           <span className="truncate">{formatLeagueLabel(match.league)}</span>
@@ -405,19 +405,19 @@ function MatchExpansion({ match, onClose, onOddsClick, selectedOdds }) {
         <button
           type="button"
           onClick={onClose}
-          className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-xl border border-[#3d4f6c]/50 bg-[#101a2e]/80 text-[#b6bfd8] transition-all duration-200 hover:bg-[#1a2440] hover:ring-1 hover:ring-(--sb-accent-fill)/25"
+          className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-xl bg-[#0a0a0a]/80 text-[rgba(255,255,255,0.72)] transition-all duration-200 hover:bg-[#111111]"
         >
           <AppIcon name="x" size={14} />
         </button>
       </div>
 
-      <div className="border-b border-[#2a3754]/50 bg-[#081128]/92 px-3 py-3">
+      <div className="border-b border-white/8 bg-[#000000]/92 px-3 py-3">
         <div className="mb-1 text-center text-[11px] font-semibold text-[#7f89a4]">
           {datePart} {timePart}
         </div>
         <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
           <div className="flex flex-col items-center gap-1 text-center">
-            <div className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full border border-[#2b3656] bg-[#101a33]">
+            <div className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full border border-transparent bg-[#111111]">
               {match.homeTeamLogo ? (
                 <LogoImg
                   src={match.homeTeamLogo}
@@ -436,7 +436,7 @@ function MatchExpansion({ match, onClose, onOddsClick, selectedOdds }) {
             VS
           </div>
           <div className="flex flex-col items-center gap-1 text-center">
-            <div className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full border border-[#2b3656] bg-[#101a33]">
+            <div className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full border border-transparent bg-[#111111]">
               {match.awayTeamLogo ? (
                 <LogoImg
                   src={match.awayTeamLogo}
@@ -454,7 +454,7 @@ function MatchExpansion({ match, onClose, onOddsClick, selectedOdds }) {
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-1 border-b border-[#2a3754]/55 px-3 py-2">
+      <div className="flex flex-wrap gap-1 border-b border-white/8 px-3 py-2">
         {MARKET_FILTER_CHIPS.map((chip) => (
           <button
             key={chip.id}
@@ -462,8 +462,8 @@ function MatchExpansion({ match, onClose, onOddsClick, selectedOdds }) {
             onClick={() => setActiveChipId(chip.id)}
             className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-all duration-200 ${
               chip.id === activeChipId
-                ? "border-(--sb-accent) bg-(--sb-accent-surface) text-(--sb-accent-text-soft) shadow-[0_4px_12px_-4px_rgba(79,220,204,0.25)]"
-                : "border-[#3d4f6c]/45 bg-[#101020]/55 text-[#9ea6c2] hover:border-[#5fe3d6]/22"
+                ? "border-(--sb-accent) bg-(--sb-accent-surface) text-(--sb-accent-text-soft) shadow-[0_4px_12px_-4px_rgba(246,175,1,0.25)]"
+                : "border-transparent bg-[#0a0a0a]/55 text-[rgba(255,255,255,0.72)] hover:bg-[#111111]"
             }`}
           >
             {chip.label}
@@ -473,7 +473,7 @@ function MatchExpansion({ match, onClose, onOddsClick, selectedOdds }) {
 
       <div className="space-y-2 p-2.5">
         {showFilteredEmpty ? (
-          <p className="rounded-xl bg-[#101020]/45 px-3 py-8 text-center text-xs text-[#7f89a4] ring-1 ring-[#34354f]/40">
+          <p className="rounded-xl bg-[#0a0a0a]/45 px-3 py-8 text-center text-xs text-[#7f89a4]">
             No markets in this category for this match.
           </p>
         ) : null}
@@ -570,17 +570,17 @@ function MatchesTable({
           return (
             <section
               key={league}
-              className="overflow-hidden rounded-xl ring-1 ring-[#3d3f5c]/38"
+              className="overflow-hidden rounded-xl"
             >
-              <header className="border-b border-[#2a3754]/50 bg-[#101a2e]/40">
-                <div className="flex items-center gap-2 border-b border-[#2a3754]/40 px-2.5 py-2 text-sm font-semibold text-[#d9dded]">
+              <header className="border-b border-white/8 bg-[#0a0a0a]/40">
+                <div className="flex items-center gap-2 border-b border-white/8 px-2.5 py-2 text-sm font-semibold text-[#d9dded]">
                   {head?.countryFlag ? (
                     <LogoImg
                       src={head.countryFlag}
                       alt=""
                       size={18}
                       rounded="rounded-[2px]"
-                      className="border border-[#1f2a40]"
+                      className="border border-transparent"
                     />
                   ) : null}
                   {head?.leagueLogo ? (
@@ -588,7 +588,7 @@ function MatchesTable({
                       src={head.leagueLogo}
                       alt=""
                       size={20}
-                      className="border border-[#1f2a40] bg-[#0a1225]"
+                      className="border border-transparent bg-[#000000]"
                     />
                   ) : (
                     <AppIcon
