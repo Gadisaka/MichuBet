@@ -6,7 +6,7 @@ import Modal from "../../components/ui/Modal";
 import TicketTemplate from "../../components/ticket/TicketTemplate";
 import { useTicketPrint } from "../../components/ticket/useTicketPrint";
 import { encodeTicketAsync } from "../../components/ticket/escpos";
-import { printViaWebUSB } from "../../components/ticket/WebUSBPrinter";
+import { print as printViaLocalService } from "../../services/localPrinter";
 import { useAuth } from "../../context/AuthContext";
 import { API_URL } from "../../../constants.js";
 import {
@@ -43,17 +43,6 @@ const RIGHT_TABS = [
 ];
 
 const PRINTED_STORAGE_KEY = "cashier:printedTicketIds";
-const ZADIG_STEPS = [
-  "1) Download Zadig (single .exe, no install needed).",
-  "2) Plug in the printer.",
-  "3) Run Zadig as Administrator.",
-  '4) Options -> check "List All Devices".',
-  '5) Pick your printer in the dropdown (manufacturer name or "USB Printing Support").',
-  "6) In the driver target box, pick WinUSB.",
-  "7) Click Replace Driver (or Install Driver).",
-  "8) Wait about 30 seconds for Windows to switch the driver binding.",
-  "9) Refresh cashier page, Pair USB Printer again, then Test Print.",
-];
 
 function toNumber(value) {
   const parsed = Number(value);
@@ -84,12 +73,6 @@ function readPrintedCache() {
 
 function writePrintedCache(setValue) {
   localStorage.setItem(PRINTED_STORAGE_KEY, JSON.stringify([...setValue]));
-}
-
-function isUsbAccessDeniedError(message) {
-  return /access denied|permission denied|securityerror/i.test(
-    String(message || ""),
-  );
 }
 
 function TicketDetail({ ticket, platformWinningsTax = null }) {
@@ -408,10 +391,8 @@ export default function CashierTicketsPage() {
     barcodeDataUrl,
     downloadPdf,
     pdfBusy,
-    webUSBSupported,
-    printerInfo,
-    pairPrinter,
-    unpairPrinter,
+    printerStatus,
+    refreshPrinterStatus,
     testPrint,
     lastError: printError,
   } = useTicketPrint(ticketForPrint, {
@@ -451,8 +432,12 @@ export default function CashierTicketsPage() {
     executeCashoutMutation.isPending ||
     confirmPrint.isPending ||
     updateStake.isPending;
-  const showZadigGuide =
-    isUsbAccessDeniedError(sellError) || isUsbAccessDeniedError(printError);
+  const printerConnected = Boolean(printerStatus?.connected);
+  const printerPort = printerStatus?.port || "";
+  const printerQueueLength = Number(printerStatus?.queueLength) || 0;
+  const printerProcessing = Boolean(printerStatus?.processing);
+  const printerLastError = printerStatus?.lastError || "";
+  const printerQueueActive = printerProcessing || printerQueueLength > 0;
 
   const setPrintedTicket = (ticketId) => {
     setPrintedCache((prev) => {
@@ -615,19 +600,10 @@ export default function CashierTicketsPage() {
         ? "Ticket already printed before; wallet was not deducted again."
         : `Wallet deducted by ${formatCurrency(confirmResult.deductedAmount)}.`;
 
-      if (!webUSBSupported) {
+      if (!printerConnected) {
         setActionSuccess("");
         setSellError(
-          `${walletMessage} WebUSB is not supported in this browser. Use Chrome or Edge.`,
-        );
-        setTicketPreviewOpen(false);
-        return;
-      }
-
-      if (!printerInfo) {
-        setActionSuccess("");
-        setSellError(
-          `${walletMessage} No USB printer paired. Click "Pair USB Printer" first.`,
+          `${walletMessage} Printer offline. Ensure local print service is running and POS80 printer is connected.`,
         );
         setTicketPreviewOpen(false);
         return;
@@ -637,29 +613,37 @@ export default function CashierTicketsPage() {
         width: "80mm",
         platformWinningsTax,
       });
-      const usbResult = await printViaWebUSB(escposData, {
-        allowPrompt: false,
-      });
-      if (usbResult.success) {
+      const localPrintResult = await printViaLocalService(escposData);
+      if (localPrintResult.success) {
         setTicketPreviewOpen(false);
-        setActionSuccess(`${walletMessage} Ticket sent to USB printer.`);
+        setActionSuccess(`${walletMessage} Ticket sent to printer.`);
         return;
       }
 
-      const usbError = String(
-        usbResult.error?.message || "Failed to send ticket to USB printer.",
+      const localError = String(
+        localPrintResult.error?.message ||
+          "Failed to send ticket to local printer service.",
       );
-      if (isUsbAccessDeniedError(usbError)) {
+      if (localPrintResult.code === "service_unreachable") {
         setActionSuccess("");
         setSellError(
-          `${walletMessage} USB access denied. Follow the Zadig WinUSB steps below, then pair and test again.`,
+          `${walletMessage} Local print service unreachable. Start PrinterBridge.exe on this PC.`,
+        );
+        setTicketPreviewOpen(false);
+        return;
+      }
+
+      if (localPrintResult.code === "com_unavailable") {
+        setActionSuccess("");
+        setSellError(
+          `${walletMessage} COM port unavailable. Check POS80 driver and printer connection.`,
         );
         setTicketPreviewOpen(false);
         return;
       }
 
       setActionSuccess("");
-      setSellError(`${walletMessage} ${usbError}`);
+      setSellError(`${walletMessage} ${localError}`);
       setTicketPreviewOpen(false);
     } catch (error) {
       setSellError(error?.message || "Failed to print ticket");
@@ -757,16 +741,10 @@ export default function CashierTicketsPage() {
     try {
       const detail = await loadTicketById.mutateAsync(ticket.id);
 
-      if (!webUSBSupported) {
+      if (!printerConnected) {
         setSellError(
-          "WebUSB is not supported in this browser. Use Chrome or Edge.",
+          "Printer offline. Ensure local print service is running and POS80 printer is connected.",
         );
-        setActionSuccess("");
-        return;
-      }
-
-      if (!printerInfo) {
-        setSellError('No USB printer paired. Click "Pair USB Printer" first.');
         setActionSuccess("");
         return;
       }
@@ -775,24 +753,27 @@ export default function CashierTicketsPage() {
         width: "80mm",
         platformWinningsTax,
       });
-      const usbResult = await printViaWebUSB(escposData, {
-        allowPrompt: false,
-      });
-      if (usbResult.success) {
+      const localPrintResult = await printViaLocalService(escposData);
+      if (localPrintResult.success) {
         setActionSuccess("Ticket reprinted.");
         window.setTimeout(() => setActionSuccess(""), 2500);
         return;
       }
 
-      const usbError = String(
-        usbResult.error?.message || "Failed to send ticket to USB printer.",
+      const localError = String(
+        localPrintResult.error?.message ||
+          "Failed to send ticket to local printer service.",
       );
-      if (isUsbAccessDeniedError(usbError)) {
+      if (localPrintResult.code === "service_unreachable") {
         setSellError(
-          "USB access denied. Follow the Zadig WinUSB steps below, then pair and test again.",
+          "Local print service unreachable. Start PrinterBridge.exe on this PC.",
+        );
+      } else if (localPrintResult.code === "com_unavailable") {
+        setSellError(
+          "COM port unavailable. Check POS80 driver and printer connection.",
         );
       } else {
-        setSellError(usbError);
+        setSellError(localError);
       }
       setTicketPreviewOpen(false);
       setActionSuccess("");
@@ -852,59 +833,58 @@ export default function CashierTicketsPage() {
         </p>
       </PanelCard>
 
-      {webUSBSupported && (
-        <div className="mb-4 flex flex-wrap items-center gap-3 rounded-sm border border-[var(--border)] bg-[var(--surfaceMuted)] px-3 py-2 text-sm">
-          <span className="font-semibold text-[var(--muted)]">Printer:</span>
-          {printerInfo ? (
-            <>
-              <span className="flex items-center gap-1.5">
-                <span className="inline-block h-2 w-2 rounded-full bg-green-500" />
-                {printerInfo.productName || "USB Printer"}
+      <div className="mb-4 flex flex-wrap items-center gap-3 rounded-sm border border-[var(--border)] bg-[var(--surfaceMuted)] px-3 py-2 text-sm">
+        <span className="font-semibold text-[var(--muted)]">Printer:</span>
+        {printerConnected ? (
+          <>
+            <span className="flex items-center gap-1.5">
+              <span className="inline-block h-2 w-2 rounded-full bg-green-500" />
+              Printer Connected
+              {printerPort ? (
+                <span className="text-xs text-[var(--muted)]">({printerPort})</span>
+              ) : null}
+            </span>
+            {printerQueueActive ? (
+              <span className="text-xs text-[var(--muted)]">
+                Printing…
+                {printerQueueLength > 0
+                  ? ` (${printerQueueLength} queued)`
+                  : ""}
               </span>
-              <button
-                type="button"
-                onClick={() => void testPrint()}
-                className="rounded-sm border border-[var(--border)] px-2 py-1 text-xs font-semibold hover:bg-[var(--surface)]"
-              >
-                Test Print
-              </button>
-              <button
-                type="button"
-                onClick={() => void unpairPrinter()}
-                className="rounded-sm border border-[var(--border)] px-2 py-1 text-xs text-[var(--muted)] hover:bg-[var(--surface)]"
-              >
-                Unpair
-              </button>
-            </>
-          ) : (
-            <>
-              <span className="text-[var(--muted)]">No printer paired</span>
-              <button
-                type="button"
-                onClick={() => void pairPrinter()}
-                className="rounded-sm bg-[var(--accent)] px-2 py-1 text-xs font-semibold text-white"
-              >
-                Pair USB Printer
-              </button>
-            </>
-          )}
-          {printError && (
-            <span className="text-xs text-[var(--danger)]">{printError}</span>
-          )}
-        </div>
-      )}
-      {showZadigGuide && (
-        <PanelCard className="mb-4 border border-amber-300/40 bg-amber-500/10 px-4 py-3">
-          <p className="text-sm font-semibold text-amber-900">
-            USB access denied. Switch printer driver to WinUSB using Zadig:
-          </p>
-          <ul className="mt-2 list-disc space-y-1 pl-5 text-xs text-amber-950">
-            {ZADIG_STEPS.map((step) => (
-              <li key={step}>{step}</li>
-            ))}
-          </ul>
-        </PanelCard>
-      )}
+            ) : null}
+            <button
+              type="button"
+              onClick={() => void testPrint()}
+              className="rounded-sm border border-[var(--border)] px-2 py-1 text-xs font-semibold hover:bg-[var(--surface)]"
+            >
+              Test Print
+            </button>
+          </>
+        ) : (
+          <>
+            <span className="flex items-center gap-1.5 text-[var(--muted)]">
+              <span className="inline-block h-2 w-2 rounded-full bg-red-500" />
+              Printer Offline
+              {printerPort ? (
+                <span className="text-xs">({printerPort})</span>
+              ) : null}
+            </span>
+            {printerLastError ? (
+              <span className="text-xs text-[var(--muted)]">{printerLastError}</span>
+            ) : null}
+          </>
+        )}
+        <button
+          type="button"
+          onClick={() => void refreshPrinterStatus()}
+          className="rounded-sm border border-[var(--border)] px-2 py-1 text-xs text-[var(--muted)] hover:bg-[var(--surface)]"
+        >
+          Refresh
+        </button>
+        {printError && (
+          <span className="text-xs text-[var(--danger)]">{printError}</span>
+        )}
+      </div>
 
       {actionSuccess && (
         <div className="mb-4 rounded-sm border border-green-500/30 bg-green-500/10 px-3 py-2 text-sm text-green-700">

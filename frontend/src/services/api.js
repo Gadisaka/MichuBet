@@ -1,3 +1,8 @@
+import {
+  clearAuthSession,
+  isPlayerUser,
+} from "../utils/authSession.js";
+
 /**
  * Base URL for the API host only (no trailing slash, no `/api` suffix).
  * `VITE_API_URL` may be `http://host:port` or `http://host:port/api` — we normalize
@@ -60,6 +65,10 @@ export async function fetchProfile() {
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
     throw new Error(data.message || data.error || "Failed to load profile");
+  }
+  if (!isPlayerUser(data)) {
+    clearAuthSession();
+    throw new Error("NOT_LOGGED_IN");
   }
   return data;
 }

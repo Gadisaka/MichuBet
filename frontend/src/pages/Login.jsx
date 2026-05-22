@@ -13,6 +13,10 @@ import {
 } from "../components/common/accountFormClasses";
 import { topHeaderData, topNavItems } from "../data/homepageData";
 import { getApiOrigin } from "../services/api";
+import {
+  isPlayerUser,
+  saveAuthSession,
+} from "../utils/authSession";
 
 function Login() {
   const navigate = useNavigate();
@@ -49,9 +53,12 @@ function Login() {
         return;
       }
 
-      const storage = remember ? localStorage : sessionStorage;
-      storage.setItem("token", token);
-      storage.setItem("user", JSON.stringify(data.user));
+      if (!isPlayerUser(data.user)) {
+        setError("Only player accounts can sign in here.");
+        return;
+      }
+
+      saveAuthSession({ token, user: data.user, remember });
       navigate("/");
     } catch {
       setError("Network error. Please try again.");

@@ -1,4 +1,6 @@
+import { useEffect } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
+import { enforcePlayerSession } from './utils/authSession'
 import Home from './pages/Home'
 import Live from './pages/Live'
 import Login from './pages/Login'
@@ -13,6 +15,10 @@ import InfoArticlePage from './pages/InfoArticlePage'
 import { LanguageProvider } from './i18n/LanguageContext.jsx'
 
 function App() {
+  useEffect(() => {
+    enforcePlayerSession()
+  }, [])
+
   return (
     <LanguageProvider>
     <Routes>

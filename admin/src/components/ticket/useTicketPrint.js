@@ -6,12 +6,11 @@ import {
   renderBarcodeToDataURL,
 } from "./ticketBarcode";
 import {
-  isWebUSBSupported,
-  printViaWebUSB,
-  requestPrinter,
-  getPrinterInfo,
-  forgetPrinter,
-} from "./WebUSBPrinter";
+  checkBridgeCompatibility,
+  getStatus as getLocalPrinterStatus,
+  print as printViaLocalService,
+  STATUS_POLL_MS,
+} from "../../services/localPrinter";
 
 /**
  * Orchestrates the cashier print flow:
@@ -20,23 +19,57 @@ import {
  *      <TicketTemplate> under the logo.
  *   2. Returns a `ticketRef` to attach to the off-screen <TicketTemplate>.
  *   3. Exposes `print()` which:
- *        a. tries WebUSB direct printing (silent, no dialog),
+ *        a. tries local print bridge direct printing (silent, no dialog),
  *        b. returns reason codes for UI handling when it cannot print.
  *   4. Exposes `downloadPdf()` for manual backup export.
- *   5. Exposes `pairPrinter()` to let cashiers select their USB printer once.
+ *   5. Exposes printer status and test print helpers.
  *
- * Print priority: WebUSB only (silent).
+ * Print priority: local bridge only (silent).
  */
 export function useTicketPrint(
   ticket,
-  { width = "80mm", preferWebUSB = true, platformWinningsTax = null } = {},
+  { width = "80mm", preferLocalService = true, platformWinningsTax = null } = {},
 ) {
   const ticketRef = useRef(null);
   const [barcodeDataUrl, setBarcodeDataUrl] = useState("");
   const [pdfBusy, setPdfBusy] = useState(false);
   const [lastError, setLastError] = useState("");
-  const [printerInfo, setPrinterInfo] = useState(null);
-  const [webUSBSupported] = useState(() => isWebUSBSupported());
+  const [printerStatus, setPrinterStatus] = useState({
+    connected: false,
+    port: "",
+    message: "",
+    queueLength: 0,
+    processing: false,
+    lastError: null,
+    reconnectAttempts: 0,
+    lastSuccessfulPrintAt: null,
+  });
+
+  const applyStatus = useCallback((status) => {
+    if (status.success) {
+      setPrinterStatus({
+        connected: status.connected,
+        port: status.port || "",
+        message: status.message || "",
+        queueLength: status.queueLength ?? 0,
+        processing: Boolean(status.processing),
+        lastError: status.lastError || null,
+        reconnectAttempts: status.reconnectAttempts ?? 0,
+        lastSuccessfulPrintAt: status.lastSuccessfulPrintAt || null,
+      });
+      return;
+    }
+    setPrinterStatus((prev) => ({
+      connected: false,
+      port: "",
+      message: status.message || "",
+      queueLength: 0,
+      processing: false,
+      lastError: status.code === "service_unreachable" ? null : prev.lastError,
+      reconnectAttempts: 0,
+      lastSuccessfulPrintAt: prev.lastSuccessfulPrintAt,
+    }));
+  }, []);
 
   const barcodePayload = getBarcodePayload(ticket);
 
@@ -55,11 +88,49 @@ export function useTicketPrint(
     };
   }, [barcodePayload]);
 
+  const refreshPrinterStatus = useCallback(async () => {
+    const status = await getLocalPrinterStatus();
+    applyStatus(status);
+    return status;
+  }, [applyStatus]);
+
   useEffect(() => {
-    if (webUSBSupported) {
-      getPrinterInfo().then(setPrinterInfo).catch(() => setPrinterInfo(null));
-    }
-  }, [webUSBSupported]);
+    let active = true;
+
+    void (async () => {
+      const compatibility = await checkBridgeCompatibility();
+      if (!active) return;
+      if (compatibility.warning) {
+        setPrinterStatus((prev) => ({
+          ...prev,
+          message: compatibility.warning,
+        }));
+      }
+    })();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    let timer = null;
+
+    const run = async () => {
+      const status = await getLocalPrinterStatus();
+      if (!active) return;
+      applyStatus(status);
+      timer = window.setTimeout(run, STATUS_POLL_MS);
+    };
+
+    void run();
+
+    return () => {
+      active = false;
+      if (timer) window.clearTimeout(timer);
+    };
+  }, [applyStatus]);
 
   const downloadPdf = useCallback(async () => {
     if (!ticketRef.current) {
@@ -87,76 +158,85 @@ export function useTicketPrint(
     if (!ticket) return { printed: false, method: "none", fellBackToPdf: false };
     setLastError("");
 
-    if (preferWebUSB && webUSBSupported) {
+    if (preferLocalService) {
       try {
         const escposData = await encodeTicketAsync(ticket, {
           width,
           platformWinningsTax,
         });
-        const result = await printViaWebUSB(escposData, { allowPrompt: false });
+        const result = await printViaLocalService(escposData);
 
         if (result.success) {
-          return { printed: true, method: "webusb", reason: "success" };
+          return { printed: true, method: "local_service", reason: "success" };
         }
 
-        if (result.error?.message === "No printer selected") {
-          setLastError("No USB printer paired. Click \"Pair USB Printer\" first.");
-          return { printed: false, method: "webusb", reason: "no_printer_selected" };
+        if (result.code === "service_unreachable") {
+          setLastError(
+            "Local print service unreachable. Start PrinterBridge.exe on this PC.",
+          );
+          return {
+            printed: false,
+            method: "local_service",
+            reason: "service_unreachable",
+          };
+        }
+
+        if (result.code === "unauthorized") {
+          setLastError(
+            "Printer bridge auth failed. Ensure PrinterBridge.exe and cashier app use the same API key.",
+          );
+          return {
+            printed: false,
+            method: "local_service",
+            reason: "unauthorized",
+          };
+        }
+
+        if (result.code === "com_unavailable") {
+          setLastError("COM port unavailable. Check POS80 driver and PRINTER_COM.");
+          return {
+            printed: false,
+            method: "local_service",
+            reason: "com_unavailable",
+          };
+        }
+
+        if (result.code === "write_timeout") {
+          setLastError("Print timed out. Check printer connection and try again.");
+          return {
+            printed: false,
+            method: "local_service",
+            reason: "write_timeout",
+          };
         }
 
         const errorMessage = String(result.error?.message || "");
-        if (/access denied/i.test(errorMessage)) {
-          setLastError(errorMessage);
-          return { printed: false, method: "webusb", reason: "access_denied" };
+        if (/printer disconnected|offline/i.test(errorMessage)) {
+          setLastError("Printer disconnected. Check POS80 connection and COM port.");
+          return {
+            printed: false,
+            method: "local_service",
+            reason: "printer_disconnected",
+          };
         }
 
-        setLastError(errorMessage || "USB printing failed");
-        return { printed: false, method: "webusb", reason: "other_error" };
+        setLastError(errorMessage || "Local printing failed");
+        return { printed: false, method: "local_service", reason: "other_error" };
       } catch (error) {
-        setLastError(error?.message || "Failed to prepare USB print data");
-        return { printed: false, method: "webusb", reason: "other_error" };
+        setLastError(error?.message || "Failed to prepare print data");
+        return { printed: false, method: "local_service", reason: "other_error" };
       }
     }
 
-    setLastError("WebUSB is not supported in this browser. Use Chrome or Edge.");
-    return { printed: false, method: "none", reason: "webusb_unsupported" };
-  }, [ticket, width, preferWebUSB, webUSBSupported, platformWinningsTax]);
+    setLastError("Local printer service is disabled.");
+    return { printed: false, method: "none", reason: "local_service_disabled" };
+  }, [ticket, width, preferLocalService, platformWinningsTax]);
 
   const retryPrint = useCallback(async () => {
     return print();
   }, [print]);
 
-  const pairPrinter = useCallback(async () => {
-    if (!webUSBSupported) {
-      setLastError("WebUSB is not supported in this browser. Use Chrome or Edge.");
-      return false;
-    }
-    try {
-      const device = await requestPrinter();
-      if (device) {
-        const info = await getPrinterInfo();
-        setPrinterInfo(info);
-        setLastError("");
-        return true;
-      }
-      return false;
-    } catch (error) {
-      setLastError(error?.message || "Failed to pair printer");
-      return false;
-    }
-  }, [webUSBSupported]);
-
-  const unpairPrinter = useCallback(async () => {
-    await forgetPrinter();
-    setPrinterInfo(null);
-  }, []);
-
   const testPrint = useCallback(async () => {
-    if (!webUSBSupported) {
-      setLastError("WebUSB is not supported");
-      return false;
-    }
-
     const testData = await encodeTicketAsync(
       {
         couponNumber: "ab000000",
@@ -182,13 +262,13 @@ export function useTicketPrint(
       { width, platformWinningsTax: null },
     );
 
-    const result = await printViaWebUSB(testData, { allowPrompt: true });
+    const result = await printViaLocalService(testData);
     if (!result.success) {
-      setLastError(result.error?.message || "Test print failed");
+      setLastError(result.error?.message || "Test print failed. Check printer service.");
       return false;
     }
     return true;
-  }, [webUSBSupported, width]);
+  }, [width]);
 
   return {
     ticketRef,
@@ -198,10 +278,8 @@ export function useTicketPrint(
     downloadPdf,
     pdfBusy,
     lastError,
-    webUSBSupported,
-    printerInfo,
-    pairPrinter,
-    unpairPrinter,
+    printerStatus,
+    refreshPrinterStatus,
     testPrint,
   };
 }

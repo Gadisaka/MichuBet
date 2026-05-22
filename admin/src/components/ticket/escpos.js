@@ -162,7 +162,7 @@ function formatKickoff(value) {
  * RGBA ImageData -> GS v 0 raster bit image (1-bit threshold).
  *
  * Many thermal printers are more reliable with GS v 0 raster mode than ESC *
- * row mode when receiving bytes over WebUSB.
+ * row mode when receiving bytes over serial/COM transport.
  */
 function imageDataToGsV0(imageData, w, h) {
   const data = imageData;
@@ -429,7 +429,7 @@ export function encodeTicket(ticket, opts = {}) {
 }
 
 /**
- * Encode a ticket with proportional raster logo (WebUSB / browser).
+ * Encode a ticket with proportional raster logo (browser canvas rasterization).
  *
  * @param {Object} ticket
  * @param {Object} [opts]
