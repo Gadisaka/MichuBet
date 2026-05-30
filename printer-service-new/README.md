@@ -1,6 +1,8 @@
-# MichuBet Printer Service / PrinterBridge
+# Michotbet Printer Service / PrinterBridge
 
-Local Node print bridge for cashier thermal receipts. Receives pre-encoded ESC/POS bytes from the admin cashier UI and writes them sequentially to a POS80 printer via the official Windows driver (COM port).
+Local Node print bridge for cashier thermal receipts. Receives pre-encoded ESC/POS bytes from the admin cashier UI (`https://admin.michot.bet`) and writes them to the **POS80** Windows print queue via RAW spooler (PowerShell `WritePrinter` fallback).
+
+Ticket APIs are served by **`https://api.michot.bet`** — the bridge only handles localhost printing; it does not proxy API traffic.
 
 **Production deployment:** cashiers install via **`Install-PrinterBridge.bat`** in the build `dist/` folder — see [install/INSTALL.md](install/INSTALL.md).
 
@@ -8,12 +10,12 @@ Local Node print bridge for cashier thermal receipts. Receives pre-encoded ESC/P
 
 1. Install POS80 driver: `POS80Setup_20200118.exe`
 2. Connect the thermal printer via USB
-3. Note the assigned COM port in Windows Device Manager (e.g. `COM3`)
+3. Verify the Windows queue name is exactly **POS80** (Settings → Printers)
 
 ## Developer setup
 
 ```bash
-cd printer-service
+cd printer-service-new
 npm install
 npm start
 ```
@@ -39,29 +41,27 @@ Settings are stored in `config.json` beside the exe (or source folder in dev):
 
 ```json
 {
-  "comPort": "COM3",
+  "comPort": "",
   "baudRate": 115200,
-  "printerName": "Shop Counter",
-  "apiKey": "michubet-local-print-v1"
+  "printerName": "POS80",
+  "apiKey": "michotbet-local-print-v1"
 }
 ```
 
-**Precedence:** `config.json` → env overrides (`PRINTER_COM`, `BAUD_RATE`, `PRINTER_API_KEY`) → auto-detect when `comPort` is empty.
+**Precedence:** `config.json` → env overrides (`PRINTER_NAME`, `PRINTER_API_KEY`) → strict match on `printerName` (no silent fallback to another queue).
 
 Update at runtime via authenticated `POST /config`:
 
 ```json
 {
-  "comPort": "COM3",
-  "baudRate": 115200,
-  "printerName": "Shop Counter"
+  "printerName": "POS80"
 }
 ```
 
 ## Security
 
 - Binds to **127.0.0.1 only** — never exposed on LAN
-- All routes except `/health` and `/version` require header: `X-Printer-Key: michubet-local-print-v1`
+- All routes except `/health` and `/version` require header: `X-Printer-Key: michotbet-local-print-v1`
 - CORS allows localhost and `https://admin.michot.bet` (override via `CASHIER_ORIGINS` env)
 
 ## API
@@ -90,7 +90,7 @@ Update at runtime via authenticated `POST /config`:
 {
   "success": true,
   "connected": true,
-  "port": "COM3",
+  "port": "POS80",
   "message": "Printer ready",
   "queueLength": 0,
   "processing": false,
@@ -102,39 +102,40 @@ Update at runtime via authenticated `POST /config`:
 
 ### `GET /printers` (auth required)
 
-Lists available COM ports with metadata.
+Lists Windows print queues.
 
 ### `POST /print` (auth required)
 
 Body: `{ "data": "<base64 ESC/POS bytes>" }`
 
-Success: `{ "success": true, "port": "COM3", "jobId": "uuid" }`
+Success: `{ "success": true, "port": "POS80", "jobId": "uuid" }`
 
 ### Auth header
 
 ```
-X-Printer-Key: michubet-local-print-v1
+X-Printer-Key: michotbet-local-print-v1
 ```
 
 ## Cashier UI
 
-The admin app posts to `http://localhost:3005` with the API key header. Production build env:
+The admin app at **https://admin.michot.bet** posts to `http://localhost:3005` (auto-probes 3005–3010) with the API key header. Production build env:
 
 ```
-VITE_PRINT_SERVICE_URL=http://localhost:3005
-VITE_PRINTER_API_KEY=michubet-local-print-v1
+VITE_PRINTER_API_KEY=michotbet-local-print-v1
+# optional: VITE_PRINT_SERVICE_URL=http://localhost:3005
 ```
 
 The cashier page polls `/status` every 7 seconds.
 
 ## Features
 
-- FIFO print queue (one COM write at a time)
+- FIFO print queue (one spooler write at a time)
 - Auto-reconnect every 5s after disconnect
 - Write timeout protection (60s default)
+- Port fallback 3005–3010 on bridge and client
 - Structured JSON logs
 - Protocol version handshake via `/version`
 
 ## Production startup
 
-See [install/INSTALL.md](install/INSTALL.md) for cashier-facing steps (Task Scheduler / Startup folder + hidden VBS launcher).
+See [install/INSTALL.md](install/INSTALL.md) for cashier-facing steps (Startup folder + hidden VBS launcher).

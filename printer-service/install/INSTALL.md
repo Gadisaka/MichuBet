@@ -57,7 +57,7 @@ Use this if you prefer to configure everything by hand.
 ```json
 {
   "comPort": "COM3",
-  "baudRate": 9600,
+  "baudRate": 115200,
   "printerName": "Shop Counter",
   "apiKey": "michubet-local-print-v1"
 ```

@@ -30,7 +30,9 @@ export function useTicketPrint(
   ticket,
   { width = "80mm", preferLocalService = true, platformWinningsTax = null } = {},
 ) {
+  const MAX_STATUS_FAILURES = 3;
   const ticketRef = useRef(null);
+  const statusFailuresRef = useRef(0);
   const [barcodeDataUrl, setBarcodeDataUrl] = useState("");
   const [pdfBusy, setPdfBusy] = useState(false);
   const [lastError, setLastError] = useState("");
@@ -47,6 +49,7 @@ export function useTicketPrint(
 
   const applyStatus = useCallback((status) => {
     if (status.success) {
+      statusFailuresRef.current = 0;
       setPrinterStatus({
         connected: status.connected,
         port: status.port || "",
@@ -57,6 +60,10 @@ export function useTicketPrint(
         reconnectAttempts: status.reconnectAttempts ?? 0,
         lastSuccessfulPrintAt: status.lastSuccessfulPrintAt || null,
       });
+      return;
+    }
+    statusFailuresRef.current += 1;
+    if (statusFailuresRef.current < MAX_STATUS_FAILURES) {
       return;
     }
     setPrinterStatus((prev) => ({
@@ -193,7 +200,9 @@ export function useTicketPrint(
         }
 
         if (result.code === "com_unavailable") {
-          setLastError("COM port unavailable. Check POS80 driver and PRINTER_COM.");
+          setLastError(
+            "Printer queue unavailable. Check POS80 is installed in Windows Print queues.",
+          );
           return {
             printed: false,
             method: "local_service",
@@ -212,7 +221,9 @@ export function useTicketPrint(
 
         const errorMessage = String(result.error?.message || "");
         if (/printer disconnected|offline/i.test(errorMessage)) {
-          setLastError("Printer disconnected. Check POS80 connection and COM port.");
+          setLastError(
+            "Printer disconnected. Check POS80 connection and Windows print queue.",
+          );
           return {
             printed: false,
             method: "local_service",

@@ -34,6 +34,7 @@ import {
   MarketUnknownError,
 } from "../services/markets/errors.js";
 import { validatePlacementSelections } from "../services/odds-engine/validateSelections.js";
+import { validateOpenTicketForPrint } from "../services/ticketPrintValidation.js";
 import { getCache, setCache } from "../services/cacheService.js";
 import { withWalletLock } from "../lib/walletLock.js";
 import { logPlacementValidation } from "../lib/placementValidationLogger.js";
@@ -2319,6 +2320,129 @@ export async function updateTicketStake(req, res) {
 }
 
 /**
+ * POST /api/tickets/:id/validate-print
+ * Dry-run odds/market validation before physical print (no wallet debit).
+ */
+export async function validatePrintTicket(req, res) {
+  try {
+    const requestBody = req.body ?? {};
+    const acceptOddsChanges = parseAcceptOddsChanges(
+      requestBody.acceptOddsChanges,
+    );
+    const ticket = await prisma.ticket.findUnique({
+      where: { id: req.params.id },
+      include: { selections: true },
+    });
+    if (!ticket) {
+      return res.status(404).json({ message: "Ticket not found" });
+    }
+
+    const cashier = await resolveCashierByUserId(req.user.sub);
+    if (!cashier) {
+      return res.status(404).json({ message: CASHIER_PROFILE_MISSING_MESSAGE });
+    }
+    if (ticket.cashier_id && ticket.cashier_id !== cashier.id) {
+      return res.status(403).json({ message: "Access denied" });
+    }
+    if (ticket.status !== "OPEN") {
+      return res.status(400).json({
+        message: "Only OPEN tickets can be validated for print",
+      });
+    }
+
+    const validation = await validateOpenTicketForPrint({
+      prismaClient: prisma,
+      ticket,
+      cashierId: cashier.id,
+      requestBody,
+      acceptOddsChanges,
+    });
+
+    if (!validation.ok) {
+      await logValidationFailure({
+        action: "TICKET_VALIDATE_PRINT_FAILED",
+        req,
+        code: validation.logCode,
+        meta: validation.logMeta || {},
+      });
+      return res.status(validation.statusCode).json(validation.body);
+    }
+
+    return res.json({
+      ok: true,
+      message: "Ticket is valid for print",
+      acceptOddsChanges,
+    });
+  } catch (error) {
+    console.error("validatePrintTicket error:", error);
+    return res.status(500).json({ message: "Failed to validate ticket print" });
+  }
+}
+
+/**
+ * POST /api/tickets/:id/prepare-print
+ * Reserves receipt number for an OPEN ticket before physical print (no wallet debit).
+ */
+export async function preparePrintTicket(req, res) {
+  try {
+    const ticket = await prisma.ticket.findUnique({
+      where: { id: req.params.id },
+    });
+    if (!ticket) {
+      return res.status(404).json({ message: "Ticket not found" });
+    }
+
+    const cashier = await resolveCashierByUserId(req.user.sub);
+    if (!cashier) {
+      return res.status(404).json({ message: CASHIER_PROFILE_MISSING_MESSAGE });
+    }
+    if (ticket.cashier_id && ticket.cashier_id !== cashier.id) {
+      return res.status(403).json({ message: "Access denied" });
+    }
+    if (ticket.status !== "OPEN") {
+      return res.status(400).json({
+        message: "Only OPEN tickets can be prepared for print",
+      });
+    }
+
+    let receiptNumber = ticket.receipt_number;
+    if (!receiptNumber) {
+      receiptNumber = await reserveUniqueReceiptNumber(prisma);
+      await prisma.ticket.update({
+        where: { id: ticket.id },
+        data: {
+          receipt_number: receiptNumber,
+          cashier_id: ticket.cashier_id || cashier.id,
+          branch_name: ticket.branch_name || cashier.branch_name,
+          branch_location: ticket.branch_location || cashier.branch_location,
+        },
+      });
+    }
+
+    const preparedTicket = await prisma.ticket.findUnique({
+      where: { id: ticket.id },
+      include: ticketDetailInclude,
+    });
+    const printedSet = preparedTicket?.cashier_id
+      ? await getPrintedTicketIdSet({
+          cashierId: preparedTicket.cashier_id,
+          ticketIds: [ticket.id],
+        })
+      : new Set();
+
+    return res.json({
+      message: "Ticket prepared for print",
+      ticket: preparedTicket
+        ? mapTicket(preparedTicket, { printed: printedSet.has(ticket.id) })
+        : undefined,
+    });
+  } catch (error) {
+    console.error("preparePrintTicket error:", error);
+    return res.status(500).json({ message: "Failed to prepare ticket print" });
+  }
+}
+
+/**
  * PATCH /api/tickets/:id/confirm-print
  * Deducts cashier stake only after print confirmation.
  */
@@ -2343,201 +2467,15 @@ export async function confirmPrintTicket(req, res) {
     if (ticket.cashier_id && ticket.cashier_id !== cashier.id) {
       return res.status(403).json({ message: "Access denied" });
     }
-    if (ticket.status !== "OPEN") {
-      return res.status(400).json({
-        message: "Only OPEN tickets can be print-confirmed",
-      });
-    }
-
-    const snapshotSelections = Array.isArray(ticket.selection_snapshot)
-      ? ticket.selection_snapshot
-      : [];
-    let normalizedForValidation = [];
-    if (snapshotSelections.length > 0) {
-      const acceptedOddsByIndex = new Map();
-      const acceptedVersionsByIndex = new Map();
-      if (Array.isArray(requestBody.selections)) {
-        for (const row of requestBody.selections) {
-          const idx = Number.parseInt(row?.index, 10);
-          const accepted = Number(row?.acceptedOdds);
-          const acceptedVersion = Number(
-            row?.acceptedMarketVersion ?? row?.marketVersion,
-          );
-          if (Number.isFinite(idx) && Number.isFinite(accepted)) {
-            acceptedOddsByIndex.set(idx, accepted);
-          }
-          if (Number.isFinite(idx) && Number.isFinite(acceptedVersion)) {
-            acceptedVersionsByIndex.set(idx, acceptedVersion);
-          }
-        }
-      }
-      normalizedForValidation = snapshotSelections.map((entry, index) => ({
-        apiFixtureId: Number.parseInt(entry?.apiFixtureId, 10),
-        marketLabel: String(entry?.marketLabel || "").trim(),
-        marketCode: entry?.marketCode ? String(entry.marketCode).trim() : null,
-        marketParams:
-          entry?.marketParams && typeof entry.marketParams === "object"
-            ? entry.marketParams
-            : null,
-        label: String(entry?.label || "").trim(),
-        odds: Number.isFinite(acceptedOddsByIndex.get(index))
-          ? acceptedOddsByIndex.get(index)
-          : Number(entry?.odds),
-        marketVersion: Number.isFinite(acceptedVersionsByIndex.get(index))
-          ? acceptedVersionsByIndex.get(index)
-          : Number(entry?.marketVersion),
-        fromLive: false,
-      }));
-      const fullyStructuredSnapshot = normalizedForValidation.every(
-        (row) =>
-          Number.isFinite(Number(row.apiFixtureId)) &&
-          row.marketLabel &&
-          row.label &&
-          Number.isFinite(Number(row.odds)),
-      );
-      if (fullyStructuredSnapshot) {
-        const validated = await validatePlacementSelections({
-          prismaClient: prisma,
-          rawSelections: normalizedForValidation,
-          live: false,
-          actorId: `cashier:${cashier.id}`,
-          writeFreeze: false,
-          now: new Date(),
-        });
-        if (!validated.ok && validated.code === "odds_changed") {
-          await logValidationFailure({
-            action: "TICKET_CONFIRM_PRINT_VALIDATION_FAILED",
-            req,
-            code: "odds_changed",
-            meta: { ticketId: ticket.id, selections: validated.drift },
-          });
-          return res.status(409).json({
-            code: "odds_changed",
-            requiresConfirmation: true,
-            message:
-              "Odds changed. Review and confirm latest odds before print.",
-            selections: validated.drift,
-            newTotalOdds: Number(validated.totalOdds || 0),
-            acceptOddsChanges,
-          });
-        }
-        if (!validated.ok && validated.code === "market_version_changed") {
-          await logValidationFailure({
-            action: "TICKET_CONFIRM_PRINT_VALIDATION_FAILED",
-            req,
-            code: "market_version_changed",
-            meta: {
-              ticketId: ticket.id,
-              selections: validated.versionDrift || [],
-            },
-          });
-          return res.status(409).json({
-            code: "market_version_changed",
-            requiresConfirmation: true,
-            message:
-              "Market version changed. Confirm latest market before print.",
-            selections: validated.versionDrift || [],
-            newTotalOdds: Number(validated.totalOdds || 0),
-          });
-        }
-        if (!validated.ok && validated.code === "market_locked") {
-          await logValidationFailure({
-            action: "TICKET_CONFIRM_PRINT_VALIDATION_FAILED",
-            req,
-            code: "market_locked",
-            meta: { ticketId: ticket.id },
-          });
-          return res.status(409).json({
-            code: "market_locked",
-            selections: validated.selections || [],
-          });
-        }
-        if (!validated.ok) {
-          await logValidationFailure({
-            action: "TICKET_CONFIRM_PRINT_VALIDATION_FAILED",
-            req,
-            code: validated.code || "validation_failed",
-            meta: { ticketId: ticket.id },
-          });
-          return res.status(409).json({
-            code: validated.code || "validation_failed",
-            selections: validated.selections || [],
-          });
-        }
-        // If cashier submitted explicit acceptance with updated odds, refresh
-        // ticket snapshots/rows before wallet debit so printed data stays aligned.
-        if (acceptOddsChanges) {
-          const resolvedByIndex = new Map(
-            (validated.resolved || []).map((row) => [row.index, row]),
-          );
-          const nextSnapshot = snapshotSelections.map((entry, index) => {
-            const row = resolvedByIndex.get(index);
-            return row && Number.isFinite(row.serverOdds)
-              ? {
-                  ...entry,
-                  odds: Number(row.serverOdds),
-                  serverMarketVersion: Number(row.serverMarketVersion || 0),
-                  marketState: row.marketState || "OPEN",
-                }
-              : entry;
-          });
-          const limits = await resolveBettingLimits(prisma);
-          const accPct = Number(ticket.accumulator_bonus_percent) || 0;
-          const nextTotalOdds = Number(
-            validated.totalOdds || ticket.total_odds || 0,
-          );
-          const nextPotentialWin = capGrossPotentialWin(
-            limits,
-            Number(
-              (
-                Number(ticket.stake) *
-                nextTotalOdds *
-                (1 + accPct / 100)
-              ).toFixed(2),
-            ),
-          );
-          await prisma.ticket.update({
-            where: { id: ticket.id },
-            data: {
-              total_odds: nextTotalOdds,
-              potential_win: nextPotentialWin,
-              selection_snapshot: nextSnapshot,
-            },
-          });
-          for (
-            let index = 0;
-            index < (ticket.selections || []).length;
-            index++
-          ) {
-            const row = ticket.selections[index];
-            const resolved = resolvedByIndex.get(index);
-            if (!resolved || !Number.isFinite(resolved.serverOdds)) continue;
-            await prisma.ticketSelection.update({
-              where: { id: row.id },
-              data: {
-                odds: Number(resolved.serverOdds),
-                server_odds: Number(resolved.serverOdds),
-                server_odds_at: new Date(),
-                market_state: resolved.marketState || "OPEN",
-                server_market_version: Number(
-                  resolved.serverMarketVersion || 0,
-                ),
-              },
-            });
-          }
-        }
-      }
-    }
-
     const printReference = `ticket-print:${ticket.id}`;
-    const existing = await prisma.transaction.findFirst({
+    const existingPrint = await prisma.transaction.findFirst({
       where: {
         type: "BET",
         reference: printReference,
       },
       select: { id: true, wallet_id: true },
     });
-    if (existing) {
+    if (existingPrint || ticket.status === "PRINTED") {
       if (!ticket.receipt_number) {
         try {
           const rn = await reserveUniqueReceiptNumber(prisma);
@@ -2556,7 +2494,7 @@ export async function confirmPrintTicket(req, res) {
         });
       }
       const wallet = await prisma.wallet.findUnique({
-        where: { id: existing.wallet_id || cashier.wallet_id },
+        where: { id: existingPrint?.wallet_id || cashier.wallet_id },
         select: { balance: true },
       });
       const printedTicket = await prisma.ticket.findUnique({
@@ -2578,6 +2516,88 @@ export async function confirmPrintTicket(req, res) {
           ? mapTicket(printedTicket, { printed: printedSet.has(ticket.id) })
           : undefined,
       });
+    }
+    if (ticket.status !== "OPEN") {
+      return res.status(400).json({
+        message: "Only OPEN tickets can be print-confirmed",
+      });
+    }
+
+    const validation = await validateOpenTicketForPrint({
+      prismaClient: prisma,
+      ticket,
+      cashierId: cashier.id,
+      requestBody,
+      acceptOddsChanges,
+    });
+
+    if (!validation.ok) {
+      await logValidationFailure({
+        action: "TICKET_CONFIRM_PRINT_VALIDATION_FAILED",
+        req,
+        code: validation.logCode,
+        meta: validation.logMeta || {},
+      });
+      return res.status(validation.statusCode).json(validation.body);
+    }
+
+    if (acceptOddsChanges && validation.validated) {
+      const validated = validation.validated;
+      const snapshotSelections = Array.isArray(ticket.selection_snapshot)
+        ? ticket.selection_snapshot
+        : [];
+      const resolvedByIndex = new Map(
+        (validated.resolved || []).map((row) => [row.index, row]),
+      );
+      const nextSnapshot = snapshotSelections.map((entry, index) => {
+        const row = resolvedByIndex.get(index);
+        return row && Number.isFinite(row.serverOdds)
+          ? {
+              ...entry,
+              odds: Number(row.serverOdds),
+              serverMarketVersion: Number(row.serverMarketVersion || 0),
+              marketState: row.marketState || "OPEN",
+            }
+          : entry;
+      });
+      const limits = await resolveBettingLimits(prisma);
+      const accPct = Number(ticket.accumulator_bonus_percent) || 0;
+      const nextTotalOdds = Number(
+        validated.totalOdds || ticket.total_odds || 0,
+      );
+      const nextPotentialWin = capGrossPotentialWin(
+        limits,
+        Number(
+          (
+            Number(ticket.stake) *
+            nextTotalOdds *
+            (1 + accPct / 100)
+          ).toFixed(2),
+        ),
+      );
+      await prisma.ticket.update({
+        where: { id: ticket.id },
+        data: {
+          total_odds: nextTotalOdds,
+          potential_win: nextPotentialWin,
+          selection_snapshot: nextSnapshot,
+        },
+      });
+      for (let index = 0; index < (ticket.selections || []).length; index++) {
+        const row = ticket.selections[index];
+        const resolved = resolvedByIndex.get(index);
+        if (!resolved || !Number.isFinite(resolved.serverOdds)) continue;
+        await prisma.ticketSelection.update({
+          where: { id: row.id },
+          data: {
+            odds: Number(resolved.serverOdds),
+            server_odds: Number(resolved.serverOdds),
+            server_odds_at: new Date(),
+            market_state: resolved.marketState || "OPEN",
+            server_market_version: Number(resolved.serverMarketVersion || 0),
+          },
+        });
+      }
     }
 
     const result = await withWalletLock(cashier.wallet_id, {}, async () =>

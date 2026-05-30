@@ -1,24 +1,23 @@
 #Requires -Version 5.1
 <#
 .SYNOPSIS
-  Installs MichuBet PrinterBridge to C:\MichuBet\PrinterBridge and registers auto-start.
+  Installs Michotbet PrinterBridge to C:\Michotbet\PrinterBridge and registers auto-start.
 
-.PARAMETER ComPort
-  Optional COM port (e.g. COM3). Leave empty for auto-detect.
+.PARAMETER PrinterName
+  Windows print queue name (e.g. POS80). Default POS80.
 
 .PARAMETER SkipStartup
   Do not add a Startup folder shortcut.
 #>
 param(
-  [string]$ComPort = "",
+  [string]$PrinterName = "POS80",
   [switch]$SkipStartup
 )
 
 $ErrorActionPreference = "Stop"
 
-$InstallDest = "C:\MichuBet\PrinterBridge"
-$ApiKey = "michubet-local-print-v1"
-$HealthUrl = "http://127.0.0.1:3005/health"
+$InstallDest = "C:\Michotbet\PrinterBridge"
+$ApiKey = "michotbet-local-print-v1"
 
 function Write-Step([string]$Message) {
   Write-Host "`n==> $Message" -ForegroundColor Cyan
@@ -59,12 +58,12 @@ function Copy-BridgeFiles([string]$SourceDir, [string]$Dest) {
   }
 }
 
-function Write-Config([string]$Dest, [string]$Port) {
+function Write-Config([string]$Dest, [string]$PrinterName) {
   $configPath = Join-Path $Dest "config.json"
   $config = @{
-    comPort     = $Port
+    comPort     = ""
     baudRate    = 115200
-    printerName = "Shop Counter"
+    printerName = $PrinterName
     apiKey      = $ApiKey
   } | ConvertTo-Json -Compress
   [System.IO.File]::WriteAllText($configPath, $config + "`n", [System.Text.UTF8Encoding]::new($false))
@@ -80,90 +79,38 @@ function Write-HiddenLauncher([string]$Dest) {
 function Register-StartupShortcut([string]$Dest) {
   $startup = [Environment]::GetFolderPath("Startup")
   $vbsPath = Join-Path $Dest "PrinterBridge-hidden.vbs"
-  $shortcutPath = Join-Path $startup "MichuBet PrinterBridge.lnk"
+  $shortcutPath = Join-Path $startup "Michotbet PrinterBridge.lnk"
 
   $shell = New-Object -ComObject WScript.Shell
   $shortcut = $shell.CreateShortcut($shortcutPath)
   $shortcut.TargetPath = $vbsPath
   $shortcut.WorkingDirectory = $Dest
-  $shortcut.Description = "MichuBet PrinterBridge (hidden)"
+  $shortcut.Description = "Michotbet PrinterBridge (hidden)"
   $shortcut.Save()
 }
 
 function Test-BridgeHealth {
   param([int]$Retries = 8, [int]$DelaySec = 2)
+  $ports = 3005..3010
   for ($i = 1; $i -le $Retries; $i++) {
-    try {
-      $response = Invoke-RestMethod -Uri $HealthUrl -TimeoutSec 5
-      if ($response.ok) {
-        return $response
+    foreach ($port in $ports) {
+      try {
+        $url = "http://127.0.0.1:$port/health"
+        $response = Invoke-RestMethod -Uri $url -TimeoutSec 5
+        if ($response.ok) {
+          return $response
+        }
+      } catch {
+        # Bridge may still be starting or on another port
       }
-    } catch {
-      # Bridge may still be starting
     }
     Start-Sleep -Seconds $DelaySec
   }
   return $null
 }
 
-function Unblock-BridgeFiles([string]$Dest) {
-  Get-ChildItem -Path $Dest -Recurse -File -ErrorAction SilentlyContinue | ForEach-Object {
-    try {
-      Unblock-File -LiteralPath $_.FullName -ErrorAction SilentlyContinue | Out-Null
-    } catch {
-      # Older Windows builds may not support Unblock-File for all paths
-    }
-  }
-}
-
-function Start-PrinterBridge([string]$Dest) {
-  $exePath = Join-Path $Dest "PrinterBridge.exe"
-  $vbsPath = Join-Path $Dest "PrinterBridge-hidden.vbs"
-
-  if (Get-Process -Name "PrinterBridge" -ErrorAction SilentlyContinue) {
-    Write-Ok "Already running"
-    return $true
-  }
-
-  Unblock-BridgeFiles -Dest $Dest
-
-  $attempts = @(
-    @{
-      Label = "hidden launcher"
-      Action = {
-        Start-Process -FilePath "wscript.exe" -ArgumentList "`"$vbsPath`"" -WorkingDirectory $Dest
-      }
-    },
-    @{
-      Label = "PrinterBridge.exe"
-      Action = {
-        Start-Process -FilePath $exePath -WorkingDirectory $Dest
-      }
-    }
-  )
-
-  foreach ($attempt in $attempts) {
-    try {
-      & $attempt.Action
-      Start-Sleep -Seconds 2
-      if (Get-Process -Name "PrinterBridge" -ErrorAction SilentlyContinue) {
-        Write-Ok "Started via $($attempt.Label)"
-        return $true
-      }
-    } catch {
-      Write-Warn "Start via $($attempt.Label) failed: $($_.Exception.Message)"
-    }
-  }
-
-  Write-Warn "Could not auto-start PrinterBridge."
-  Write-Warn "Windows SmartScreen or antivirus may have blocked it."
-  Write-Warn "Manual start: open $Dest and double-click PrinterBridge-hidden.vbs"
-  Write-Warn "If SmartScreen appears: More info -> Run anyway."
-  return $false
-}
-
 Write-Host ""
-Write-Host "MichuBet PrinterBridge Installer" -ForegroundColor White
+Write-Host "Michotbet PrinterBridge Installer" -ForegroundColor White
 Write-Host "================================" -ForegroundColor White
 
 $SourceDir = Get-SourceDir
@@ -183,12 +130,8 @@ Copy-BridgeFiles -SourceDir $SourceDir -Dest $InstallDest
 Write-Ok "Files copied"
 
 Write-Step "Writing config.json"
-Write-Config -Dest $InstallDest -Port $ComPort
-if ($ComPort) {
-  Write-Ok "COM port set to $ComPort"
-} else {
-  Write-Ok "COM port left empty (auto-detect on startup)"
-}
+Write-Config -Dest $InstallDest -PrinterName $PrinterName
+Write-Ok "Printer queue set to $PrinterName"
 
 Write-Step "Creating hidden launcher"
 Write-HiddenLauncher -Dest $InstallDest
@@ -203,10 +146,9 @@ if (-not $SkipStartup) {
 }
 
 Write-Step "Starting PrinterBridge"
-$started = Start-PrinterBridge -Dest $InstallDest
-if (-not $started) {
-  Write-Warn "Installation finished but PrinterBridge is not running yet."
-}
+$exePath = Join-Path $InstallDest "PrinterBridge.exe"
+Start-Process -FilePath $exePath -WorkingDirectory $InstallDest
+Write-Ok "Process started"
 
 Write-Step "Verifying service"
 $health = Test-BridgeHealth

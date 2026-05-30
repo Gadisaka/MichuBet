@@ -7,7 +7,9 @@ import {
   getTicketByReceipt,
   listTickets,
   payoutTicket,
+  preparePrintTicket,
   updateTicketStake,
+  validatePrintTicket,
   voidTicket,
 } from "../controllers/ticketsController.js";
 import {
@@ -32,6 +34,16 @@ router.patch(
   "/:id/stake",
   authorizePermission("tickets:create"),
   updateTicketStake,
+);
+router.post(
+  "/:id/validate-print",
+  authorizePermission("tickets:create"),
+  validatePrintTicket,
+);
+router.post(
+  "/:id/prepare-print",
+  authorizePermission("tickets:create"),
+  preparePrintTicket,
 );
 router.patch(
   "/:id/confirm-print",
