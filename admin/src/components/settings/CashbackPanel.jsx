@@ -278,27 +278,15 @@ export default function CashbackPanel() {
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Field
             label="Disqualifying fixture statuses"
-            hint="Any leg with these statuses voids cashback (comma-separated)"
+            hint="Any leg with these statuses voids cashback (system-managed)"
           >
-            <input
-              type="text"
-              value={form.fixtureStatuses}
-              onChange={(e) => setField("fixtureStatuses", e.target.value)}
-              placeholder="PST, CANC, ABD"
-              className={inputClass}
-            />
+            <div className={readOnlyClass}>{form.fixtureStatuses}</div>
           </Field>
           <Field
             label="Disqualifying match statuses"
-            hint="Admin-managed match statuses that void cashback"
+            hint="Admin-managed match statuses that void cashback (system-managed)"
           >
-            <input
-              type="text"
-              value={form.matchStatuses}
-              onChange={(e) => setField("matchStatuses", e.target.value)}
-              placeholder="SUSPENDED"
-              className={inputClass}
-            />
+            <div className={readOnlyClass}>{form.matchStatuses}</div>
           </Field>
         </div>
 
@@ -409,6 +397,9 @@ export default function CashbackPanel() {
 
 const inputClass =
   "w-full rounded-sm border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--text)] outline-none focus:border-[var(--accent)]";
+
+const readOnlyClass =
+  "w-full rounded-sm border border-[var(--border)] bg-[var(--bg)] px-3 py-2 text-sm text-[var(--muted)] cursor-not-allowed select-none";
 
 function Field({ label, hint, children }) {
   return (
