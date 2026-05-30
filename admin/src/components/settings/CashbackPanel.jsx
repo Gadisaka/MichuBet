@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import PanelCard from "../ui/PanelCard";
 import PrimaryButton from "../ui/PrimaryButton";
 import { useBonusesQuery, useUpdateBonusMutation } from "../../hook/useSettingsQuery";
@@ -56,6 +56,7 @@ export default function CashbackPanel() {
   const query = useBonusesQuery();
   const updateMut = useUpdateBonusMutation();
   const [form, setForm] = useState(null);
+  const [syncedId, setSyncedId] = useState(null);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
 
@@ -65,9 +66,14 @@ export default function CashbackPanel() {
     return list.find((b) => b.type === "CASHBACK") ?? null;
   }, [query.data]);
 
-  useEffect(() => {
-    if (cashbackRow) setForm(rowToForm(cashbackRow));
-  }, [cashbackRow]);
+  // Reset the editable form when the underlying cashback row changes
+  // identity (initial load / different record). Setting state during
+  // render with an id guard is React's recommended pattern and avoids
+  // cascading renders from a setState-in-effect.
+  if (cashbackRow && cashbackRow.id !== syncedId) {
+    setSyncedId(cashbackRow.id);
+    setForm(rowToForm(cashbackRow));
+  }
 
   function setField(key, value) {
     setForm((f) => ({ ...f, [key]: value }));
