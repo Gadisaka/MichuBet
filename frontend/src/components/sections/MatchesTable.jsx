@@ -9,6 +9,7 @@ import {
   filterCategoriesByChipId,
 } from "../../data/footballMarketsByCategory";
 import { getTopLeagueOrder } from "../../utils/topLeagues";
+import { resolveCompactMarketToken } from "../../utils/compactMarketToken";
 
 const TABLE_GRID_COLS =
   "grid-cols-[64px_minmax(220px,1fr)_repeat(6,82px)_58px_22px]";
@@ -159,8 +160,8 @@ function MatchRow({
                     id: selectionId,
                     apiFixtureId: match.apiFixtureId,
                     matchName: match.match,
-                    marketLabel: "Match Winner",
-                    label: marketId.toUpperCase(),
+                    league: match.league,
+                    ...resolveCompactMarketToken(marketId),
                     value,
                     kickoffAt: match.kickoffAt,
                     matchStatus: match.status,
@@ -228,8 +229,8 @@ function MatchRow({
                     id: selectionId,
                     apiFixtureId: match.apiFixtureId,
                     matchName: match.match,
-                    marketLabel: "Match Winner",
-                    label: marketId.toUpperCase(),
+                    league: match.league,
+                    ...resolveCompactMarketToken(marketId),
                     value,
                     kickoffAt: match.kickoffAt,
                     matchStatus: match.status,

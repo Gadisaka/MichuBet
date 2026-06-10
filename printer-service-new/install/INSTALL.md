@@ -103,6 +103,22 @@ Then:
 | Local print service unreachable | Ensure `PrinterBridge.exe` is running (Task Manager); try ports 3005–3010 |
 | Auth failed | `apiKey` in `config.json` must match admin build `VITE_PRINTER_API_KEY` |
 | Wrong printer used | Bridge uses strict queue name match — never falls back to another printer |
+| Printing is very slow (seconds–minutes) | When the native printer driver isn't available, the bridge prints via a helper `powershell.exe` process. Antivirus / Windows Defender real-time scanning of PowerShell (AMSI) can add large delays. Add an exclusion (see below). |
+
+### Antivirus exclusions (fixes slow printing)
+
+If prints take several seconds or more, exclude the bridge and its helper from
+real-time scanning. In an **elevated** PowerShell:
+
+```powershell
+Add-MpPreference -ExclusionPath "C:\Michotbet\PrinterBridge"
+Add-MpPreference -ExclusionProcess "PrinterBridge.exe"
+Add-MpPreference -ExclusionProcess "powershell.exe"
+```
+
+The bridge already keeps a single long-lived `powershell.exe` worker (it no
+longer launches a new PowerShell per ticket), so these exclusions plus the
+worker keep printing near-instant.
 
 ---
 

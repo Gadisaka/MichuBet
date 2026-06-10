@@ -44,7 +44,15 @@ async function resolveCashierByUserId(userId) {
   if (!userId) return null;
   return prisma.cashier.findUnique({
     where: { user_id: userId },
+    include: { user: { select: { name: true } } },
   });
+}
+
+function formatDateOnlyLabel(date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
 }
 
 /**
@@ -191,6 +199,18 @@ export async function getCashierDashboardStats(req, res) {
     return res.json({
       from: from.toISOString(),
       to: to.toISOString(),
+      fromLabel:
+        typeof fromRaw === "string" && fromRaw.trim()
+          ? fromRaw.trim()
+          : formatDateOnlyLabel(from),
+      toLabel:
+        typeof toRaw === "string" && toRaw.trim()
+          ? toRaw.trim()
+          : formatDateOnlyLabel(to),
+      cashierId: cashier.id,
+      cashierName: String(cashier.user?.name || "").trim(),
+      branchName: String(cashier.branch_name || "").trim(),
+      branchLocation: String(cashier.branch_location || "").trim(),
       totalTicketsSold,
       totalSoldPrice,
       totalDepositAmount,

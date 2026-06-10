@@ -15,6 +15,7 @@ import { topHeaderData, topNavItems, sportsList } from "../data/homepageData";
 import { fetchFixturesLive, fetchLiveOdds } from "../services/api";
 import { mapFixtureToMatch } from "../services/fixtureMapper";
 import { normalizeApiFixtureId } from "../utils/fixtureId";
+import { resolveCompactMarketToken } from "../utils/compactMarketToken";
 import {
   MARKET_FILTER_CHIPS,
   MARKET_FILTER_ALL_CHIP_ID,
@@ -426,12 +427,12 @@ function LiveRow({ match, isExpanded, onToggle, onOddsClick, selectedOdds }) {
                   onClick={(e) => {
                     e.stopPropagation();
                     if (!value) return;
-                    onOddsClick?.({
+                      onOddsClick?.({
                       id: selectionId,
                       apiFixtureId: match.apiFixtureId,
                       matchName: match.match,
-                      marketLabel: "1X2",
-                      label: marketId.toUpperCase(),
+                      league: match.league,
+                      ...resolveCompactMarketToken(marketId),
                       value,
                       kickoffAt: match.kickoffAt,
                       matchStatus: match.liveStatus ?? match.status,
@@ -463,12 +464,12 @@ function LiveRow({ match, isExpanded, onToggle, onOddsClick, selectedOdds }) {
                   onClick={(e) => {
                     e.stopPropagation();
                     if (!value) return;
-                    onOddsClick?.({
+                      onOddsClick?.({
                       id: selectionId,
                       apiFixtureId: match.apiFixtureId,
                       matchName: match.match,
-                      marketLabel: "1X2",
-                      label: marketId.toUpperCase(),
+                      league: match.league,
+                      ...resolveCompactMarketToken(marketId),
                       value,
                       kickoffAt: match.kickoffAt,
                       matchStatus: match.liveStatus ?? match.status,

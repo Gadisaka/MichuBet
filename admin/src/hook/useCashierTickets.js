@@ -75,6 +75,12 @@ export function mapTicketDetail(ticket) {
                   selection.match.awayTeam ?? selection.match.away_team ?? "",
                 startTime:
                   selection.match.startTime ?? selection.match.start_time ?? "",
+                country:
+                  selection.match.country ?? selection.match.country_name ?? "",
+                leagueName:
+                  selection.match.leagueName ??
+                  selection.match.league_name ??
+                  "",
               }
             : null,
         }))
@@ -264,6 +270,42 @@ export function useConfirmPrintedTicketMutation() {
           selections,
         }),
       }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: TICKETS_KEY });
+    },
+  });
+}
+
+export function useRepeatTicketMutation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (ticketId) => {
+      const id = String(ticketId || "").trim();
+      if (!id) throw new Error("Ticket id is required");
+      const payload = await apiRequest(`/tickets/${id}/repeat`, {
+        method: "POST",
+        body: JSON.stringify({}),
+      });
+      return mapTicketDetail(payload);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: TICKETS_KEY });
+    },
+  });
+}
+
+export function useRemoveTicketSelectionMutation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ ticketId, selectionId }) => {
+      const tid = String(ticketId || "").trim();
+      const sid = String(selectionId || "").trim();
+      if (!tid || !sid) throw new Error("Ticket and selection id are required");
+      const payload = await apiRequest(`/tickets/${tid}/selections/${sid}`, {
+        method: "DELETE",
+      });
+      return mapTicketDetail(payload);
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: TICKETS_KEY });
     },

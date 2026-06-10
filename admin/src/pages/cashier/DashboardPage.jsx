@@ -4,6 +4,11 @@ import AdminShell from "../../components/layout/AdminShell";
 import PanelCard from "../../components/ui/PanelCard";
 import { useVerifyPasswordMutation } from "../../hook/useVerifyPasswordMutation";
 import { useCashierDashboardStatsQuery } from "../../hook/useCashierDashboardStats";
+import {
+  buildSalesReportBarcodePayload,
+  encodeSalesReportAsync,
+} from "../../components/ticket/salesReportEscpos";
+import { print as printViaLocalService } from "../../services/localPrinter";
 
 function formatYmd(d) {
   const y = d.getFullYear();
@@ -42,6 +47,9 @@ function DashboardContent() {
   const [from, setFrom] = useState(todayStr);
   const [to, setTo] = useState(todayStr);
   const [applied, setApplied] = useState({ from: todayStr, to: todayStr });
+  const [printError, setPrintError] = useState("");
+  const [printSuccess, setPrintSuccess] = useState("");
+  const [printing, setPrinting] = useState(false);
 
   const query = useCashierDashboardStatsQuery({
     from: applied.from,
@@ -53,13 +61,58 @@ function DashboardContent() {
     (e) => {
       e.preventDefault();
       setApplied({ from, to });
+      setPrintError("");
+      setPrintSuccess("");
     },
     [from, to],
   );
 
-  const handlePrint = useCallback(() => {
-    window.print();
-  }, []);
+  const handlePrint = useCallback(async () => {
+    if (!query.data || printing) return;
+    setPrintError("");
+    setPrintSuccess("");
+    setPrinting(true);
+
+    try {
+      const report = {
+        ...query.data,
+        fromLabel: query.data.fromLabel || applied.from,
+        toLabel: query.data.toLabel || applied.to,
+        printedAt: new Date().toISOString(),
+        barcodePayload: buildSalesReportBarcodePayload({
+          ...query.data,
+          fromLabel: query.data.fromLabel || applied.from,
+          toLabel: query.data.toLabel || applied.to,
+        }),
+      };
+
+      const escposData = await encodeSalesReportAsync(report, { width: "80mm" });
+      const result = await printViaLocalService(escposData);
+
+      if (!result.success) {
+        if (result.code === "service_unreachable") {
+          setPrintError(
+            "Local print service unreachable. Start PrinterBridge.exe on this PC.",
+          );
+        } else if (result.code === "com_unavailable") {
+          setPrintError(
+            "Printer queue unavailable. Check POS80 is installed in Windows Print queues.",
+          );
+        } else {
+          setPrintError(
+            String(result.error?.message || "Failed to print sales report."),
+          );
+        }
+        return;
+      }
+
+      setPrintSuccess("Sales report sent to printer.");
+    } catch (error) {
+      setPrintError(error?.message || "Failed to print sales report");
+    } finally {
+      setPrinting(false);
+    }
+  }, [applied.from, applied.to, printing, query.data]);
 
   const fmtMoney = (n) =>
     Number(n ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -100,12 +153,20 @@ function DashboardContent() {
         </button>
         <button
           type="button"
-          onClick={handlePrint}
-          className="rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+          onClick={() => void handlePrint()}
+          disabled={printing || query.isLoading || !query.data}
+          className="rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60"
         >
-          Print
+          {printing ? "Printing..." : "Print"}
         </button>
       </form>
+
+      {printError && (
+        <p className="text-sm font-medium text-[var(--danger)]">{printError}</p>
+      )}
+      {printSuccess && (
+        <p className="text-sm font-medium text-green-700">{printSuccess}</p>
+      )}
 
       {query.isLoading && <p className="text-sm text-[var(--muted)]">Loading stats…</p>}
       {query.isError && (
@@ -128,11 +189,6 @@ function DashboardContent() {
         </div>
       )}
 
-      <style>{`
-        @media print {
-          .no-print { display: none !important; }
-        }
-      `}</style>
     </div>
   );
 }

@@ -118,3 +118,20 @@
     animation: bet-slip-row-enter 0.56s cubic-bezier(0.33, 1, 0.68, 1) both;
   }
 }
+
+/* Public check-coupon: scalloped "torn paper" top & bottom edges on the receipt
+   card. The mask punches half-circles out of the card so the dark page shows
+   through, mimicking a perforated thermal receipt. Keep vertical padding >= 8px
+   so content is never clipped by the notches. */
+.coupon-receipt {
+  -webkit-mask:
+    radial-gradient(circle at 50% 0, transparent 7px, #000 7.5px) repeat-x 0 0 /
+      15px 51%,
+    radial-gradient(circle at 50% 100%, transparent 7px, #000 7.5px) repeat-x 0
+      100% / 15px 51%;
+  mask:
+    radial-gradient(circle at 50% 0, transparent 7px, #000 7.5px) repeat-x 0 0 /
+      15px 51%,
+    radial-gradient(circle at 50% 100%, transparent 7px, #000 7.5px) repeat-x 0
+      100% / 15px 51%;
+}

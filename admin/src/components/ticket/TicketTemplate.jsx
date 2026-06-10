@@ -5,6 +5,7 @@ import {
 } from "../../utils/winningsTax";
 import receiptLogo from "../../assets/image.png";
 import { formatCashierReceiptLine } from "./receiptFormat";
+import { TICKET_FOOTER_LINES } from "./ticketFooter";
 
 /**
  * Thermal POS receipt for cashier tickets.
@@ -53,6 +54,13 @@ function formatKickoff(value) {
   return `${pad(date.getDate())}/${pad(date.getMonth() + 1)} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
+function formatLeagueLine(country, leagueName) {
+  const c = String(country || "").trim();
+  const l = String(leagueName || "").trim();
+  if (c && l) return `${c} - ${l}`;
+  return l || c || "";
+}
+
 function buildSelectionLines(ticket) {
   const selections = Array.isArray(ticket?.selections) ? ticket.selections : [];
   return selections.map((selection, index) => {
@@ -62,6 +70,10 @@ function buildSelectionLines(ticket) {
     return {
       id: selection.id || `sel-${index}`,
       kickoff: formatKickoff(selection?.match?.startTime),
+      leagueLine: formatLeagueLine(
+        selection?.match?.country,
+        selection?.match?.leagueName,
+      ),
       matchName,
       pick: selection?.selection || selection?.pick || "-",
       market: selection?.marketLabel || "",
@@ -121,25 +133,15 @@ const TicketTemplate = forwardRef(function TicketTemplate(
             margin: "0 auto",
           }}
         />
-        {barcodeDataUrl ? (
-          <img
-            src={barcodeDataUrl}
-            alt=""
-            style={{
-              width: "100%",
-              maxWidth: "100%",
-              height: "auto",
-              display: "block",
-              margin: "2mm auto 0",
-            }}
-          />
-        ) : null}
       </div>
 
       <Divider />
 
-      <Row label="Coupon" value={ticket.couponNumber || "-"} mono />
-      <CashierRow value={formatCashierReceiptLine(ticket)} />
+      <ReceiptCouponRow
+        receipt={ticket.receiptNumber || "-"}
+        coupon={ticket.couponNumber || "-"}
+      />
+      <BranchRow value={formatCashierReceiptLine(ticket)} />
       <Row label="Date" value={printedAt} />
 
       <Divider />
@@ -162,7 +164,7 @@ const TicketTemplate = forwardRef(function TicketTemplate(
               <div style={{ fontWeight: 800 }}>
                 {idx + 1}. {line.matchName}
               </div>
-              {line.kickoff && (
+              {line.leagueLine ? (
                 <div
                   style={{
                     fontSize: "11px",
@@ -170,9 +172,9 @@ const TicketTemplate = forwardRef(function TicketTemplate(
                     color: "#000000",
                   }}
                 >
-                  {line.kickoff}
+                  {line.leagueLine}
                 </div>
-              )}
+              ) : null}
               <div
                 style={{
                   display: "flex",
@@ -188,8 +190,27 @@ const TicketTemplate = forwardRef(function TicketTemplate(
                     color: "#000000",
                   }}
                 >
-                  {line.market ? `${line.market}: ` : ""}
+                  {line.market || "-"}
+                </span>
+                <span style={{ fontWeight: 800, color: "#000000" }}>
                   {line.pick}
+                </span>
+              </div>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  gap: "2mm",
+                }}
+              >
+                <span
+                  style={{
+                    fontSize: "11px",
+                    fontWeight: 700,
+                    color: "#000000",
+                  }}
+                >
+                  {line.kickoff || "-"}
                 </span>
                 <span style={{ fontWeight: 800, color: "#000000" }}>
                   {line.odds}
@@ -219,9 +240,71 @@ const TicketTemplate = forwardRef(function TicketTemplate(
           bold
         />
       )}
+
+      <Divider />
+
+      {barcodeDataUrl ? (
+        <div style={{ textAlign: "center", marginTop: "2mm" }}>
+          <img
+            src={barcodeDataUrl}
+            alt=""
+            style={{
+              width: "100%",
+              maxWidth: "100%",
+              height: "auto",
+              display: "block",
+              margin: "0 auto",
+            }}
+          />
+        </div>
+      ) : null}
+
+      <TicketFooter />
     </div>
   );
 });
+
+function ReceiptCouponRow({ receipt, coupon }) {
+  return (
+    <div
+      style={{
+        display: "flex",
+        justifyContent: "space-between",
+        gap: "2mm",
+        fontWeight: 800,
+        flexWrap: "wrap",
+      }}
+    >
+      <span style={{ color: "#000000" }}>
+        Receipt:{" "}
+        <span style={{ fontFamily: "'Courier New', monospace" }}>{receipt}</span>
+      </span>
+      <span style={{ color: "#000000" }}>
+        Coupon:{" "}
+        <span style={{ fontFamily: "'Courier New', monospace" }}>{coupon}</span>
+      </span>
+    </div>
+  );
+}
+
+function TicketFooter() {
+  return (
+    <div
+      style={{
+        marginTop: "2mm",
+        textAlign: "center",
+        fontSize: "10px",
+        fontWeight: 700,
+        lineHeight: 1.4,
+        color: "#000000",
+      }}
+    >
+      {TICKET_FOOTER_LINES.map((line) => (
+        <div key={line}>{line}</div>
+      ))}
+    </div>
+  );
+}
 
 function Row({ label, value, mono = false, bold = false }) {
   return (
@@ -248,7 +331,7 @@ function Row({ label, value, mono = false, bold = false }) {
   );
 }
 
-function CashierRow({ value }) {
+function BranchRow({ value }) {
   return (
     <div
       style={{
@@ -259,7 +342,7 @@ function CashierRow({ value }) {
       }}
     >
       <span style={{ color: "#000000", flexShrink: 0, fontWeight: 700 }}>
-        Cashier
+        Branch
       </span>
       <span
         style={{

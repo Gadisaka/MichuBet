@@ -404,6 +404,7 @@ export async function placeBet(
     selections: selections.map((s) => ({
       apiFixtureId: s.apiFixtureId,
       matchName: s.matchName,
+      league: s.league,
       marketLabel: s.marketLabel,
       marketCode: s.marketCode,
       marketParams: s.marketParams,

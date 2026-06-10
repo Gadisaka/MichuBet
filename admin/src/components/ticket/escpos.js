@@ -13,6 +13,7 @@ import {
   slipGrossTaxNetForTicket,
 } from "../../utils/winningsTax.js";
 import { formatCashierReceiptLine } from "./receiptFormat.js";
+import { TICKET_FOOTER_LINES } from "./ticketFooter.js";
 import {
   createBarcodeCanvasForPrint,
   getBarcodePayload,
@@ -158,6 +159,37 @@ function formatKickoff(value) {
   return `${pad(date.getDate())}/${pad(date.getMonth() + 1)} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
+function formatLeagueLine(country, leagueName) {
+  const c = String(country || "").trim();
+  const l = String(leagueName || "").trim();
+  if (c && l) return `${c} - ${l}`;
+  return l || c || "";
+}
+
+function formatReceiptCouponLine(receipt, coupon, width) {
+  const receiptVal = String(receipt || "-").trim();
+  const couponVal = String(coupon || "-").trim();
+  const combined = `Receipt: ${receiptVal}  Coupon: ${couponVal}`;
+  if (combined.length <= width) {
+    return [combined];
+  }
+  return [
+    leftRight("Receipt:", receiptVal, width),
+    leftRight("Coupon:", couponVal, width),
+  ];
+}
+
+function appendTicketFooterParts(parts, chars) {
+  parts.push(new Uint8Array(CMD.ALIGN_CENTER));
+  parts.push(new Uint8Array(CMD.BOLD_OFF));
+  for (const footerLine of TICKET_FOOTER_LINES) {
+    const wrapped = wrapText(footerLine, chars);
+    for (const row of wrapped) {
+      parts.push(line(center(row, chars)));
+    }
+  }
+}
+
 /**
  * RGBA ImageData -> GS v 0 raster bit image (1-bit threshold).
  *
@@ -299,23 +331,23 @@ function ticketDateForEscpos(ticket) {
   return formatDate(ticket?.printedAt || ticket?.createdAt);
 }
 
-function pushCashierLines(parts, ticket, chars) {
+function pushBranchLines(parts, ticket, chars) {
   const full = formatCashierReceiptLine(ticket);
-  const valueWidth = Math.max(8, chars - 9);
+  const valueWidth = Math.max(8, chars - 8);
   const wrapped = wrapText(full, valueWidth);
   if (wrapped.length === 0) {
-    parts.push(line(leftRight("Cashier:", "-", chars)));
+    parts.push(line(leftRight("Branch:", "-", chars)));
     return;
   }
-  parts.push(line(leftRight("Cashier:", wrapped[0], chars)));
-  const indent = " ".repeat(9);
+  parts.push(line(leftRight("Branch:", wrapped[0], chars)));
+  const indent = " ".repeat(8);
   for (let i = 1; i < wrapped.length; i++) {
     parts.push(line(indent + wrapped[i]));
   }
 }
 
 /**
- * Ticket body after optional logo: metadata, legs, totals, footer. No INIT.
+ * Ticket body after optional logo: metadata, legs, totals. No barcode, footer, or cut.
  */
 function buildTicketEscPosParts(ticket, opts) {
   const { width = "80mm", platformWinningsTax = null } = opts;
@@ -336,8 +368,14 @@ function buildTicketEscPosParts(ticket, opts) {
   parts.push(line(divider(chars)));
   parts.push(new Uint8Array(CMD.BOLD_ON));
 
-  parts.push(line(leftRight("Coupon:", ticket.couponNumber || "-", chars)));
-  pushCashierLines(parts, ticket, chars);
+  for (const idLine of formatReceiptCouponLine(
+    ticket.receiptNumber,
+    ticket.couponNumber,
+    chars,
+  )) {
+    parts.push(line(idLine));
+  }
+  pushBranchLines(parts, ticket, chars);
   parts.push(line(leftRight("Date:", ticketDateForEscpos(ticket), chars)));
 
   parts.push(line(divider(chars)));
@@ -352,6 +390,10 @@ function buildTicketEscPosParts(ticket, opts) {
       const home = sel?.match?.homeTeam || "";
       const away = sel?.match?.awayTeam || "";
       const matchName = away ? `${home} vs ${away}` : home || "Match";
+      const leagueLine = formatLeagueLine(
+        sel?.match?.country,
+        sel?.match?.leagueName,
+      );
       const kickoff = formatKickoff(sel?.match?.startTime);
       const pick = sel?.selection || sel?.pick || "-";
       const market = sel?.marketLabel || "";
@@ -362,19 +404,25 @@ function buildTicketEscPosParts(ticket, opts) {
         parts.push(line(ml));
       }
 
-      if (kickoff) {
-        parts.push(line(`   ${kickoff}`));
-      }
-
-      const pickLabel = market ? `${market}: ${pick}` : pick;
-      const pickLines = wrapText(pickLabel, chars - 8);
-      for (let j = 0; j < pickLines.length; j++) {
-        if (j === pickLines.length - 1) {
-          parts.push(line(leftRight(`   ${pickLines[j]}`, odds, chars)));
-        } else {
-          parts.push(line(`   ${pickLines[j]}`));
+      if (leagueLine) {
+        const leagueLines = wrapText(`   ${leagueLine}`, chars);
+        for (const ll of leagueLines) {
+          parts.push(line(ll));
         }
       }
+
+      const marketLabel = market || "-";
+      const marketLines = wrapText(`   ${marketLabel}`, chars - pick.length - 4);
+      for (let j = 0; j < marketLines.length; j++) {
+        if (j === marketLines.length - 1) {
+          parts.push(line(leftRight(marketLines[j], pick, chars)));
+        } else {
+          parts.push(line(marketLines[j]));
+        }
+      }
+
+      const kickoffLabel = kickoff || "-";
+      parts.push(line(leftRight(`   ${kickoffLabel}`, odds, chars)));
 
       if (i < selections.length - 1) {
         parts.push(line(divider(chars)));
@@ -402,15 +450,7 @@ function buildTicketEscPosParts(ticket, opts) {
   }
 
   parts.push(line(divider(chars)));
-
-  parts.push(new Uint8Array(CMD.ALIGN_CENTER));
-  parts.push(
-    line(center(ticket.receiptNumber || ticket.couponNumber || "", chars)),
-  );
-
   parts.push(new Uint8Array(CMD.BOLD_OFF));
-  parts.push(new Uint8Array(CMD.FEED_LINES(2)));
-  parts.push(new Uint8Array(CMD.CUT_PARTIAL));
 
   return parts;
 }
@@ -423,8 +463,13 @@ function buildTicketEscPosParts(ticket, opts) {
  * @returns {Uint8Array}
  */
 export function encodeTicket(ticket, opts = {}) {
+  const { width = "80mm" } = opts;
+  const chars = width === "58mm" ? CHARS_58MM : CHARS_80MM;
   const parts = [new Uint8Array(CMD.INIT)];
   parts.push(...buildTicketEscPosParts(ticket, opts));
+  appendTicketFooterParts(parts, chars);
+  parts.push(new Uint8Array(CMD.FEED_LINES(2)));
+  parts.push(new Uint8Array(CMD.CUT_PARTIAL));
   return concat(...parts);
 }
 
@@ -437,6 +482,7 @@ export function encodeTicket(ticket, opts = {}) {
  */
 export async function encodeTicketAsync(ticket, opts = {}) {
   const { width = "80mm" } = opts;
+  const chars = width === "58mm" ? CHARS_58MM : CHARS_80MM;
   const logoBytes = await getLogoEscPosPromise(width);
   const barcodePayload = getBarcodePayload(ticket);
 
@@ -447,6 +493,8 @@ export async function encodeTicketAsync(ticket, opts = {}) {
     parts.push(logoBytes);
   }
 
+  parts.push(...buildTicketEscPosParts(ticket, opts));
+
   if (barcodePayload) {
     const barcodeBytes = await getBarcodeEscPosPromise(width, barcodePayload);
     if (barcodeBytes.length > 0) {
@@ -455,6 +503,22 @@ export async function encodeTicketAsync(ticket, opts = {}) {
     }
   }
 
-  parts.push(...buildTicketEscPosParts(ticket, opts));
+  appendTicketFooterParts(parts, chars);
+  parts.push(new Uint8Array(CMD.FEED_LINES(2)));
+  parts.push(new Uint8Array(CMD.CUT_PARTIAL));
   return concat(...parts);
 }
+
+export {
+  CMD,
+  CHARS_80MM,
+  CHARS_58MM,
+  concat,
+  line,
+  center,
+  leftRight,
+  divider,
+  wrapText,
+  getLogoEscPosPromise,
+  getBarcodeEscPosPromise,
+};

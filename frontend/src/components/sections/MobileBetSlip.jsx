@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import AppIcon from "../common/AppIcon";
+import CouponReceipt from "../common/CouponReceipt";
 import {
   fetchPublicCouponTicket,
   hasAuthToken,
@@ -739,54 +740,8 @@ function MobileBetSlip({
                 onClick={() => setCouponCheckPreview(null)}
                 label="Close ticket preview"
               />
-              <div className="mb-4 text-center">
-                <h2 className="text-xl font-extrabold text-(--sb-accent)">
-                  Coupon template
-                </h2>
-                <p className="mt-1 font-mono text-lg font-bold tracking-wide text-[#ffffff]">
-                  {couponCheckPreview.couponNumber}
-                </p>
-                <p className="mt-3 text-left text-xs leading-relaxed text-[rgba(255,255,255,0.72)]">
-                  This shows the selections linked to this coupon code. Stake,
-                  status, and payout use your receipt number (issued when you
-                  pay or when the slip is printed at the shop).
-                </p>
-              </div>
-              <div className="overflow-hidden rounded-[1rem] ring-1 ring-white/10 shadow-inner shadow-black/20">
-                <div className="bg-(--sb-accent-fill) px-3 py-2 text-sm font-bold text-[#000000]">
-                  Games on this coupon
-                </div>
-                <table className="w-full text-left text-[11px]">
-                  <thead>
-                    <tr className="border-b border-white/8 bg-[#0a0a0a]/70 text-[rgba(255,255,255,0.72)] backdrop-blur-sm">
-                      <th className="px-2 py-2 font-semibold">Match</th>
-                      <th className="px-2 py-2 font-semibold">Market</th>
-                      <th className="px-2 py-2 font-semibold">Pick</th>
-                      <th className="px-2 py-2 text-right font-semibold">
-                        Odds
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {(couponCheckPreview.selections || []).map((sel, idx) => (
-                      <tr
-                        key={`${couponCheckPreview.couponNumber}-${idx}`}
-                        className="border-b border-[#2a2a3e] text-[#ffffff]"
-                      >
-                        <td className="max-w-[120px] px-2 py-2 align-top">
-                          {sel.matchName}
-                        </td>
-                        <td className="px-2 py-2 align-top">
-                          {sel.marketLabel}
-                        </td>
-                        <td className="px-2 py-2 align-top">{sel.label}</td>
-                        <td className="px-2 py-2 text-right align-top font-bold">
-                          {Number(sel.odds).toFixed(2)}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+              <div className="flex justify-center">
+                <CouponReceipt ticket={couponCheckPreview} />
               </div>
             </div>
           </div>,

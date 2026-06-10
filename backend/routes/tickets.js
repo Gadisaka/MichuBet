@@ -8,6 +8,8 @@ import {
   listTickets,
   payoutTicket,
   preparePrintTicket,
+  removeTicketSelection,
+  repeatTicket,
   updateTicketStake,
   validatePrintTicket,
   voidTicket,
@@ -34,6 +36,16 @@ router.patch(
   "/:id/stake",
   authorizePermission("tickets:create"),
   updateTicketStake,
+);
+router.post(
+  "/:id/repeat",
+  authorizePermission("tickets:create"),
+  repeatTicket,
+);
+router.delete(
+  "/:id/selections/:selectionId",
+  authorizePermission("tickets:create"),
+  removeTicketSelection,
 );
 router.post(
   "/:id/validate-print",
