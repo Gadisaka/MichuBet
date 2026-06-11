@@ -2805,13 +2805,13 @@ export async function repeatTicket(req, res) {
 
 /**
  * DELETE /api/tickets/:id/selections/:selectionId
- * Removes an expired/near-expiry leg from an OPEN ticket before print.
+ * Removes any leg from an OPEN ticket before print.
  */
 export async function removeTicketSelection(req, res) {
   try {
     const ticket = await prisma.ticket.findUnique({
       where: { id: req.params.id },
-      include: ticketSelectionRelationArgs,
+      include: { selections: ticketSelectionRelationArgs },
     });
     if (!ticket) {
       return res.status(404).json({ message: "Ticket not found" });
@@ -2861,13 +2861,6 @@ export async function removeTicketSelection(req, res) {
     }
 
     const targetSelection = selections[selectionIndex];
-    const kickoff = selectionKickoffTime(targetSelection);
-    if (!isSelectionWithinRemovalBuffer(kickoff)) {
-      return res.status(400).json({
-        message:
-          "Selection can only be removed when kickoff is within 5 minutes or already passed",
-      });
-    }
 
     const snapshot = Array.isArray(ticket.selection_snapshot)
       ? [...ticket.selection_snapshot]
