@@ -26,23 +26,19 @@ import { logAuditEvent } from "../lib/auditLog.js";
 import { notifyUserSafe } from "../lib/createNotification.js";
 import { betPlacedNotification } from "../lib/notificationMessages.js";
 import { resolveAccumulatorForNewTicket } from "../lib/bonusEngine.js";
-import { inferMarketCode } from "../services/marketEvaluator.js";
-import { MARKET_REGISTRY } from "../services/markets/registry.js";
-import { tryResolveMarketCodeBetId } from "../services/markets/apiSportsBetIdMap.js";
-import {
-  ValidationError,
-  MarketUnknownError,
-} from "../services/markets/errors.js";
+import { classifySelectionSupport } from "../services/markets/marketSupport.js";
 import { validatePlacementSelections } from "../services/odds-engine/validateSelections.js";
 import { validateOpenTicketForPrint, normalizeSnapshotForPrintValidation } from "../services/ticketPrintValidation.js";
 import { getCache, setCache } from "../services/cacheService.js";
 import { withWalletLock } from "../lib/walletLock.js";
 import { logPlacementValidation } from "../lib/placementValidationLogger.js";
 import { toMoney, d, sub } from "../lib/moneyDecimal.js";
+import {
+  buildCouponNumber,
+  couponLookupCandidates,
+  normalizeCouponLookupInput,
+} from "../lib/couponNumber.js";
 
-function placementV2Enabled() {
-  return String(process.env.PLACEMENT_VALIDATION || "").toLowerCase() === "v2";
-}
 
 /**
  * Normalize a raw selection via the V2 market registry.
@@ -55,53 +51,6 @@ function placementV2Enabled() {
  *   - createTicket:        { marketCode?, marketLabel?, marketParams?, selection? }
  *   - createPrebookTicket: { marketCode?, marketLabel?, marketParams?, label? }
  */
-function normalizeSelectionForV2(input, ctx) {
-  const explicitRaw = input?.marketCode
-    ? String(input.marketCode).trim()
-    : null;
-  const baseParams =
-    input?.marketParams && typeof input.marketParams === "object"
-      ? { ...input.marketParams }
-      : {};
-
-  let code = null;
-  const betFromCode = explicitRaw
-    ? tryResolveMarketCodeBetId(explicitRaw)
-    : null;
-  if (betFromCode) {
-    code =
-      MARKET_REGISTRY.resolveCode(betFromCode.canonical) ||
-      String(betFromCode.canonical).toUpperCase().trim();
-    baseParams.apiBetId = betFromCode.apiBetId;
-  } else if (explicitRaw) {
-    code = MARKET_REGISTRY.resolveCode(explicitRaw);
-  }
-
-  if (!code) {
-    code =
-      MARKET_REGISTRY.resolveCode(input?.marketLabel) ||
-      MARKET_REGISTRY.resolveCode(input?.selection) ||
-      MARKET_REGISTRY.resolveCode(input?.label);
-  }
-
-  if (!code) {
-    throw new MarketUnknownError(
-      explicitRaw ||
-        input?.marketLabel ||
-        input?.selection ||
-        input?.label ||
-        "",
-    );
-  }
-  const label = input?.label ?? input?.selection ?? "";
-  const params = MARKET_REGISTRY.validate(code, baseParams, {
-    label,
-    fixture: ctx?.fixture,
-    match: ctx?.match,
-  });
-  return { marketCode: code, marketParams: params };
-}
-
 function toPositiveInt(value, fallback) {
   const parsed = Number.parseInt(value, 10);
   if (!Number.isFinite(parsed) || parsed <= 0) return fallback;
@@ -110,19 +59,6 @@ function toPositiveInt(value, fallback) {
 
 const CASHIER_PROFILE_MISSING_MESSAGE =
   "Cashier profile not found. Ask admin to create/assign this cashier in Agents & Cashiers.";
-
-function randomLowerLetter() {
-  return String.fromCharCode(97 + Math.floor(Math.random() * 26));
-}
-
-/** Unique human-facing id for offline lookup / printing — two letters + six digits (lowercase) */
-function buildCouponNumber() {
-  const letters = randomLowerLetter() + randomLowerLetter();
-  const digits = Math.floor(Math.random() * 1_000_000)
-    .toString()
-    .padStart(6, "0");
-  return `${letters}${digits}`;
-}
 
 /** Unique payout id — #####-##### (digits). Uniqueness enforced when assigning (Mongo has no sparse unique in Prisma). */
 function buildReceiptNumber() {
@@ -136,6 +72,23 @@ function buildReceiptNumber() {
 }
 
 const RECEIPT_ASSIGN_MAX_ATTEMPTS = 12;
+const COUPON_ASSIGN_MAX_ATTEMPTS = 12;
+
+/**
+ * @param {import("@prisma/client").PrismaClient | import("@prisma/client").Prisma.TransactionClient} client
+ * @returns {Promise<string>}
+ */
+async function reserveUniqueCouponNumber(client) {
+  for (let i = 0; i < COUPON_ASSIGN_MAX_ATTEMPTS; i++) {
+    const candidate = buildCouponNumber();
+    const clash = await client.ticket.findFirst({
+      where: { coupon_number: candidate },
+      select: { id: true },
+    });
+    if (!clash) return candidate;
+  }
+  throw new Error("COUPON_NUMBER_EXHAUSTED");
+}
 
 /**
  * @param {import("@prisma/client").PrismaClient | import("@prisma/client").Prisma.TransactionClient} client
@@ -261,7 +214,7 @@ async function resolveCouponNumberForCreate(
 ) {
   const trimmed = String(couponRaw ?? "").trim();
   if (!trimmed) {
-    return buildCouponNumber();
+    return reserveUniqueCouponNumber(client);
   }
 
   const { compact, compactLower } = normalizeCouponLookupInput(trimmed);
@@ -627,6 +580,8 @@ function mapPublicCouponPayload(ticket) {
 
   return {
     couponNumber: ticket.coupon_number,
+    receiptNumber: ticket.receipt_number ?? null,
+    status: ticket.status,
     stake: ticket.stake,
     totalOdds: ticket.total_odds,
     potentialWin: ticket.potential_win,
@@ -636,41 +591,6 @@ function mapPublicCouponPayload(ticket) {
     netPayout: taxBreakdown.netPayout,
     selections: selectionLegs,
   };
-}
-
-/**
- * Clean pasted coupon digits/letters copy (NBSP/BOM/zero-width trimmed, inner spaces removed).
- * Coupons are alphanumeric; DB stores lowercase from `buildCouponNumber`.
- *
- * @param {unknown} raw
- * @returns {{ compact: string, compactLower: string }}
- */
-function normalizeCouponLookupInput(raw) {
-  let s = String(raw ?? "").normalize("NFKC");
-  s = s.replace(/\ufeff/g, "").trim();
-  s = s.replace(/[\u00a0\u200b-\u200d\ufeff]/g, "").trim();
-  const compact = s.replace(/\s+/g, "");
-  const compactLower = compact.toLowerCase();
-  return { compact, compactLower };
-}
-
-/**
- * Unique DB values we should try against `coupon_number` (handles legacy casing quirks).
- *
- * @param {string} compact
- * @param {string} compactLower
- */
-function couponLookupCandidates(compact, compactLower) {
-  /** @type {string[]} */
-  const out = [];
-  const push = (v) => {
-    const t = String(v || "").trim();
-    if (!t || out.includes(t)) return;
-    out.push(t);
-  };
-  push(compactLower);
-  push(compact);
-  return out;
 }
 
 /**
@@ -718,6 +638,42 @@ export async function getPublicCouponTicket(req, res) {
     return res.json(mapPublicCouponPayload(ticket));
   } catch (error) {
     console.error("getPublicCouponTicket error:", error);
+    return res.status(500).json({ message: "Failed to load ticket" });
+  }
+}
+
+/**
+ * GET /api/cms/ticket-by-receipt?receiptNumber=
+ * Public read — exact receipt match for check-ticket flows.
+ */
+export async function getPublicReceiptTicket(req, res) {
+  try {
+    const compact = normalizeReceiptLookupInput(
+      req.query.receiptNumber ?? req.query.receipt ?? "",
+    );
+    if (!compact) {
+      return res.status(400).json({ message: "receiptNumber is required" });
+    }
+
+    const ticketInclude = {
+      selections: ticketSelectionRelationArgs,
+    };
+
+    const ticket = await prisma.ticket.findFirst({
+      where: { receipt_number: compact },
+      include: ticketInclude,
+    });
+
+    if (!ticket || !ticket.receipt_number) {
+      return res.status(404).json({
+        message: "Ticket not found",
+        code: "TICKET_NOT_FOUND",
+      });
+    }
+
+    return res.json(mapPublicCouponPayload(ticket));
+  } catch (error) {
+    console.error("getPublicReceiptTicket error:", error);
     return res.status(500).json({ message: "Failed to load ticket" });
   }
 }
@@ -828,50 +784,37 @@ export async function createTicket(req, res) {
     // throwing inside the Prisma `create` call.
     const validationErrors = [];
     const preparedSelections = selections.map((item, idx) => {
-      let marketCode;
-      let marketParams;
-      if (placementV2Enabled()) {
-        try {
-          const normalized = normalizeSelectionForV2(
-            {
-              marketCode: item.marketCode,
-              marketLabel: item.marketLabel,
-              selection: item.selection,
-              marketParams: item.marketParams,
-            },
-            {},
-          );
-          marketCode = normalized.marketCode;
-          marketParams = normalized.marketParams;
-        } catch (err) {
-          validationErrors.push({
-            index: idx,
-            code: err.code || "invalid",
-            field: err.field || null,
-            marketLabel: item.marketLabel || null,
-            label: item.selection || null,
-            details: err.details || null,
-          });
-          return null;
-        }
-      } else {
-        marketCode = item.marketCode
-          ? String(item.marketCode).toUpperCase().trim()
-          : inferMarketCode({
-              marketLabel: item.marketLabel,
-              selection: item.selection,
-            });
-        marketParams =
-          item.marketParams && typeof item.marketParams === "object"
-            ? item.marketParams
-            : undefined;
+      // Cashier admin-Match path: lenient guard — require a resolvable code with
+      // a real grader (checks 1–3), but NOT the feed allowlist, since cashier
+      // markets settle via the admin result-string path and shouldn't be
+      // over-blocked. Still closes the unresolvable / no-handler holes.
+      const support = classifySelectionSupport(
+        {
+          marketCode: item.marketCode,
+          marketLabel: item.marketLabel,
+          selection: item.selection,
+          label: item.selection,
+          marketParams: item.marketParams,
+        },
+        { mode: "lenient" },
+      );
+      if (!support.ok) {
+        validationErrors.push({
+          index: idx,
+          code: support.reason || "market_not_supported",
+          field: "marketCode",
+          marketLabel: item.marketLabel || null,
+          label: item.selection || null,
+          details: null,
+        });
+        return null;
       }
       return {
         match_id: item.matchId,
         selection: item.selection,
         odds: Number(item.odds),
-        market_code: marketCode,
-        market_params: marketParams,
+        market_code: support.code,
+        market_params: support.params,
         result: "PENDING",
       };
     });
@@ -966,39 +909,28 @@ function normalizePrebookSelectionsInput(selections = []) {
       let marketCode;
       let marketParams;
 
-      if (placementV2Enabled()) {
-        try {
-          const normalized = normalizeSelectionForV2(
-            {
-              marketCode: explicitMarketCode,
-              marketLabel,
-              marketParams: item?.marketParams,
-              label,
-            },
-            {},
-          );
-          marketCode = normalized.marketCode;
-          marketParams = normalized.marketParams;
-        } catch (err) {
-          validationErrors.push({
-            index: idx,
-            code: err.code || "invalid",
-            field: err.field || null,
-            marketLabel,
-            label,
-            details: err.details || null,
-          });
-          return null;
-        }
-      } else {
-        marketCode =
-          explicitMarketCode ||
-          inferMarketCode({ marketLabel, selection: label });
-        marketParams =
-          item?.marketParams && typeof item.marketParams === "object"
-            ? item.marketParams
-            : null;
+      // PHASE-0 PLACEMENT GUARD (engine-independent). A leg may only be stored
+      // if it resolves to a real settlement grader, the name↔code mapping is
+      // consistent (blocks the mis-mapped markets), and the code is allowlisted
+      // for the active phase. This closes the null-`market_code` hole that
+      // produced unsettleable + mis-graded tickets.
+      const support = classifySelectionSupport(
+        { marketCode: explicitMarketCode, marketLabel, selection: label, label, marketParams: item?.marketParams },
+        { mode: "strict" },
+      );
+      if (!support.ok) {
+        validationErrors.push({
+          index: idx,
+          code: support.reason || "market_not_supported",
+          field: "marketCode",
+          marketLabel,
+          label,
+          details: null,
+        });
+        return null;
       }
+      marketCode = support.code;
+      marketParams = support.params;
 
       const accepted = Number(item?.acceptedOdds);
       const submitted = Number(item?.odds);

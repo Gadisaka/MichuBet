@@ -20,7 +20,10 @@ import {
 } from "../lib/onlineDepositReceiversConfig.js";
 import { resolveCancelWindowMinutes } from "../lib/ticketCancelWindow.js";
 import { resolveWinningsTax } from "../lib/winningsTax.js";
-import { getPublicCouponTicket } from "../controllers/ticketsController.js";
+import {
+  getPublicCouponTicket,
+  getPublicReceiptTicket,
+} from "../controllers/ticketsController.js";
 
 const router = Router();
 
@@ -70,6 +73,9 @@ router.get("/site-branding", async (_req, res) => {
 
 /** Public sportsbook: lookup ticket by coupon for check / replay slip flows. */
 router.get("/ticket-by-coupon", getPublicCouponTicket);
+
+/** Public sportsbook: lookup ticket by receipt id for check-ticket flows. */
+router.get("/ticket-by-receipt", getPublicReceiptTicket);
 
 /** Public sportsbook UX: numeric limits + effective cancel window (minutes). */
 router.get("/platform-config", async (_req, res) => {

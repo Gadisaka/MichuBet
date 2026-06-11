@@ -135,3 +135,47 @@
     radial-gradient(circle at 50% 100%, transparent 7px, #000 7.5px) repeat-x 0
       100% / 15px 51%;
 }
+
+.coupon-receipt__ticket-status--won {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.coupon-receipt__ticket-status--lost {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.coupon-receipt__ticket-status--pending {
+  background: #fef9c3;
+  color: #a16207;
+}
+
+.coupon-receipt__ticket-status--cancelled {
+  background: #e2e8f0;
+  color: #475569;
+}
+
+.coupon-receipt__leg--won {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.coupon-receipt__leg--lost {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.coupon-receipt__leg--pending {
+  background: #fef9c3;
+  color: #a16207;
+}
+
+.coupon-receipt__summary-highlight {
+  background: #14532d;
+  color: #ffffff;
+}
+
+.coupon-receipt__summary-highlight span {
+  color: inherit;
+}

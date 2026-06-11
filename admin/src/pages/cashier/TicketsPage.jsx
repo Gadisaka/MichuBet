@@ -1020,7 +1020,7 @@ export default function CashierTicketsPage() {
                     type="text"
                     value={sellCouponInput}
                     onChange={(event) => setSellCouponInput(event.target.value)}
-                    placeholder="Enter Coupon ID"
+                    placeholder="e.g. 12345-67890"
                     className="w-full rounded-sm border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5 text-sm outline-none focus:border-[var(--accent)]"
                   />
                   <button

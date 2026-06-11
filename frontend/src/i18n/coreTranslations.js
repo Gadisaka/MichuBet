@@ -72,6 +72,7 @@ export const translations = Object.freeze({
       menu: "Menu",
       games: "GAMES",
       deposit: "DEPOSIT",
+      slip: "SLIP",
       betSlip: "Bet Slip",
     }),
     sidebar: Object.freeze({
@@ -168,6 +169,7 @@ export const translations = Object.freeze({
       menu: "ምናሌ",
       games: "ጨዋታዎች",
       deposit: "ዲፖዚት",
+      slip: "ቁራጭ",
       betSlip: "የውርርድ ቁራጭ",
     }),
     sidebar: Object.freeze({

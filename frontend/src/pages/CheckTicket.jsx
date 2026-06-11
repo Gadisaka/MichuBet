@@ -11,25 +11,25 @@ import {
   accountPrimaryBtn,
 } from "../components/common/accountFormClasses";
 import { topHeaderData, topNavItems } from "../data/homepageData";
-import { fetchPublicCouponTicket } from "../services/api";
+import { fetchPublicReceiptTicket } from "../services/api";
 import CouponReceipt from "../components/common/CouponReceipt";
 
 function CheckTicket() {
   const navigate = useNavigate();
-  const [couponInput, setCouponInput] = useState("");
+  const [receiptInput, setReceiptInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [preview, setPreview] = useState(null);
 
   async function handleSubmit(e) {
     e?.preventDefault?.();
-    const trimmed = String(couponInput || "").trim().toLowerCase();
+    const trimmed = String(receiptInput || "").trim();
     if (!trimmed || loading) return;
     setLoading(true);
     setError(null);
     setPreview(null);
     try {
-      const data = await fetchPublicCouponTicket(trimmed);
+      const data = await fetchPublicReceiptTicket(trimmed);
       setPreview(data);
     } catch (err) {
       setError(err?.message || "Ticket not found.");
@@ -72,26 +72,25 @@ function CheckTicket() {
         <form onSubmit={handleSubmit} className="animate-deposit-panel">
           <SoftPanel>
             <p className="mb-4 text-center text-xs font-extrabold uppercase tracking-[0.18em] text-[rgba(255,255,255,0.72)]">
-              Coupon code
+              Receipt ID
             </p>
             <p className="mb-4 text-center text-[11px] leading-relaxed text-[rgba(255,255,255,0.5)]">
-              Enter the coupon number from your slip. This shows the selections
-              linked to that code. Stake and payout follow your receipt when the
-              bet is paid or printed.
+              Enter the receipt number from your slip to view selections, status,
+              stake, and payout.
             </p>
             <div className="flex gap-2">
               <input
                 type="text"
-                value={couponInput}
-                onChange={(e) => setCouponInput(e.target.value)}
-                placeholder="e.g. abc123…"
+                value={receiptInput}
+                onChange={(e) => setReceiptInput(e.target.value)}
+                placeholder="e.g. 95548-72957"
                 disabled={loading}
                 autoComplete="off"
                 className={`${accountInputCls} min-h-[3rem] flex-1`}
               />
               <button
                 type="submit"
-                disabled={loading || !String(couponInput || "").trim()}
+                disabled={loading || !String(receiptInput || "").trim()}
                 className="inline-flex min-h-[3rem] shrink-0 cursor-pointer items-center justify-center rounded-2xl border-0 bg-[#0a0a0a]/90 px-4 text-[#9aaed1] ring-1 ring-[#F6AF01]/70 transition-all hover:ring-(--sb-accent-fill)/45 disabled:pointer-events-none disabled:opacity-45"
                 aria-label="Look up ticket"
               >
@@ -104,7 +103,7 @@ function CheckTicket() {
             </div>
             <button
               type="submit"
-              disabled={loading || !String(couponInput || "").trim()}
+              disabled={loading || !String(receiptInput || "").trim()}
               className={`${accountPrimaryBtn} mt-4`}
             >
               {loading ? "Checking…" : "Check ticket"}

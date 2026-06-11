@@ -4,6 +4,7 @@ import AppIcon from "../common/AppIcon";
 import CouponReceipt from "../common/CouponReceipt";
 import {
   fetchPublicCouponTicket,
+  fetchPublicReceiptTicket,
   hasAuthToken,
   placeBet,
 } from "../../services/api";
@@ -423,9 +424,7 @@ function BetSlipPanel({
   }
 
   async function handleLoadCouponSubmit() {
-    const trimmed = String(loadCouponInput || "")
-      .trim()
-      .toLowerCase();
+    const trimmed = String(loadCouponInput || "").trim();
     if (!trimmed || couponLoadingLoad) return;
     setCouponLoadingLoad(true);
     setBetResult(null);
@@ -461,14 +460,12 @@ function BetSlipPanel({
   }
 
   async function handleCheckCouponSubmit() {
-    const trimmed = String(checkCouponInput || "")
-      .trim()
-      .toLowerCase();
+    const trimmed = String(checkCouponInput || "").trim();
     if (!trimmed || couponLoadingCheck) return;
     setCouponLoadingCheck(true);
     setBetResult(null);
     try {
-      const data = await fetchPublicCouponTicket(trimmed);
+      const data = await fetchPublicReceiptTicket(trimmed);
       setCouponCheckPreview(data);
     } catch (err) {
       setBetResult({
@@ -525,7 +522,7 @@ function BetSlipPanel({
               onKeyDown={(e) => {
                 if (e.key === "Enter") handleLoadCouponSubmit();
               }}
-              placeholder="Load Coupon..."
+              placeholder="e.g. 12345-67890"
               disabled={couponLoadingLoad}
               autoComplete="off"
               className="h-10 min-w-0 flex-1 rounded-xl border-0 bg-[#0a0a0a]/80 px-3 text-[13px] text-[#ffffff] shadow-inner shadow-black/25 ring-1 ring-white/10 outline-none transition-all placeholder:text-[rgba(255,255,255,0.72)] focus:ring-2 focus:ring-(--sb-accent-fill)/45 disabled:opacity-60"
@@ -552,14 +549,14 @@ function BetSlipPanel({
               onKeyDown={(e) => {
                 if (e.key === "Enter") handleCheckCouponSubmit();
               }}
-              placeholder="Check Coupon..."
+              placeholder="Check Receipt..."
               disabled={couponLoadingCheck}
               autoComplete="off"
               className="h-10 min-w-0 flex-1 rounded-xl border-0 bg-[#0a0a0a]/80 px-3 text-[13px] text-[#ffffff] shadow-inner shadow-black/25 ring-1 ring-white/10 outline-none transition-all placeholder:text-[rgba(255,255,255,0.72)] focus:ring-2 focus:ring-(--sb-accent-fill)/45 disabled:opacity-60"
             />
             <button
               type="button"
-              title="Check coupon status"
+              title="Check receipt status"
               disabled={couponLoadingCheck}
               onClick={handleCheckCouponSubmit}
               className="flex h-10 w-11 shrink-0 cursor-pointer items-center justify-center rounded-xl border-0 bg-[#0a0a0a]/80 text-[#9aaed1] shadow-inner shadow-black/20 ring-1 ring-white/10 transition-all hover:ring-(--sb-accent-fill)/35 disabled:pointer-events-none disabled:opacity-50"

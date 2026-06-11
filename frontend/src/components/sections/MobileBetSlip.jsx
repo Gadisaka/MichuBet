@@ -4,6 +4,7 @@ import AppIcon from "../common/AppIcon";
 import CouponReceipt from "../common/CouponReceipt";
 import {
   fetchPublicCouponTicket,
+  fetchPublicReceiptTicket,
   hasAuthToken,
   placeBet,
 } from "../../services/api";
@@ -376,9 +377,7 @@ function MobileBetSlip({
   }
 
   async function handleLoadCouponSubmit() {
-    const trimmed = String(loadCouponInput || "")
-      .trim()
-      .toLowerCase();
+    const trimmed = String(loadCouponInput || "").trim();
     if (!trimmed || couponLoadingLoad) return;
     setCouponLoadingLoad(true);
     setBetResult(null);
@@ -414,14 +413,12 @@ function MobileBetSlip({
   }
 
   async function handleCheckCouponSubmit() {
-    const trimmed = String(checkCouponInput || "")
-      .trim()
-      .toLowerCase();
+    const trimmed = String(checkCouponInput || "").trim();
     if (!trimmed || couponLoadingCheck) return;
     setCouponLoadingCheck(true);
     setBetResult(null);
     try {
-      const data = await fetchPublicCouponTicket(trimmed);
+      const data = await fetchPublicReceiptTicket(trimmed);
       setCouponCheckPreview(data);
     } catch (err) {
       setBetResult({
@@ -434,51 +431,11 @@ function MobileBetSlip({
     }
   }
 
-  return (
-    <>
-      <div
-        className={`fixed inset-x-0 bottom-0 z-60 flex flex-col rounded-t-[1.25rem] bg-gradient-to-br from-[#111111]/96 via-[#0a0a0a]/96 to-[#000000]/95 shadow-[0_-12px_40px_-8px_rgba(0,0,0,0.55)]  backdrop-blur-md transition-transform duration-300 ease-in-out lg:hidden ${
-          open ? "translate-y-0" : "translate-y-full"
-        }`}
-        style={{ height: "100vh", paddingTop: "env(safe-area-inset-top, 0px)" }}
-      >
-        {/* Tabs header */}
-        <div
-          className={`flex shrink-0 items-center border-b bg-[#0a0a0a]/35 backdrop-blur-md ${slipDivider}`}
-        >
-          <button
-            type="button"
-            className={`mx-0.5 flex-1 cursor-pointer rounded-t-xl border-0 bg-transparent py-3 text-sm font-bold transition-colors ${
-              isMulti
-                ? "text-(--sb-accent-text-on-dark) shadow-[inset_0_-2px_0_0_var(--sb-accent-fill)]"
-                : "text-[rgba(255,255,255,0.72)]"
-            }`}
-          >
-            Multi
-          </button>
-          <button
-            type="button"
-            className={`mx-0.5 flex-1 cursor-pointer rounded-t-xl border-0 bg-transparent py-3 text-sm font-bold transition-colors ${
-              !isMulti
-                ? "text-(--sb-accent-text-on-dark) shadow-[inset_0_-2px_0_0_var(--sb-accent-fill)]"
-                : "text-[rgba(255,255,255,0.72)]"
-            }`}
-          >
-            Single
-          </button>
-          <button
-            type="button"
-            onClick={onClose}
-            className="flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-xl border-0 bg-transparent text-[rgba(255,255,255,0.72)] transition-colors hover:bg-[#0a0a0a]/50 hover:text-[#ffffff]"
-          >
-            <AppIcon name="chevronDown" size={20} />
-          </button>
-        </div>
-
-        <div
-          className={`space-y-2 border-b bg-[#0a0a0a]/25 px-3 pb-2.5 pt-2 backdrop-blur-sm shrink-0 ${slipDivider}`}
-        >
-          <div className="flex gap-2">
+  const couponToolsSection = (
+    <div
+      className={`space-y-2 border-b bg-[#0a0a0a]/25 px-3 pb-2.5 pt-2 backdrop-blur-sm shrink-0 ${slipDivider}`}
+    >
+      <div className="flex gap-2">
             <input
               type="text"
               value={loadCouponInput}
@@ -486,7 +443,7 @@ function MobileBetSlip({
               onKeyDown={(e) => {
                 if (e.key === "Enter") handleLoadCouponSubmit();
               }}
-              placeholder="Load Coupon..."
+              placeholder="e.g. 12345-67890"
               disabled={couponLoadingLoad}
               autoComplete="off"
               className="h-10 min-w-0 flex-1 rounded-xl border-0 bg-[#0a0a0a]/80 px-3 text-[13px] text-[#ffffff] shadow-inner shadow-black/25 ring-1 ring-white/10 outline-none transition-all placeholder:text-[rgba(255,255,255,0.72)] focus:ring-2 focus:ring-(--sb-accent-fill)/45 disabled:opacity-60"
@@ -513,14 +470,14 @@ function MobileBetSlip({
               onKeyDown={(e) => {
                 if (e.key === "Enter") handleCheckCouponSubmit();
               }}
-              placeholder="Check Coupon..."
+              placeholder="Check Receipt..."
               disabled={couponLoadingCheck}
               autoComplete="off"
               className="h-10 min-w-0 flex-1 rounded-xl border-0 bg-[#0a0a0a]/80 px-3 text-[13px] text-[#ffffff] shadow-inner shadow-black/25 ring-1 ring-white/10 outline-none transition-all placeholder:text-[rgba(255,255,255,0.72)] focus:ring-2 focus:ring-(--sb-accent-fill)/45 disabled:opacity-60"
             />
             <button
               type="button"
-              title="Check coupon status"
+              title="Check receipt status"
               disabled={couponLoadingCheck}
               onClick={handleCheckCouponSubmit}
               className="flex h-10 w-11 shrink-0 cursor-pointer items-center justify-center rounded-xl border-0 bg-[#0a0a0a]/80 text-[#9aaed1] shadow-inner shadow-black/20 ring-1 ring-white/10 transition-all hover:ring-(--sb-accent-fill)/35 disabled:pointer-events-none disabled:opacity-50"
@@ -532,9 +489,49 @@ function MobileBetSlip({
               )}
             </button>
           </div>
-        </div>
+    </div>
+  );
 
-        {/* Selections list */}
+  return (
+    <>
+      <div
+        className={`fixed inset-x-0 bottom-0 z-60 flex flex-col rounded-t-[1.25rem] bg-gradient-to-br from-[#111111]/96 via-[#0a0a0a]/96 to-[#000000]/95 shadow-[0_-12px_40px_-8px_rgba(0,0,0,0.55)]  backdrop-blur-md transition-transform duration-300 ease-in-out lg:hidden ${
+          open ? "translate-y-0" : "translate-y-full"
+        }`}
+        style={{ height: "100vh", paddingTop: "env(safe-area-inset-top, 0px)" }}
+      >
+        <div
+          className={`flex shrink-0 items-center border-b bg-[#0a0a0a]/35 backdrop-blur-md ${slipDivider}`}
+        >
+              <button
+                type="button"
+                className={`mx-0.5 flex-1 cursor-pointer rounded-t-xl border-0 bg-transparent py-3 text-sm font-bold transition-colors ${
+                  isMulti
+                    ? "text-(--sb-accent-text-on-dark) shadow-[inset_0_-2px_0_0_var(--sb-accent-fill)]"
+                    : "text-[rgba(255,255,255,0.72)]"
+                }`}
+              >
+                Multi
+              </button>
+              <button
+                type="button"
+                className={`mx-0.5 flex-1 cursor-pointer rounded-t-xl border-0 bg-transparent py-3 text-sm font-bold transition-colors ${
+                  !isMulti
+                    ? "text-(--sb-accent-text-on-dark) shadow-[inset_0_-2px_0_0_var(--sb-accent-fill)]"
+                    : "text-[rgba(255,255,255,0.72)]"
+                }`}
+              >
+                Single
+              </button>
+              <button
+                type="button"
+                onClick={onClose}
+                className="flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-xl border-0 bg-transparent text-[rgba(255,255,255,0.72)] transition-colors hover:bg-[#0a0a0a]/50 hover:text-[#ffffff]"
+              >
+                <AppIcon name="chevronDown" size={20} />
+          </button>
+        </div>
+        {couponToolsSection}
         <div className="flex-1 overflow-y-auto">
           {selections.map((sel) => {
             const expired = isSelectionExpired(sel);
@@ -591,12 +588,10 @@ function MobileBetSlip({
               </div>
             );
           })}
-        </div>
-
-        {/* Bottom: stake input + stats + place bet */}
-        <div
-          className={`shrink-0 border-t bg-[#0a0a0a]/30 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur-sm ${slipDivider}`}
-        >
+            </div>
+            <div
+              className={`shrink-0 border-t bg-[#0a0a0a]/30 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur-sm ${slipDivider}`}
+            >
           {selections.length > 0 && hasExpiredSelection ? (
             <div className="mb-3 rounded border border-[#3f1d1d] bg-[#1f0a0a] px-3 py-2 text-center text-[11px] font-bold text-[#fecaca]">
               Remove expired matches to place this bet.

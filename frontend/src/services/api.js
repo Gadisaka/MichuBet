@@ -274,6 +274,21 @@ export async function fetchPublicCouponTicket(couponNumber) {
   return data;
 }
 
+/**
+ * GET /api/cms/ticket-by-receipt?receiptNumber= — public check-ticket lookup.
+ */
+export async function fetchPublicReceiptTicket(receiptNumber) {
+  const q = encodeURIComponent(String(receiptNumber || "").trim());
+  const res = await fetch(
+    `${API_URL}/api/cms/ticket-by-receipt?receiptNumber=${q}`,
+  );
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data.message || data.error || "Ticket not found");
+  }
+  return data;
+}
+
 export async function fetchMatch(id) {
   const res = await fetch(`${API_URL}/api/dummy/matches/${id}`);
   if (!res.ok) throw new Error(`Failed to fetch match: ${res.status}`);
