@@ -167,22 +167,20 @@ function TicketDetail({
                     ? home || "-"
                     : "-";
               const marketText = String(selection.marketLabel ?? "").trim();
-              const removable =
-                canRemoveSelections &&
-                isSelectionRemovable(selection.match?.startTime);
+              const startingSoon = isSelectionRemovable(selection.match?.startTime);
               const isRemoving = removingSelectionId === selection.id;
               return (
                 <tr
                   key={selection.id}
                   className={`border-b border-[var(--border)] last:border-0 ${
-                    removable ? "bg-[var(--surfaceMuted)]/40" : ""
+                    startingSoon ? "bg-[var(--surfaceMuted)]/40" : ""
                   }`}
                 >
                   <td className="px-3 py-2 text-xs text-[var(--muted)]">
                     {selection.match?.startTime
                       ? new Date(selection.match.startTime).toLocaleString()
                       : "-"}
-                    {removable ? (
+                    {startingSoon ? (
                       <span className="mt-0.5 block text-[10px] font-semibold uppercase text-[var(--danger)]">
                         Starting soon
                       </span>
@@ -198,18 +196,14 @@ function TicketDetail({
                   </td>
                   {canRemoveSelections ? (
                     <td className="px-3 py-2 text-right text-xs">
-                      {removable ? (
-                        <button
-                          type="button"
-                          disabled={Boolean(removingSelectionId)}
-                          onClick={() => onRemoveSelection?.(selection.id)}
-                          className="rounded-sm border border-[var(--border)] bg-[var(--surface)] px-2 py-1 text-[11px] font-semibold text-[var(--danger)] disabled:opacity-50"
-                        >
-                          {isRemoving ? "Removing..." : "Remove"}
-                        </button>
-                      ) : (
-                        <span className="text-[var(--muted)]">—</span>
-                      )}
+                      <button
+                        type="button"
+                        disabled={Boolean(removingSelectionId)}
+                        onClick={() => onRemoveSelection?.(selection.id)}
+                        className="rounded-sm border border-[var(--border)] bg-[var(--surface)] px-2 py-1 text-[11px] font-semibold text-[var(--danger)] disabled:opacity-50"
+                      >
+                        {isRemoving ? "Removing..." : "Remove"}
+                      </button>
                     </td>
                   ) : null}
                 </tr>
