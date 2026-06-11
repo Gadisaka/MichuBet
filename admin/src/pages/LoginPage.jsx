@@ -98,7 +98,7 @@ export default function LoginPage() {
       <form className="space-y-5" onSubmit={handleSubmit}>
         <PanelCard className="p-7">
           <div className="mb-6 text-center">
-            <h1 className="text-2xl font-bold tracking-tight">Michotbet</h1>
+            <h1 className="text-2xl font-bold tracking-tight">Michot.bet</h1>
             <p className="mt-1 text-sm text-[var(--muted)]">Admin Portal</p>
           </div>
 
