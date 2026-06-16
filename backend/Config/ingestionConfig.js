@@ -99,6 +99,12 @@ export function parseBookmakerFallbackChain() {
   return out;
 }
 
+/**
+ * Default bookmaker chain when admin preferred is set but BOOKMAKER_FALLBACK_CHAIN is empty.
+ * Marathonbet (2), 1xBet (11), Unibet (16), Superbet (34), Betano (32), Betfair (3).
+ */
+export const DEFAULT_BOOKMAKER_FALLBACK_CHAIN = [2, 11, 16, 34, 32, 3];
+
 let leagueTierMapWarned = false;
 
 /** api_league_id -> tier (0 = elite). Empty map when JSON invalid / unset. */

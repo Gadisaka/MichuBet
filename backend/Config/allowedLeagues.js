@@ -1,9 +1,8 @@
 /**
- * Allowlist of API-Football league IDs that we ingest fixtures and odds for.
+ * Legacy seed for league ranks (ranks 11+ after preferred + product priority).
  * IDs sourced from LIST_OF_LEAGUES.md (verified against API-Football /v3/leagues).
  *
- * Only fixtures belonging to these leagues will be stored in the database.
- * This dramatically reduces API usage, DB size, and sync times.
+ * Runtime ingestion uses dynamic top-active-by-rank via leagueRanks.js — see syncFixtures.js.
  */
 
 export const ALLOWED_LEAGUE_IDS = new Set([
@@ -162,7 +161,17 @@ export const PREFERRED_LEAGUE_IDS = new Set([
 ]);
 
 /**
- * Quick membership check for filtering fixtures during ingestion.
+ * Local product priority — ranked immediately after PREFERRED (ranks 9+),
+ * pinned in sidebar Top Leagues when active, always ingested when fixtures exist.
+ */
+export const PRODUCT_PRIORITY_LEAGUE_IDS = new Set([
+  363, // Premier League (Ethiopia)
+  1228, // Ethiopia Cup
+]);
+
+/**
+ * Legacy allowlist check (scripts / backward compat). Ingestion uses dynamic
+ * top-active-by-rank via leagueRanks.js — see syncFixtures.js.
  * @param {number} leagueId API-Football league.id
  */
 export function isAllowedLeague(leagueId) {

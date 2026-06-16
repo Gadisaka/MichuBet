@@ -321,9 +321,13 @@ export function useMatches({ includeLive = true, filters = {} } = {}) {
       byFixtureId.set(live.api_fixture_id, mapFixtureToMatch(live));
     }
 
-    return Array.from(byFixtureId.values()).sort(
-      (a, b) => Number(a.apiFixtureId) - Number(b.apiFixtureId),
-    );
+    return Array.from(byFixtureId.values()).sort((a, b) => {
+      const dr = (a.leagueRank ?? 9999) - (b.leagueRank ?? 9999);
+      if (dr !== 0) return dr;
+      const ka = a.kickoffAt ? new Date(a.kickoffAt).getTime() : 0;
+      const kb = b.kickoffAt ? new Date(b.kickoffAt).getTime() : 0;
+      return ka - kb || Number(a.apiFixtureId) - Number(b.apiFixtureId);
+    });
   }, [flatPrematchFixtures, liveFixtures]);
 
   const hydrateMatchOdds = useCallback(async (apiFixtureId) => {

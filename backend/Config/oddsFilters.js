@@ -8,6 +8,8 @@
  *      Resolved at runtime by `services/settingsService.getPreferredBookmakerApiId`.
  *      Optional `BOOKMAKER_FALLBACK_CHAIN` tries additional API ids when the
  *      preferred row has no priced markets after filtering.
+ *      When preferred is set and env chain is empty, appends
+ *      DEFAULT_BOOKMAKER_FALLBACK_CHAIN so lower-tier leagues still get lines.
  *      Falls back to `DEFAULT_BOOKMAKER_API_ID` when no preference is set.
  *      If none apply and no chain env, persistence stays unfiltered (legacy).
  *
@@ -17,7 +19,10 @@
  * Backward-compatible: every value below has a "do nothing" sentinel.
  */
 
-import { parseBookmakerFallbackChain } from "./ingestionConfig.js";
+import {
+  parseBookmakerFallbackChain,
+  DEFAULT_BOOKMAKER_FALLBACK_CHAIN,
+} from "./ingestionConfig.js";
 
 function parseList(envValue) {
   if (!envValue) return null;
@@ -59,6 +64,15 @@ export function buildOddsParseOptions(preferredApiId) {
 
   pushUnique(preferredApiId);
   for (const id of chainEnv) pushUnique(id);
+  // When only the preferred id is configured, still try common fallbacks so
+  // fixtures in leagues without preferred-bookmaker coverage get priced lines.
+  if (
+    preferredApiId != null &&
+    chainEnv.length === 0 &&
+    ordered.length <= 1
+  ) {
+    for (const id of DEFAULT_BOOKMAKER_FALLBACK_CHAIN) pushUnique(id);
+  }
   pushUnique(DEFAULT_BOOKMAKER_API_ID);
 
   const legacyPersistAllBookmakers = ordered.length === 0;

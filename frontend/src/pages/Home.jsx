@@ -436,6 +436,7 @@ function Home() {
     () => ({
       regionGroups,
       countryGroups,
+      catalogItems,
       allLeaguesId,
       totalLeagueCount,
       selectedLeagueId,
@@ -450,6 +451,7 @@ function Home() {
     [
       regionGroups,
       countryGroups,
+      catalogItems,
       allLeaguesId,
       totalLeagueCount,
       selectedLeagueId,

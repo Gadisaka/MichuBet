@@ -11,6 +11,21 @@ describe("mapFixtureToMatch summary strip", () => {
     league: { name: "Serie A", country: "Italy", sport: "Football" },
   });
 
+  it("maps league rank from fixture payload", () => {
+    const match = mapFixtureToMatch({
+      ...baseFx(),
+      league: {
+        name: "Premier League",
+        country: "Ethiopia",
+        sport: "Football",
+        api_league_id: 363,
+        rank: 9,
+      },
+    });
+    expect(match.leagueRank).toBe(9);
+    expect(match.apiLeagueId).toBe(363);
+  });
+
   it("uses first duplicate Double Chance label like expanded panel", () => {
     const match = mapFixtureToMatch({
       ...baseFx(),

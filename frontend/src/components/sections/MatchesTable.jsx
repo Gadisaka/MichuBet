@@ -8,7 +8,6 @@ import {
   MARKET_FILTER_ALL_CHIP_ID,
   filterCategoriesByChipId,
 } from "../../data/footballMarketsByCategory";
-import { getTopLeagueOrder } from "../../utils/topLeagues";
 import { resolveCompactMarketToken } from "../../utils/compactMarketToken";
 
 const TABLE_GRID_COLS =
@@ -515,11 +514,7 @@ function MatchesTable({
       groups.get(key).push(match);
     });
 
-    const nonTopRank = 1_000;
-    const rankOf = (leagueKey) => {
-      const o = getTopLeagueOrder(leagueKey);
-      return o === null ? nonTopRank : o;
-    };
+    const rankOf = (leagueMatches) => leagueMatches[0]?.leagueRank ?? 9999;
     const earliestKickMs = (leagueMatches) => {
       let min = Infinity;
       for (const m of leagueMatches) {
@@ -529,9 +524,18 @@ function MatchesTable({
       return min;
     };
 
-    return Array.from(groups.entries()).sort(([la, ma], [lb, mb]) => {
-      const ra = rankOf(la);
-      const rb = rankOf(lb);
+    return Array.from(groups.entries())
+      .map(([league, leagueMatches]) => {
+        const sorted = [...leagueMatches].sort((a, b) => {
+          const ka = a.kickoffAt ? new Date(a.kickoffAt).getTime() : 0;
+          const kb = b.kickoffAt ? new Date(b.kickoffAt).getTime() : 0;
+          return ka - kb || Number(a.apiFixtureId) - Number(b.apiFixtureId);
+        });
+        return [league, sorted];
+      })
+      .sort(([la, ma], [lb, mb]) => {
+      const ra = rankOf(ma);
+      const rb = rankOf(mb);
       if (ra !== rb) return ra - rb;
       const ka = earliestKickMs(ma);
       const kb = earliestKickMs(mb);

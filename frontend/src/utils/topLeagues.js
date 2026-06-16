@@ -37,6 +37,10 @@ const TOP_LEAGUE_MATCHERS = [
     const s = String(id || "").toLowerCase();
     return s.includes("ethiopia") && s.includes("premier");
   },
+  (id) => {
+    const s = String(id || "").toLowerCase();
+    return s.includes("ethiopia") && s.includes("cup");
+  },
 ];
 
 export function getTopLeagueOrder(leagueId) {

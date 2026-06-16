@@ -3,7 +3,11 @@ import { upsertNoTx } from "../utils/upsertNoTx.js";
 import { api, sleep } from "../services/apiSportsService.js";
 import { deleteByPattern } from "../services/cacheService.js";
 import { getEnabledSports } from "../services/sportsRegistry.js";
-import { isAllowedLeague } from "../Config/allowedLeagues.js";
+import {
+  getIngestActiveCap,
+  pickTopActiveLeagues,
+} from "../Config/leagueRanks.js";
+import { PRODUCT_PRIORITY_LEAGUE_IDS } from "../Config/allowedLeagues.js";
 import { getFixturesDaysAhead } from "../Config/ingestionConfig.js";
 import {
   isTerminalFixtureStatus,
@@ -321,18 +325,24 @@ async function safeSettleFixture(fixtureId, sportSlug) {
 }
 
 /**
- * Run a single date slice for one sport (near-window or full-horizon bulk jobs).
+ * Upsert fixtures for one sport/date slice (pre-fetched upstream payload).
  */
-async function runDate(sportSlug, providerName, date, caches) {
+async function processDateFixtures(
+  sportSlug,
+  providerName,
+  date,
+  fixtures,
+  caches,
+  ingestEligible,
+) {
   const sport = await getOrUpsertSport(
     sportSlug,
     providerName,
     caches.sportCache,
   );
 
-  const fixtures = await api(sportSlug).getFixturesByDate(date);
   console.log(
-    `[syncFixtures] ${sportSlug} ${date}: upstream fixtures=${fixtures.length}`,
+    `[syncFixtures] ${sportSlug} ${date}: upstream fixtures=${fixtures.length}, ingestEligible=${ingestEligible.size}`,
   );
 
   let upserts = 0;
@@ -349,9 +359,8 @@ async function runDate(sportSlug, providerName, date, caches) {
       continue;
     }
 
-    // Skip fixtures from leagues not in our allowlist
     const apiLeagueId = entry.league?.id;
-    if (!apiLeagueId || !isAllowedLeague(apiLeagueId)) {
+    if (!apiLeagueId || !ingestEligible.has(apiLeagueId)) {
       skipped++;
       continue;
     }
@@ -464,10 +473,56 @@ export async function runFixturesBulkByDate(opts = {}) {
   let totalTicketsSettled = 0;
   let totalPayoutsCredited = 0;
 
+  const ingestCap = getIngestActiveCap();
+
   for (const sportSlug of enabled) {
+    /** @type {Array<{ date: string, fixtures: unknown[] }>} */
+    const buffered = [];
+    /** @type {Map<number, number>} */
+    const leagueActivity = new Map();
+
     for (const date of dates) {
       try {
-        const result = await runDate(sportSlug, sportSlug, date, caches);
+        const fixtures = await api(sportSlug).getFixturesByDate(date);
+        buffered.push({ date, fixtures });
+        for (const entry of fixtures) {
+          const apiLeagueId = entry.league?.id;
+          if (!apiLeagueId) continue;
+          leagueActivity.set(
+            apiLeagueId,
+            (leagueActivity.get(apiLeagueId) ?? 0) + 1,
+          );
+        }
+      } catch (err) {
+        console.error(
+          `[syncFixtures] ${sportSlug} ${date} fetch failed:`,
+          err.message,
+        );
+      }
+      await sleep(DATE_CALL_DELAY_MS);
+    }
+
+    const ingestEligible = pickTopActiveLeagues(
+      leagueActivity.keys(),
+      ingestCap,
+    );
+    for (const id of PRODUCT_PRIORITY_LEAGUE_IDS) {
+      if (leagueActivity.has(id)) ingestEligible.add(id);
+    }
+    console.log(
+      `[syncFixtures] ${sportSlug} rank gate – activeLeagues=${leagueActivity.size}, ingestCap=${ingestCap}, eligible=${ingestEligible.size}`,
+    );
+
+    for (const { date, fixtures } of buffered) {
+      try {
+        const result = await processDateFixtures(
+          sportSlug,
+          sportSlug,
+          date,
+          fixtures,
+          caches,
+          ingestEligible,
+        );
         totalUpserts += result.upserts;
         totalSkipped += result.skipped;
         totalSettled += result.settled || 0;
@@ -475,11 +530,10 @@ export async function runFixturesBulkByDate(opts = {}) {
         totalPayoutsCredited += result.payoutsCredited || 0;
       } catch (err) {
         console.error(
-          `[syncFixtures] ${sportSlug} ${date} failed:`,
+          `[syncFixtures] ${sportSlug} ${date} upsert failed:`,
           err.message,
         );
       }
-      await sleep(DATE_CALL_DELAY_MS);
     }
   }
 

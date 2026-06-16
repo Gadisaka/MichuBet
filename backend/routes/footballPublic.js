@@ -19,9 +19,11 @@ import {
   isPublicFixturesStrictBookmaker,
 } from "../Config/ingestionConfig.js";
 import {
-  ALLOWED_LEAGUE_IDS,
-  PREFERRED_LEAGUE_IDS,
-} from "../Config/allowedLeagues.js";
+  getLeagueRank,
+  getSidebarActiveCap,
+  isTopLeague,
+  pickTopActiveLeagues,
+} from "../Config/leagueRanks.js";
 import { recomputeExtraMarketsCountForFixture } from "../services/extraMarketsCount.js";
 import { writeLiveOddsFromApiResponse } from "../services/liveOddsCache.js";
 
@@ -372,6 +374,35 @@ function fixturesListCacheModeSuffix() {
   return isPublicFixturesStrictBookmaker() ? "strict" : "relaxed";
 }
 
+/** Sort by league rank (asc) then kickoff; optional cap after sort. */
+function sortFixturesByLeagueRank(fixtures, limit = null) {
+  const sorted = [...(fixtures || [])].sort((a, b) => {
+    const rankA = getLeagueRank(a?.league?.api_league_id);
+    const rankB = getLeagueRank(b?.league?.api_league_id);
+    if (rankA !== rankB) return rankA - rankB;
+    return (
+      new Date(a.start_time).getTime() - new Date(b.start_time).getTime()
+    );
+  });
+  if (limit != null && limit > 0) return sorted.slice(0, limit);
+  return sorted;
+}
+
+function attachLeagueRank(fixture) {
+  if (!fixture?.league) return fixture;
+  return {
+    ...fixture,
+    league: {
+      ...fixture.league,
+      rank: getLeagueRank(fixture.league.api_league_id),
+    },
+  };
+}
+
+function attachLeagueRanksToList(fixtures) {
+  return (fixtures || []).map(attachLeagueRank);
+}
+
 /**
  * Preferred-bookmaker rows first; when relaxed mode and preferred is set,
  * fill fixtures missing markets using any bookmaker (same caps).
@@ -465,7 +496,7 @@ router.get("/fixtures", async (req, res) => {
     }
 
     const preferred = await getPreferredBookmakerRecord();
-    const cacheKey = `fixtures:by-date:${parsed.ymd}:${bookmakerCacheSuffix(preferred)}:${fixturesListCacheModeSuffix()}`;
+    const cacheKey = `fixtures:by-date:v3:${parsed.ymd}:${bookmakerCacheSuffix(preferred)}:${fixturesListCacheModeSuffix()}`;
 
     let data = await getCache(cacheKey);
     if (!data) {
@@ -491,7 +522,6 @@ router.get("/fixtures", async (req, res) => {
           }),
         },
         orderBy: { start_time: "asc" },
-        take: UPCOMING_FIXTURES_LIMIT,
       });
 
       let merged = await mergeMarketsFallbackForList(rows, preferred, {
@@ -501,8 +531,9 @@ router.get("/fixtures", async (req, res) => {
       });
 
       merged = merged.filter(fixtureHasPricedOdds);
+      merged = sortFixturesByLeagueRank(merged, UPCOMING_FIXTURES_LIMIT);
 
-      data = merged;
+      data = attachLeagueRanksToList(merged);
       await setCache(cacheKey, data, TTL.FIXTURES);
     }
 
@@ -544,53 +575,52 @@ function leagueSidebarDisplayId(league) {
 router.get("/sidebar-leagues", async (_req, res) => {
   try {
     const horizonDays = getOddsHorizonDays();
-    const cacheKey = `sidebar-leagues:v1:${horizonDays}`;
+    const sidebarCap = getSidebarActiveCap();
+    const cacheKey = `sidebar-leagues:v2:${horizonDays}:${sidebarCap}`;
     const cached = await getCache(cacheKey);
     if (cached) {
       res.json(cached);
       return;
     }
 
-    const allowedList = [...ALLOWED_LEAGUE_IDS];
     const { start, end } = startEndUtcWindow(horizonDays);
+    const effectiveStart = upcomingCutoffStart(start);
 
     const [upcomingRows, liveRows] = await Promise.all([
       prisma.fixture.findMany({
         where: {
           status: { in: [...UPCOMING_ALLOWED_STATUSES] },
-          start_time: { gte: start, lte: end },
-          league: { api_league_id: { in: allowedList } },
+          start_time: { gte: effectiveStart, lte: end },
         },
         select: { league: { select: { api_league_id: true } } },
       }),
       prisma.fixture.findMany({
         where: {
           status: { in: LIVE_SIDEBAR_STATUSES },
-          league: { api_league_id: { in: allowedList } },
         },
         select: { league: { select: { api_league_id: true } } },
       }),
     ]);
 
-    const fromFixtures = new Set();
+    const activeIds = new Set();
     for (const row of upcomingRows) {
       const id = row.league?.api_league_id;
-      if (id != null && ALLOWED_LEAGUE_IDS.has(id)) fromFixtures.add(id);
+      if (id != null) activeIds.add(id);
     }
     for (const row of liveRows) {
       const id = row.league?.api_league_id;
-      if (id != null && ALLOWED_LEAGUE_IDS.has(id)) fromFixtures.add(id);
+      if (id != null) activeIds.add(id);
     }
 
-    const preferredList = [...PREFERRED_LEAGUE_IDS].filter((id) =>
-      ALLOWED_LEAGUE_IDS.has(id),
-    );
-    const unionApiIds = [...new Set([...preferredList, ...fromFixtures])];
+    const topActive = [...activeIds].filter((id) => isTopLeague(id));
+    const regionalCandidates = [...activeIds].filter((id) => !isTopLeague(id));
+    const regionalPicked = pickTopActiveLeagues(regionalCandidates, sidebarCap);
+    const catalogApiIds = [...new Set([...topActive, ...regionalPicked])];
 
     const rows = await prisma.league.findMany({
       where: {
         active: true,
-        api_league_id: { in: unionApiIds },
+        api_league_id: { in: catalogApiIds },
       },
     });
 
@@ -598,39 +628,34 @@ router.get("/sidebar-leagues", async (_req, res) => {
       rows.filter((r) => r.api_league_id != null).map((r) => [r.api_league_id, r]),
     );
 
-    const pinnedOrder = new Map(
-      preferredList.map((id, index) => [id, index]),
-    );
-
     const items = [];
-    for (const apiId of unionApiIds) {
+    for (const apiId of catalogApiIds) {
       const row = byApiId.get(apiId);
       if (!row) continue;
-      const pinned = PREFERRED_LEAGUE_IDS.has(apiId);
       const country = row.country?.trim() || "Unknown";
+      const rank = getLeagueRank(apiId);
+      const section = isTopLeague(apiId) ? "top" : "regional";
       items.push({
         id: leagueSidebarDisplayId(row),
         apiLeagueId: apiId,
-        pinned,
+        pinned: section === "top",
         label: row.name?.trim() || "League",
         country,
         leagueLogo: row.logo ?? null,
         countryFlag: row.country_flag ?? null,
+        rank,
+        section,
       });
     }
 
     items.sort((a, b) => {
-      if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
-      if (a.pinned && b.pinned) {
-        return (
-          (pinnedOrder.get(a.apiLeagueId) ?? 999) -
-          (pinnedOrder.get(b.apiLeagueId) ?? 999)
-        );
-      }
-      return String(a.id).localeCompare(String(b.id));
+      if (a.section === "top" && b.section !== "top") return -1;
+      if (a.section !== "top" && b.section === "top") return 1;
+      if (a.rank !== b.rank) return a.rank - b.rank;
+      return String(a.label).localeCompare(String(b.label));
     });
 
-    const payload = { horizonDays, items };
+    const payload = { horizonDays, sidebarCap, items };
     await setCache(cacheKey, payload, TTL.SIDEBAR_LEAGUES);
     res.json(payload);
   } catch (e) {
@@ -642,7 +667,7 @@ router.get("/sidebar-leagues", async (_req, res) => {
 router.get("/fixtures/today", async (_req, res) => {
   try {
     const preferred = await getPreferredBookmakerRecord();
-    const cacheKey = `fixtures:today:${bookmakerCacheSuffix(preferred)}:${fixturesListCacheModeSuffix()}`;
+    const cacheKey = `fixtures:today:v3:${bookmakerCacheSuffix(preferred)}:${fixturesListCacheModeSuffix()}`;
 
     let data = await getCache(cacheKey);
     if (!data) {
@@ -667,8 +692,9 @@ router.get("/fixtures/today", async (_req, res) => {
       });
 
       merged = merged.filter(fixtureHasPricedOdds);
+      merged = sortFixturesByLeagueRank(merged);
 
-      data = merged;
+      data = attachLeagueRanksToList(merged);
       await setCache(cacheKey, data, TTL.FIXTURES);
     }
     res.json(data);
@@ -689,7 +715,7 @@ router.get("/fixtures/upcoming", async (req, res) => {
         );
 
     const preferred = await getPreferredBookmakerRecord();
-    const cacheKey = `fixtures:upcoming:${days}d:${bookmakerCacheSuffix(preferred)}:${fixturesListCacheModeSuffix()}`;
+    const cacheKey = `fixtures:upcoming:v3:${days}d:${bookmakerCacheSuffix(preferred)}:${fixturesListCacheModeSuffix()}`;
 
     let data = await getCache(cacheKey);
     if (!data) {
@@ -711,7 +737,6 @@ router.get("/fixtures/upcoming", async (req, res) => {
           }),
         },
         orderBy: { start_time: "asc" },
-        take: UPCOMING_FIXTURES_LIMIT,
       });
 
       let merged = await mergeMarketsFallbackForList(rows, preferred, {
@@ -721,8 +746,9 @@ router.get("/fixtures/upcoming", async (req, res) => {
       });
 
       merged = merged.filter(fixtureHasPricedOdds);
+      merged = sortFixturesByLeagueRank(merged, UPCOMING_FIXTURES_LIMIT);
 
-      data = merged;
+      data = attachLeagueRanksToList(merged);
       await setCache(cacheKey, data, TTL.FIXTURES);
     }
     res.json(filterUpcomingByStartBuffer(data));
@@ -742,7 +768,8 @@ const LIVE_FIXTURES_CACHE_TTL = Number(
 
 router.get("/fixtures/live", async (_req, res) => {
   try {
-    const cached = await getCache("live:fixtures:current");
+    const liveCacheKey = "live:fixtures:current:v3";
+    const cached = await getCache(liveCacheKey);
     if (cached) {
       return res.json(cached);
     }
@@ -765,7 +792,7 @@ router.get("/fixtures/live", async (_req, res) => {
     ];
 
     if (allowedApiIds.length === 0) {
-      await setCache("live:fixtures:current", [], LIVE_FIXTURES_CACHE_TTL);
+      await setCache(liveCacheKey, [], LIVE_FIXTURES_CACHE_TTL);
       return res.json([]);
     }
 
@@ -783,8 +810,9 @@ router.get("/fixtures/live", async (_req, res) => {
       orderBy: { start_time: "asc" },
     });
 
-    await setCache("live:fixtures:current", rows, LIVE_FIXTURES_CACHE_TTL);
-    res.json(rows);
+    const payload = attachLeagueRanksToList(sortFixturesByLeagueRank(rows));
+    await setCache(liveCacheKey, payload, LIVE_FIXTURES_CACHE_TTL);
+    res.json(payload);
   } catch (e) {
     console.error(e);
     res.status(500).json({ message: "Failed to load live fixtures" });
