@@ -2,6 +2,8 @@ import { useMemo, useState } from "react";
 import { useAuth } from "../../context/AuthContext";
 import AdminShell from "../../components/layout/AdminShell";
 import PanelCard from "../../components/ui/PanelCard";
+import ShopReportSummary, { emptyShopSummary } from "../../components/reports/ShopReportSummary";
+import { getReportDatePreset } from "../../components/reports/reportDatePresets";
 import { useAgentReportsQuery } from "../../hook/useAgentOperations";
 
 function formatYmd(date) {
@@ -11,6 +13,12 @@ function formatYmd(date) {
 function number(value) {
   return Number(value || 0);
 }
+
+const DATE_PRESETS = [
+  { key: "today", label: "Today" },
+  { key: "last7", label: "Last 7 days" },
+  { key: "thisMonth", label: "This month" },
+];
 
 export default function AgentReportsPage() {
   const { user, logout } = useAuth();
@@ -47,13 +55,26 @@ export default function AgentReportsPage() {
     wonTickets: 0,
     lostTickets: 0,
     paidTickets: 0,
+    shop: emptyShopSummary(),
   };
   const byBranch = query.data?.byBranch || [];
   const byCashier = query.data?.byCashier || [];
 
+  function applyFilters(nextFrom, nextTo, nextBranch = branchName) {
+    setFromDate(nextFrom);
+    setToDate(nextTo);
+    setBranchName(nextBranch);
+    setApplied({ fromDate: nextFrom, toDate: nextTo, branchName: nextBranch });
+  }
+
   function onApply(event) {
     event.preventDefault();
-    setApplied({ fromDate, toDate, branchName });
+    applyFilters(fromDate, toDate, branchName);
+  }
+
+  function onPreset(presetKey) {
+    const { from, to } = getReportDatePreset(presetKey);
+    applyFilters(from, to, branchName);
   }
 
   return (
@@ -62,7 +83,8 @@ export default function AgentReportsPage() {
         <div>
           <h2 className="text-2xl font-semibold">Reports</h2>
           <p className="mt-1 text-sm text-(--muted)">
-            Agent report summary for tickets and stakes across assigned cashiers.
+            Shop financial summary for assigned cashiers — tickets sold, payouts, deposits,
+            withdrawals, and grand net.
           </p>
         </div>
 
@@ -106,6 +128,18 @@ export default function AgentReportsPage() {
             >
               Apply
             </button>
+            <div className="flex flex-wrap gap-2">
+              {DATE_PRESETS.map((preset) => (
+                <button
+                  key={preset.key}
+                  type="button"
+                  onClick={() => onPreset(preset.key)}
+                  className="rounded-sm border border-(--border) bg-(--surface) px-3 py-2 text-xs font-semibold text-(--text) hover:bg-(--surface-2)"
+                >
+                  {preset.label}
+                </button>
+              ))}
+            </div>
           </form>
         </PanelCard>
 
@@ -117,29 +151,12 @@ export default function AgentReportsPage() {
           </PanelCard>
         ) : null}
 
-        <section className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
-          <PanelCard className="p-4">
-            <p className="text-xs uppercase tracking-wide text-(--muted)">Total Tickets</p>
-            <p className="mt-2 text-xl font-semibold">{number(summary.totalTickets).toLocaleString()}</p>
-          </PanelCard>
-          <PanelCard className="p-4">
-            <p className="text-xs uppercase tracking-wide text-(--muted)">Total Stake</p>
-            <p className="mt-2 text-xl font-semibold">
-              {number(summary.totalStake).toLocaleString()} ETB
-            </p>
-          </PanelCard>
-          <PanelCard className="p-4">
-            <p className="text-xs uppercase tracking-wide text-(--muted)">Average Stake</p>
-            <p className="mt-2 text-xl font-semibold">
-              {number(summary.averageStake).toLocaleString()} ETB
-            </p>
-          </PanelCard>
-          <PanelCard className="p-4">
-            <p className="text-xs uppercase tracking-wide text-(--muted)">Open / Won / Lost</p>
-            <p className="mt-2 text-xl font-semibold">
-              {number(summary.openTickets)} / {number(summary.wonTickets)} / {number(summary.lostTickets)}
-            </p>
-          </PanelCard>
+        <section>
+          <ShopReportSummary
+            shop={summary.shop}
+            loading={query.isLoading}
+            error={query.isError ? "Failed to load shop summary." : null}
+          />
         </section>
 
         <section className="grid grid-cols-1 gap-5 xl:grid-cols-2">

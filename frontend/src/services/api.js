@@ -289,6 +289,22 @@ export async function fetchPublicReceiptTicket(receiptNumber) {
   return data;
 }
 
+/**
+ * GET /api/cms/check-coupon?couponNumber= — public coupon check.
+ * Returns list of paid tickets (those with receipt_number) only.
+ */
+export async function fetchPublicCouponCheck(couponNumber) {
+  const q = encodeURIComponent(String(couponNumber || "").trim());
+  const res = await fetch(
+    `${API_URL}/api/cms/check-coupon?couponNumber=${q}`,
+  );
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data.message || data.error || "Ticket not found");
+  }
+  return data;
+}
+
 export async function fetchMatch(id) {
   const res = await fetch(`${API_URL}/api/dummy/matches/${id}`);
   if (!res.ok) throw new Error(`Failed to fetch match: ${res.status}`);

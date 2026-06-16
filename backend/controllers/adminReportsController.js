@@ -1,4 +1,8 @@
 import { prisma } from "../Config/db.js";
+import {
+  aggregateShopStatsForWalletIds,
+  emptyShopStats,
+} from "../services/shopReportStats.js";
 
 function parseDateYmd(value) {
   if (!value) return null;
@@ -88,6 +92,35 @@ function isUnsettledTicketStatus(status) {
 }
 
 const ONLINE_CASHIER_KEY = "__online__";
+
+async function resolveCashierWalletIdsForSalesFilters({ agentId, cashierProfileId }) {
+  if (cashierProfileId) {
+    const cashier = await prisma.cashier.findUnique({
+      where: { id: cashierProfileId },
+      select: { wallet_id: true },
+    });
+    return cashier?.wallet_id ? [cashier.wallet_id] : [];
+  }
+
+  if (agentId) {
+    const assignments = await prisma.agentCashier.findMany({
+      where: { agent_id: agentId },
+      select: { cashier_id: true },
+    });
+    const ids = assignments.map((a) => a.cashier_id).filter(Boolean);
+    if (ids.length === 0) return [];
+    const cashiers = await prisma.cashier.findMany({
+      where: { id: { in: ids } },
+      select: { wallet_id: true },
+    });
+    return cashiers.map((c) => c.wallet_id).filter(Boolean);
+  }
+
+  const cashiers = await prisma.cashier.findMany({
+    select: { wallet_id: true },
+  });
+  return cashiers.map((c) => c.wallet_id).filter(Boolean);
+}
 
 /**
  * GET /api/admin/reports/sales
@@ -266,6 +299,12 @@ export async function getAdminSalesReports(req, res) {
     );
     const byCashier = [...cashierMap.values()].sort((a, b) => b.stake - a.stake);
 
+    const walletIds = await resolveCashierWalletIdsForSalesFilters({
+      agentId,
+      cashierProfileId,
+    });
+    const shopStats = await aggregateShopStatsForWalletIds(walletIds, { start, end });
+
     return res.json({
       generatedAt: new Date().toISOString(),
       range: { from: start, to: end },
@@ -281,6 +320,7 @@ export async function getAdminSalesReports(req, res) {
         wonTickets: tickets.filter((t) => t.status === "WON").length,
         lostTickets: tickets.filter((t) => t.status === "LOST").length,
         paidTickets: tickets.filter((t) => t.status === "PAID").length,
+        shop: shopStats,
       },
       byDay,
       byBranch,
@@ -326,6 +366,7 @@ function emptySalesPayload(start, end, filters) {
       wonTickets: 0,
       lostTickets: 0,
       paidTickets: 0,
+      shop: emptyShopStats(),
     },
     byDay,
     byBranch: [],

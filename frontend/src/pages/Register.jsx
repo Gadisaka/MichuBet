@@ -5,6 +5,7 @@ import TopHeader from "../components/layout/TopHeader";
 import PrimaryNav from "../components/layout/PrimaryNav";
 import SiteFooter from "../components/layout/SiteFooter";
 import AppIcon from "../components/common/AppIcon";
+import AgeRestrictionNotice from "../components/common/AgeRestrictionNotice";
 import SoftPanel from "../components/common/SoftPanel";
 import {
   accountInputCls,
@@ -160,6 +161,8 @@ function Register() {
                 className={accountInputCls}
               />
             </label>
+
+            <AgeRestrictionNotice className="mb-1" />
 
             {error ? (
               <p className="rounded-2xl bg-[#3a1515]/90 px-4 py-3 text-center text-sm font-semibold text-[#ff6b6b] ring-1 ring-red-900/30">

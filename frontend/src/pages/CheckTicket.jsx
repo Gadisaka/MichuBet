@@ -11,26 +11,26 @@ import {
   accountPrimaryBtn,
 } from "../components/common/accountFormClasses";
 import { topHeaderData, topNavItems } from "../data/homepageData";
-import { fetchPublicReceiptTicket } from "../services/api";
-import CouponReceipt from "../components/common/CouponReceipt";
+import { fetchPublicCouponCheck } from "../services/api";
+import CouponCheckPreview from "../components/common/CouponCheckPreview";
 
 function CheckTicket() {
   const navigate = useNavigate();
-  const [receiptInput, setReceiptInput] = useState("");
+  const [couponInput, setCouponInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [preview, setPreview] = useState(null);
+  const [tickets, setTickets] = useState(null);
 
   async function handleSubmit(e) {
     e?.preventDefault?.();
-    const trimmed = String(receiptInput || "").trim();
+    const trimmed = String(couponInput || "").trim();
     if (!trimmed || loading) return;
     setLoading(true);
     setError(null);
-    setPreview(null);
+    setTickets(null);
     try {
-      const data = await fetchPublicReceiptTicket(trimmed);
-      setPreview(data);
+      const data = await fetchPublicCouponCheck(trimmed);
+      setTickets(data.tickets || []);
     } catch (err) {
       setError(err?.message || "Ticket not found.");
     } finally {
@@ -72,25 +72,25 @@ function CheckTicket() {
         <form onSubmit={handleSubmit} className="animate-deposit-panel">
           <SoftPanel>
             <p className="mb-4 text-center text-xs font-extrabold uppercase tracking-[0.18em] text-[rgba(255,255,255,0.72)]">
-              Receipt ID
+              Coupon Number
             </p>
             <p className="mb-4 text-center text-[11px] leading-relaxed text-[rgba(255,255,255,0.5)]">
-              Enter the receipt number from your slip to view selections, status,
-              stake, and payout.
+              Enter the coupon number from your slip to view selections and
+              status.
             </p>
             <div className="flex gap-2">
               <input
                 type="text"
-                value={receiptInput}
-                onChange={(e) => setReceiptInput(e.target.value)}
-                placeholder="e.g. 95548-72957"
+                value={couponInput}
+                onChange={(e) => setCouponInput(e.target.value)}
+                placeholder="e.g. AB12CD"
                 disabled={loading}
                 autoComplete="off"
                 className={`${accountInputCls} min-h-[3rem] flex-1`}
               />
               <button
                 type="submit"
-                disabled={loading || !String(receiptInput || "").trim()}
+                disabled={loading || !String(couponInput || "").trim()}
                 className="inline-flex min-h-[3rem] shrink-0 cursor-pointer items-center justify-center rounded-2xl border-0 bg-[#0a0a0a]/90 px-4 text-[#9aaed1] ring-1 ring-[#F6AF01]/70 transition-all hover:ring-(--sb-accent-fill)/45 disabled:pointer-events-none disabled:opacity-45"
                 aria-label="Look up ticket"
               >
@@ -103,7 +103,7 @@ function CheckTicket() {
             </div>
             <button
               type="submit"
-              disabled={loading || !String(receiptInput || "").trim()}
+              disabled={loading || !String(couponInput || "").trim()}
               className={`${accountPrimaryBtn} mt-4`}
             >
               {loading ? "Checking…" : "Check ticket"}
@@ -116,9 +116,9 @@ function CheckTicket() {
           </SoftPanel>
         </form>
 
-        {preview ? (
+        {tickets && tickets.length > 0 ? (
           <div className="animate-deposit-panel mt-6 flex justify-center">
-            <CouponReceipt ticket={preview} />
+            <CouponCheckPreview tickets={tickets} />
           </div>
         ) : null}
       </div>

@@ -7,7 +7,9 @@ import MainLayout from "../components/layout/MainLayout";
 import MobileBottomBar from "../components/layout/MobileBottomBar";
 import PageContainer from "../components/layout/PageContainer";
 import PrimaryNav from "../components/layout/PrimaryNav";
+import SiteFooter from "../components/layout/SiteFooter";
 import TopHeader from "../components/layout/TopHeader";
+import MatchesPagination from "../components/common/MatchesPagination";
 import BetSlipPanel from "../components/sections/BetSlipPanel";
 import SportsSidebar from "../components/sections/SportsSidebar";
 import TopLeaguesSidebar from "../components/sections/TopLeaguesSidebar";
@@ -28,6 +30,7 @@ import {
   loadBetSlipState,
   persistBetSlipState,
 } from "../utils/betSlipPersistence";
+import { slicePageItems } from "../utils/pagination";
 
 const LIVE_REFRESH_MS = 10_000;
 const LIVE_MARKETS = ["1", "x", "2"];
@@ -563,6 +566,7 @@ function Live() {
   const [loading, setLoading] = useState(true);
   const [selectedLeagueId, setSelectedLeagueId] = useState("all-leagues");
   const [expandedMatchId, setExpandedMatchId] = useState(null);
+  const [matchesPage, setMatchesPage] = useState(1);
   const [activeSlip, setActiveSlip] = useState(initialBet.activeSlip);
   const [slips, setSlips] = useState(initialBet.slips);
 
@@ -662,7 +666,10 @@ function Live() {
               (c) => !isLiveMainMarketCategory(c.category),
             ),
           };
-          result.sideBets = liveCategories.length;
+          result.sideBets = liveCategories.reduce(
+            (sum, cat) => sum + (cat.odds?.length || 0),
+            0,
+          );
 
           const summaryMarkets = [];
           let bestThreeWay = null;
@@ -723,6 +730,26 @@ function Live() {
     if (selectedLeagueId === "all-leagues") return allMatches;
     return allMatches.filter((m) => m.league === selectedLeagueId);
   }, [allMatches, selectedLeagueId]);
+
+  useEffect(() => {
+    setMatchesPage(1);
+  }, [selectedLeagueId]);
+
+  const matchesPagination = useMemo(
+    () => slicePageItems(filteredMatches, matchesPage),
+    [filteredMatches, matchesPage],
+  );
+
+  useEffect(() => {
+    if (matchesPagination.page !== matchesPage) {
+      setMatchesPage(matchesPagination.page);
+    }
+  }, [matchesPagination.page, matchesPage]);
+
+  const handleMatchesPageChange = useCallback((nextPage) => {
+    setMatchesPage(nextPage);
+    setExpandedMatchId(null);
+  }, []);
 
   const leagueCounts = useMemo(() => {
     const counts = new Map();
@@ -872,12 +899,17 @@ function Live() {
                 </h1>
               </div>
               <LiveMatchesList
-                matches={filteredMatches}
+                matches={matchesPagination.items}
                 loading={loading}
                 expandedMatchId={expandedMatchId}
                 onMatchClick={handleMatchClick}
                 onOddsClick={handleOddsClick}
                 selectedOdds={selectedOdds}
+              />
+              <MatchesPagination
+                page={matchesPagination.page}
+                totalPages={matchesPagination.totalPages}
+                onPageChange={handleMatchesPageChange}
               />
             </>
           }
@@ -893,6 +925,7 @@ function Live() {
           }
         />
       </div>
+      <SiteFooter />
       <MobileBottomBar
         selections={selections}
         onRemoveSelection={handleRemoveSelection}

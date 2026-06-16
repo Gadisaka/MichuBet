@@ -25,6 +25,9 @@ export function mapTicketRow(ticket) {
     id: ticket.id,
     couponNumber: ticket.coupon_number ?? ticket.couponNumber ?? "",
     receiptNumber: ticket.receipt_number ?? ticket.receiptNumber ?? "",
+    paymentReceiptNumber:
+      ticket.payment_receipt_number ?? ticket.paymentReceiptNumber ?? "",
+    paidAt: ticket.paid_at ?? ticket.paidAt ?? null,
     cashierId: ticket.cashier_id ?? ticket.cashierId ?? "",
     cashierName: ticket.cashier_name ?? ticket.cashierName ?? "",
     branchName: ticket.branch_name ?? ticket.branchName ?? "",
@@ -39,6 +42,11 @@ export function mapTicketRow(ticket) {
       ticket.apply_winnings_tax ?? ticket.applyWinningsTax,
     ),
     winningsTaxRate: ticket.winnings_tax_rate ?? ticket.winningsTaxRate ?? null,
+    winningsTaxAmount: Number(
+      ticket.winnings_tax_amount ?? ticket.winningsTaxAmount ?? 0,
+    ),
+    netPayout: Number(ticket.net_payout ?? ticket.netPayout ?? 0),
+    payoutSummary: ticket.payoutSummary ?? ticket.payout_summary ?? null,
     status: String(ticket.status || "").toUpperCase(),
     createdAt: ticket.created_at ?? ticket.createdAt ?? null,
     printed: Boolean(ticket.printed),
@@ -181,11 +189,16 @@ export function useCancelTicketMutation() {
 export function usePayoutTicketMutation() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ ticketId, cashierId }) =>
-      apiRequest(`/tickets/${ticketId}/payout`, {
+    mutationFn: async ({ ticketId, cashierId }) => {
+      const payload = await apiRequest(`/tickets/${ticketId}/payout`, {
         method: "PATCH",
         body: JSON.stringify(cashierId ? { cashierId } : {}),
-      }),
+      });
+      return {
+        ...payload,
+        ticket: payload?.ticket ? mapTicketDetail(payload.ticket) : null,
+      };
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: TICKETS_KEY });
     },

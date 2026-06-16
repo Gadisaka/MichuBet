@@ -23,6 +23,7 @@ import { resolveWinningsTax } from "../lib/winningsTax.js";
 import {
   getPublicCouponTicket,
   getPublicReceiptTicket,
+  getPublicCouponCheck,
 } from "../controllers/ticketsController.js";
 
 const router = Router();
@@ -76,6 +77,9 @@ router.get("/ticket-by-coupon", getPublicCouponTicket);
 
 /** Public sportsbook: lookup ticket by receipt id for check-ticket flows. */
 router.get("/ticket-by-receipt", getPublicReceiptTicket);
+
+/** Public sportsbook: check coupon — returns list of paid tickets only. */
+router.get("/check-coupon", getPublicCouponCheck);
 
 /** Public sportsbook UX: numeric limits + effective cancel window (minutes). */
 router.get("/platform-config", async (_req, res) => {

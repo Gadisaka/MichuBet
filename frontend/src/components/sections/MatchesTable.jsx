@@ -547,20 +547,26 @@ function MatchesTable({
     const prev = prevExpandedMatchIdRef.current;
     prevExpandedMatchIdRef.current = expandedMatchId;
 
+    const scrollToExpanded = (matchId) => {
+      const el = matchRowRefs.current.get(matchId);
+      if (!el) return;
+      requestAnimationFrame(() => {
+        el.scrollIntoView({
+          block: "center",
+          inline: "nearest",
+          behavior: "smooth",
+        });
+      });
+    };
+
+    if (expandedMatchId != null && expandedMatchId !== prev) {
+      scrollToExpanded(expandedMatchId);
+      return;
+    }
+
     if (expandedMatchId != null || prev == null) return;
 
-    const el = matchRowRefs.current.get(prev);
-    if (!el) return;
-
-    const id = requestAnimationFrame(() => {
-      el.scrollIntoView({
-        block: "center",
-        inline: "nearest",
-        behavior: "smooth",
-      });
-    });
-
-    return () => cancelAnimationFrame(id);
+    scrollToExpanded(prev);
   }, [expandedMatchId]);
 
   return (

@@ -161,9 +161,6 @@ const TicketTemplate = forwardRef(function TicketTemplate(
         lines.map((line, idx) => (
           <div key={line.id} style={{ color: "#000000" }}>
             <div style={{ marginBottom: "1.5mm" }}>
-              <div style={{ fontWeight: 800 }}>
-                {idx + 1}. {line.matchName}
-              </div>
               {line.leagueLine ? (
                 <div
                   style={{
@@ -175,6 +172,9 @@ const TicketTemplate = forwardRef(function TicketTemplate(
                   {line.leagueLine}
                 </div>
               ) : null}
+              <div style={{ fontWeight: 800 }}>
+                {idx + 1}. {line.matchName}
+              </div>
               <div
                 style={{
                   display: "flex",

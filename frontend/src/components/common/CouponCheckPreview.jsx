@@ -5,14 +5,12 @@ import {
 } from "../../utils/ticketDisplayStatus";
 
 /**
- * Public receipt rendered to look like the printed paper ticket: white thermal
- * paper, monospace, dashed dividers, scalloped edges (`.coupon-receipt` in
- * index.css), with per-leg status highlights and a financial summary.
+ * Coupon check preview — displays list of paid tickets for a coupon number.
+ * Shows selections, odds, and status but NOT stake/financial info.
  *
- * Shared by the Check-ticket page and the "Check Receipt" preview in the desktop
- * and mobile bet slips. `ticket` is the payload from `fetchPublicReceiptTicket`:
- * `{ receiptNumber, status, stake, totalOdds, netPayout, potentialWin,
- * applyWinningsTax, winningsTaxAmount, selections: [...] }`.
+ * Used by the "Check Coupon" feature in betslip and CheckTicket page.
+ * `tickets` is the array from `fetchPublicCouponCheck`:
+ * `[{ couponNumber, receiptNumber, status, createdAt, selections: [...] }]`
  */
 
 const TICKET_STATUS_CLS = {
@@ -36,15 +34,6 @@ function formatReceiptKickoff(value) {
   return `${pad(d.getDate())}/${pad(d.getMonth() + 1)} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-function formatEtb(value) {
-  const n = Number(value);
-  if (!Number.isFinite(n)) return "—";
-  return `${n.toLocaleString(undefined, {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })} ETB`;
-}
-
 function formatOdds(value) {
   const n = Number(value);
   if (!Number.isFinite(n)) return "—";
@@ -66,28 +55,10 @@ function ReceiptDivider() {
   );
 }
 
-function SummaryRow({ label, value, highlight = false }) {
-  return (
-    <div
-      className={`flex items-center justify-between gap-2 px-1 py-1 text-[11px] font-bold ${
-        highlight
-          ? "coupon-receipt__summary-highlight -mx-1 rounded px-2 py-1.5"
-          : ""
-      }`}
-    >
-      <span className="uppercase tracking-wide text-[#555]">{label}</span>
-      <span className="font-extrabold text-[#0a0a0a]">{value}</span>
-    </div>
-  );
-}
-
-function CouponReceipt({ ticket, className = "" }) {
+function SingleTicketCard({ ticket, className = "" }) {
   if (!ticket) return null;
   const selections = ticket.selections || [];
   const ticketStatus = mapTicketUiStatus(ticket.status);
-  const showTax =
-    Boolean(ticket.applyWinningsTax) &&
-    Number(ticket.winningsTaxAmount) > 0;
 
   return (
     <div
@@ -97,9 +68,22 @@ function CouponReceipt({ ticket, className = "" }) {
         <p className="m-0 text-lg font-black uppercase tracking-[0.35em] text-[#0a0a0a]">
           {topHeaderData.brand}
         </p>
-        <p className="mt-2 break-all text-xl font-extrabold tracking-[0.12em] text-[#0a0a0a]">
-          {ticket.receiptNumber || "—"}
+        <p className="mt-1 text-[10px] font-bold uppercase tracking-[0.15em] text-[#777]">
+          Coupon
         </p>
+        <p className="break-all text-base font-extrabold tracking-[0.08em] text-[#0a0a0a]">
+          {ticket.couponNumber || "—"}
+        </p>
+        {ticket.receiptNumber ? (
+          <>
+            <p className="mt-2 text-[10px] font-bold uppercase tracking-[0.15em] text-[#777]">
+              Receipt
+            </p>
+            <p className="break-all text-sm font-bold tracking-[0.08em] text-[#333]">
+              {ticket.receiptNumber}
+            </p>
+          </>
+        ) : null}
         <p
           className={`coupon-receipt__ticket-status mt-2 inline-block px-3 py-1 text-[12px] font-black uppercase tracking-[0.15em] ${TICKET_STATUS_CLS[ticketStatus.key] ?? TICKET_STATUS_CLS.pending}`}
         >
@@ -110,7 +94,7 @@ function CouponReceipt({ ticket, className = "" }) {
       <ReceiptDivider />
 
       <p className="m-0 text-center text-[10px] font-bold uppercase tracking-[0.25em] text-[#555]">
-        Selections
+        Selections ({selections.length})
       </p>
 
       <ReceiptDivider />
@@ -161,27 +145,30 @@ function CouponReceipt({ ticket, className = "" }) {
           );
         })}
       </div>
-
-      <ReceiptDivider />
-
-      <div className="space-y-0.5">
-        <SummaryRow label="No. matches" value={String(selections.length)} />
-        <SummaryRow label="Stake" value={formatEtb(ticket.stake)} />
-        <SummaryRow label="Total odd" value={formatOdds(ticket.totalOdds)} />
-        {showTax ? (
-          <SummaryRow
-            label="Max payout"
-            value={formatEtb(ticket.potentialWin)}
-          />
-        ) : null}
-        <SummaryRow
-          label="Net pay"
-          value={formatEtb(ticket.netPayout)}
-          highlight
-        />
-      </div>
     </div>
   );
 }
 
-export default CouponReceipt;
+function CouponCheckPreview({ tickets, className = "" }) {
+  if (!tickets || tickets.length === 0) return null;
+
+  if (tickets.length === 1) {
+    return <SingleTicketCard ticket={tickets[0]} className={className} />;
+  }
+
+  return (
+    <div className={`space-y-4 ${className}`}>
+      <p className="text-center text-xs font-bold uppercase tracking-wide text-[rgba(255,255,255,0.72)]">
+        {tickets.length} Tickets Found
+      </p>
+      {tickets.map((ticket, idx) => (
+        <SingleTicketCard
+          key={ticket.receiptNumber || `ticket-${idx}`}
+          ticket={ticket}
+        />
+      ))}
+    </div>
+  );
+}
+
+export default CouponCheckPreview;

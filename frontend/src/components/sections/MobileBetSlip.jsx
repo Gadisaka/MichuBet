@@ -1,10 +1,10 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import AppIcon from "../common/AppIcon";
-import CouponReceipt from "../common/CouponReceipt";
+import CouponCheckPreview from "../common/CouponCheckPreview";
 import {
   fetchPublicCouponTicket,
-  fetchPublicReceiptTicket,
+  fetchPublicCouponCheck,
   hasAuthToken,
   placeBet,
 } from "../../services/api";
@@ -52,6 +52,9 @@ function ModalClose({ onClick, label = "Close" }) {
 }
 
 const slipDivider = "border-white/8";
+
+const SHEET_CLOSE_DRAG_PX = 80;
+const SHEET_CLOSE_DRAG_RATIO = 0.15;
 
 function computePlacementSnapshot(
   selections,
@@ -107,6 +110,7 @@ function MobileBetSlip({
   onRemoveSelection,
   onClearSelections,
   onReplaceSelections = () => {},
+  onSelectionClick,
   stakeInput,
   onStakeInputChange,
   limits = null,
@@ -122,16 +126,94 @@ function MobileBetSlip({
   const [checkCouponInput, setCheckCouponInput] = useState("");
   const [couponLoadingLoad, setCouponLoadingLoad] = useState(false);
   const [couponLoadingCheck, setCouponLoadingCheck] = useState(false);
-  const [couponCheckPreview, setCouponCheckPreview] = useState(null);
+  const [couponCheckTickets, setCouponCheckTickets] = useState(null);
   const [lockedByFixture, setLockedByFixture] = useState({});
   const isMulti = selections.length > 1;
   const [, setTick] = useState(0);
   const { bonuses: activeBonuses } = useActiveBonuses();
+  const [dragY, setDragY] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
+  const sheetRef = useRef(null);
+  const scrollRef = useRef(null);
+  const dragStartYRef = useRef(0);
+  const activePointerIdRef = useRef(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) {
+      setDragY(0);
+      setIsDragging(false);
+      activePointerIdRef.current = null;
+    }
+  }, [open]);
 
   useEffect(() => {
     const id = window.setInterval(() => setTick((t) => t + 1), 30_000);
     return () => window.clearInterval(id);
   }, []);
+
+  const handleSheetPointerDown = useCallback(
+    (e) => {
+      if (!open) return;
+
+      const el = e.target;
+      if (el instanceof Element) {
+        if (el.closest("button, a, input, textarea, select")) return;
+
+        const inDragZone = el.closest("[data-sheet-drag]");
+        const inScrollAtTop =
+          scrollRef.current &&
+          scrollRef.current.contains(el) &&
+          scrollRef.current.scrollTop <= 0;
+
+        if (!inDragZone && !inScrollAtTop) return;
+      } else {
+        return;
+      }
+
+      activePointerIdRef.current = e.pointerId;
+      dragStartYRef.current = e.clientY;
+      setIsDragging(true);
+      sheetRef.current?.setPointerCapture(e.pointerId);
+    },
+    [open],
+  );
+
+  const handleSheetPointerMove = useCallback((e) => {
+    if (activePointerIdRef.current !== e.pointerId) return;
+    const deltaY = e.clientY - dragStartYRef.current;
+    setDragY(deltaY > 0 ? deltaY : 0);
+  }, []);
+
+  const handleSheetPointerEnd = useCallback(
+    (e) => {
+      if (activePointerIdRef.current !== e.pointerId) return;
+      activePointerIdRef.current = null;
+      setIsDragging(false);
+      sheetRef.current?.releasePointerCapture(e.pointerId);
+
+      const sheetHeight =
+        sheetRef.current?.offsetHeight ?? window.innerHeight * 0.8;
+      const threshold = Math.max(
+        SHEET_CLOSE_DRAG_PX,
+        sheetHeight * SHEET_CLOSE_DRAG_RATIO,
+      );
+
+      setDragY((current) => {
+        if (current > threshold) onClose();
+        return 0;
+      });
+    },
+    [onClose],
+  );
   const socketFixtureIds = selections
     .map((s) => Number(s.apiFixtureId))
     .filter((id) => Number.isFinite(id));
@@ -418,8 +500,8 @@ function MobileBetSlip({
     setCouponLoadingCheck(true);
     setBetResult(null);
     try {
-      const data = await fetchPublicReceiptTicket(trimmed);
-      setCouponCheckPreview(data);
+      const data = await fetchPublicCouponCheck(trimmed);
+      setCouponCheckTickets(data.tickets || []);
     } catch (err) {
       setBetResult({
         type: "error",
@@ -470,14 +552,14 @@ function MobileBetSlip({
               onKeyDown={(e) => {
                 if (e.key === "Enter") handleCheckCouponSubmit();
               }}
-              placeholder="Check Receipt..."
+              placeholder="Check Coupon..."
               disabled={couponLoadingCheck}
               autoComplete="off"
               className="h-10 min-w-0 flex-1 rounded-xl border-0 bg-[#0a0a0a]/80 px-3 text-[13px] text-[#ffffff] shadow-inner shadow-black/25 ring-1 ring-white/10 outline-none transition-all placeholder:text-[rgba(255,255,255,0.72)] focus:ring-2 focus:ring-(--sb-accent-fill)/45 disabled:opacity-60"
             />
             <button
               type="button"
-              title="Check receipt status"
+              title="Check coupon status"
               disabled={couponLoadingCheck}
               onClick={handleCheckCouponSubmit}
               className="flex h-10 w-11 shrink-0 cursor-pointer items-center justify-center rounded-xl border-0 bg-[#0a0a0a]/80 text-[#9aaed1] shadow-inner shadow-black/20 ring-1 ring-white/10 transition-all hover:ring-(--sb-accent-fill)/35 disabled:pointer-events-none disabled:opacity-50"
@@ -494,15 +576,52 @@ function MobileBetSlip({
 
   return (
     <>
-      <div
-        className={`fixed inset-x-0 bottom-0 z-60 flex flex-col rounded-t-[1.25rem] bg-gradient-to-br from-[#111111]/96 via-[#0a0a0a]/96 to-[#000000]/95 shadow-[0_-12px_40px_-8px_rgba(0,0,0,0.55)]  backdrop-blur-md transition-transform duration-300 ease-in-out lg:hidden ${
-          open ? "translate-y-0" : "translate-y-full"
-        }`}
-        style={{ height: "100vh", paddingTop: "env(safe-area-inset-top, 0px)" }}
-      >
+      {createPortal(
         <div
-          className={`flex shrink-0 items-center border-b bg-[#0a0a0a]/35 backdrop-blur-md ${slipDivider}`}
+          className={`fixed inset-0 z-[59] transition-opacity duration-300 ease-out lg:hidden ${
+            open
+              ? "pointer-events-auto opacity-100"
+              : "pointer-events-none opacity-0"
+          }`}
+          aria-hidden={!open}
         >
+          <button
+            type="button"
+            className="absolute inset-0 border-0 bg-black/55 backdrop-blur-sm"
+            onClick={onClose}
+            tabIndex={open ? 0 : -1}
+            aria-label="Close betslip"
+          />
+          <div
+            ref={sheetRef}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Betslip"
+            className="absolute inset-x-0 bottom-0 z-60 flex h-[80vh] max-h-[80vh] flex-col overflow-hidden rounded-t-[1.75rem] bg-gradient-to-br from-[#111111]/96 via-[#0a0a0a]/96 to-[#000000]/95 shadow-[0_-12px_40px_-8px_rgba(0,0,0,0.55)] backdrop-blur-md lg:hidden"
+            style={{
+              transform: open ? `translateY(${dragY}px)` : "translateY(100%)",
+              transition: isDragging
+                ? "none"
+                : "transform 300ms ease-in-out",
+            }}
+            onPointerDown={handleSheetPointerDown}
+            onPointerMove={handleSheetPointerMove}
+            onPointerUp={handleSheetPointerEnd}
+            onPointerCancel={handleSheetPointerEnd}
+          >
+            <div
+              className="flex shrink-0 justify-center pb-1 pt-2.5 touch-none"
+              data-sheet-drag
+            >
+              <div
+                className="h-1 w-10 rounded-full bg-white/25"
+                aria-hidden
+              />
+            </div>
+            <div
+              className={`flex shrink-0 items-center border-b bg-[#0a0a0a]/35 backdrop-blur-md ${slipDivider}`}
+              data-sheet-drag
+            >
               <button
                 type="button"
                 className={`mx-0.5 flex-1 cursor-pointer rounded-t-xl border-0 bg-transparent py-3 text-sm font-bold transition-colors ${
@@ -532,9 +651,12 @@ function MobileBetSlip({
           </button>
         </div>
         {couponToolsSection}
-        <div className="flex-1 overflow-y-auto">
+        <div ref={scrollRef} className="flex-1 overflow-y-auto">
           {selections.map((sel) => {
             const expired = isSelectionExpired(sel);
+            const canOpenMatch =
+              typeof onSelectionClick === "function" &&
+              sel?.apiFixtureId != null;
             return (
               <div
                 key={sel.id}
@@ -542,7 +664,18 @@ function MobileBetSlip({
                   expired ? "bg-[#2a1515]/55" : "active:bg-[#0a0a0a]/20"
                 }`}
               >
-                <div className="min-w-0 flex-1">
+                <button
+                  type="button"
+                  disabled={!canOpenMatch}
+                  onClick={() => {
+                    if (!canOpenMatch) return;
+                    onSelectionClick(sel);
+                    onClose?.();
+                  }}
+                  className={`min-w-0 flex-1 border-0 bg-transparent p-0 text-left ${
+                    canOpenMatch ? "cursor-pointer" : "cursor-default"
+                  }`}
+                >
                   <div className="flex flex-wrap items-center gap-1.5">
                     <div
                       className={`text-sm font-bold ${
@@ -566,7 +699,7 @@ function MobileBetSlip({
                   >
                     {sel.marketLabel}: {sel.label}
                   </div>
-                </div>
+                </button>
                 <div className="flex items-center gap-3">
                   <span
                     className={`text-sm font-extrabold ${
@@ -726,17 +859,20 @@ function MobileBetSlip({
             </button>
           </div>
         </div>
-      </div>
-      {couponCheckPreview &&
+          </div>
+        </div>,
+        document.body,
+      )}
+      {couponCheckTickets && couponCheckTickets.length > 0 &&
         createPortal(
           <div className={modalBackdrop} style={{ zIndex: 2147483646 }}>
             <div className={modalPanel}>
               <ModalClose
-                onClick={() => setCouponCheckPreview(null)}
+                onClick={() => setCouponCheckTickets(null)}
                 label="Close ticket preview"
               />
               <div className="flex justify-center">
-                <CouponReceipt ticket={couponCheckPreview} />
+                <CouponCheckPreview tickets={couponCheckTickets} />
               </div>
             </div>
           </div>,

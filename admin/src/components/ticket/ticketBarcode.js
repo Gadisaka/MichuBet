@@ -3,7 +3,7 @@ import JsBarcode from "jsbarcode";
 const OPTIONS_DATAURL = {
   format: "CODE128",
   width: 2,
-  height: 56,
+  height: 28,
   margin: 4,
   displayValue: true,
   fontSize: 12,
@@ -15,6 +15,16 @@ const OPTIONS_DATAURL = {
 /** Receipt / coupon id for barcode (same as former QR payload). */
 export function getBarcodePayload(ticket) {
   return String(ticket?.receiptNumber || ticket?.couponNumber || "").trim();
+}
+
+/** Payment receipt id for payout barcode. */
+export function getPayoutBarcodePayload(ticket) {
+  return String(
+    ticket?.paymentReceiptNumber ||
+      ticket?.payment_receipt_number ||
+      ticket?.receiptNumber ||
+      "",
+  ).trim();
 }
 
 /**

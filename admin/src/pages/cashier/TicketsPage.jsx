@@ -4,7 +4,9 @@ import PanelCard from "../../components/ui/PanelCard";
 import PrimaryButton from "../../components/ui/PrimaryButton";
 import Modal from "../../components/ui/Modal";
 import TicketTemplate from "../../components/ticket/TicketTemplate";
+import PayoutReceiptTemplate from "../../components/ticket/PayoutReceiptTemplate";
 import { useTicketPrint } from "../../components/ticket/useTicketPrint";
+import { usePayoutReceiptPrint } from "../../components/ticket/usePayoutReceiptPrint";
 import { encodeTicketAsync } from "../../components/ticket/escpos";
 import { print as printViaLocalService } from "../../services/localPrinter";
 import { useAuth } from "../../context/AuthContext";
@@ -28,7 +30,9 @@ import {
 } from "../../hook/useCashierTickets";
 import { useCashierHistoryQuery } from "../../hook/useCashierWallet";
 import { useNotificationUnreadCountQuery } from "../../hook/useNotifications";
+import { usePlayerInfoPagesQuery } from "../../hook/useSettingsQuery";
 import CashierInboxList from "../../components/notifications/CashierInboxList";
+import { formatSelectionResult } from "../../components/ticket/receiptFormat";
 import { capGrossPotentialWin } from "../../utils/bettingStakeLimits";
 import { isSelectionRemovable } from "../../utils/selectionExpiry";
 import {
@@ -118,12 +122,33 @@ function writePrintedCache(setValue) {
   localStorage.setItem(PRINTED_STORAGE_KEY, JSON.stringify([...setValue]));
 }
 
+function selectionResultClass(result) {
+  const value = String(result || "PENDING").toUpperCase();
+  if (value === "WON") return "text-emerald-600";
+  if (value === "LOST") return "text-[var(--danger)]";
+  if (value === "VOID") return "text-[var(--muted)]";
+  return "text-[var(--muted)]";
+}
+
+function TicketStatusBadge({ status }) {
+  const normalized = String(status || "").toUpperCase();
+  if (normalized === "PAID") {
+    return (
+      <span className="rounded-sm bg-emerald-600/15 px-2 py-0.5 text-xs font-semibold uppercase tracking-wide text-emerald-700">
+        Paid
+      </span>
+    );
+  }
+  return <span className="font-mono">{normalized || "-"}</span>;
+}
+
 function TicketDetail({
   ticket,
   platformWinningsTax = null,
   canRemoveSelections = false,
   onRemoveSelection,
   removingSelectionId = "",
+  showSelectionResults = false,
 }) {
   if (!ticket) return null;
 
@@ -151,6 +176,9 @@ function TicketDetail({
               <th className="px-3 py-2">Market</th>
               <th className="px-3 py-2">Selection</th>
               <th className="px-3 py-2">Odd</th>
+              {showSelectionResults ? (
+                <th className="px-3 py-2">Result</th>
+              ) : null}
               {canRemoveSelections ? (
                 <th className="px-3 py-2 text-right">Action</th>
               ) : null}
@@ -194,6 +222,13 @@ function TicketDetail({
                   <td className="px-3 py-2 text-xs font-mono">
                     {toNumber(selection.odds).toFixed(2)}
                   </td>
+                  {showSelectionResults ? (
+                    <td
+                      className={`px-3 py-2 text-xs font-semibold ${selectionResultClass(selection.result)}`}
+                    >
+                      {formatSelectionResult(selection.result)}
+                    </td>
+                  ) : null}
                   {canRemoveSelections ? (
                     <td className="px-3 py-2 text-right text-xs">
                       <button
@@ -245,7 +280,7 @@ function TicketDetail({
         )}
         <p>
           <span className="font-semibold">Status:</span>{" "}
-          <span className="font-mono">{ticket.status}</span>
+          <TicketStatusBadge status={ticket.status} />
         </p>
       </div>
     </div>
@@ -371,6 +406,7 @@ export default function CashierTicketsPage() {
   const [payoutError, setPayoutError] = useState("");
   const [sellConfirmed, setSellConfirmed] = useState(false);
   const [ticketPreviewOpen, setTicketPreviewOpen] = useState(false);
+  const [payoutReceiptPreviewOpen, setPayoutReceiptPreviewOpen] = useState(false);
   const [actionSuccess, setActionSuccess] = useState("");
   const [printedCache, setPrintedCache] = useState(() => readPrintedCache());
   const [platformWinningsTax, setPlatformWinningsTax] = useState(null);
@@ -417,6 +453,9 @@ export default function CashierTicketsPage() {
   const repeatTicket = useRepeatTicketMutation();
   const removeSelection = useRemoveTicketSelectionMutation();
   const printInFlightRef = useRef(false);
+  const playerInfoPagesQuery = usePlayerInfoPagesQuery();
+  const payoutContactEntries =
+    playerInfoPagesQuery.data?.pages?.["contact-us"]?.entries ?? [];
 
   const sellStakeNum = Number(sellStakeInput);
   const sellAccPct = toNumber(sellTicket?.accumulatorBonusPercent);
@@ -457,6 +496,26 @@ export default function CashierTicketsPage() {
   } = useTicketPrint(ticketForPrint, {
     width: "80mm",
     platformWinningsTax,
+  });
+
+  const ticketForPayoutReceipt = payoutTicket
+    ? {
+        ...payoutTicket,
+        paidByName: user?.name || payoutTicket.cashierName || "",
+      }
+    : null;
+  const {
+    receiptRef: payoutReceiptRef,
+    barcodeDataUrl: payoutBarcodeDataUrl,
+    downloadPdf: downloadPayoutPdf,
+    pdfBusy: payoutPdfBusy,
+    print: printPayoutReceipt,
+    lastError: payoutPrintError,
+  } = usePayoutReceiptPrint(ticketForPayoutReceipt, {
+    width: "80mm",
+    platformWinningsTax,
+    contactEntries: payoutContactEntries,
+    paidByName: user?.name || "",
   });
 
   const slipsStatus = rightTab === "canceled" ? "CANCELED" : "";
@@ -775,10 +834,17 @@ export default function CashierTicketsPage() {
         ticketId: payoutTicket.id,
       });
       setActionSuccess(response?.message || "Ticket payout completed");
-      const refreshed = await refreshPayoutTicket(payoutTicket);
-      setPayoutTicket(refreshed);
+      if (response?.ticket) {
+        setPayoutTicket(response.ticket);
+      } else {
+        const refreshed = await refreshPayoutTicket(payoutTicket);
+        setPayoutTicket(refreshed);
+      }
       await slipsQuery.refetch();
     } catch (error) {
+      if (error?.details?.ticket) {
+        setPayoutTicket(mapTicketDetail(error.details.ticket));
+      }
       setPayoutError(error?.message || "Failed to payout ticket");
     }
   };
@@ -1207,9 +1273,19 @@ export default function CashierTicketsPage() {
                     <TicketDetail
                       ticket={payoutTicket}
                       platformWinningsTax={platformWinningsTax}
+                      showSelectionResults
                     />
 
                     <div className="mt-4 flex flex-wrap items-end gap-3">
+                      {payoutTicket.status === "PAID" ? (
+                        <button
+                          type="button"
+                          onClick={() => setPayoutReceiptPreviewOpen(true)}
+                          className="rounded-sm border border-[var(--border)] bg-[var(--surface)] px-4 py-2 text-sm font-semibold text-[var(--text)]"
+                        >
+                          Print Payment Receipt
+                        </button>
+                      ) : null}
                       <button
                         type="button"
                         onClick={() => {
@@ -1223,6 +1299,8 @@ export default function CashierTicketsPage() {
                         }}
                         disabled={
                           isBusy ||
+                          (payoutAction === "payout" &&
+                            payoutTicket.status !== "WON") ||
                           (payoutAction === "cashout" &&
                             payoutQuote &&
                             !payoutQuote.allowed)
@@ -1268,7 +1346,7 @@ export default function CashierTicketsPage() {
 
                     <p className="mt-2 text-[11px] text-[var(--muted)]">
                       Current status:{" "}
-                      <span className="font-mono">{payoutTicket.status}</span>
+                      <TicketStatusBadge status={payoutTicket.status} />
                       {payoutAction === "payout" &&
                         payoutTicket.status !== "WON" && (
                           <>
@@ -1416,6 +1494,79 @@ export default function CashierTicketsPage() {
         </div>
       </Modal>
 
+      <Modal
+        open={payoutReceiptPreviewOpen}
+        onClose={() => setPayoutReceiptPreviewOpen(false)}
+        title="Payment Receipt Preview"
+      >
+        <div className="space-y-4">
+          <p className="text-xs text-[var(--muted)]">
+            Confirm the payment receipt layout below, then print or download the
+            PDF.
+          </p>
+          {payoutPrintError ? (
+            <p className="text-xs text-[var(--danger)]">{payoutPrintError}</p>
+          ) : null}
+          <div className="max-h-[60vh] overflow-y-auto rounded-sm border border-[var(--border)] bg-[#f2f2f2] p-3">
+            {ticketForPayoutReceipt ? (
+              <PayoutReceiptTemplate
+                ticket={ticketForPayoutReceipt}
+                barcodeDataUrl={payoutBarcodeDataUrl}
+                width="80mm"
+                platformWinningsTax={platformWinningsTax}
+                contactEntries={payoutContactEntries}
+                paidByName={user?.name || ""}
+              />
+            ) : (
+              <p className="text-sm text-[var(--muted)]">
+                No payment receipt available for preview.
+              </p>
+            )}
+          </div>
+          <div className="flex flex-wrap justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setPayoutReceiptPreviewOpen(false)}
+              className="rounded-sm border border-[var(--border)] px-4 py-2 text-sm font-semibold text-[var(--muted)]"
+            >
+              Close
+            </button>
+            <button
+              type="button"
+              disabled={payoutPdfBusy || !ticketForPayoutReceipt}
+              onClick={async () => {
+                const ok = await downloadPayoutPdf();
+                if (ok) {
+                  setActionSuccess("Payment receipt PDF downloaded.");
+                } else {
+                  setPayoutError("Failed to generate payment receipt PDF");
+                }
+              }}
+              className="rounded-sm border border-[var(--border)] px-4 py-2 text-sm font-semibold text-[var(--text)] disabled:opacity-60"
+            >
+              {payoutPdfBusy ? "Generating PDF..." : "Download PDF"}
+            </button>
+            <button
+              type="button"
+              disabled={!ticketForPayoutReceipt}
+              onClick={async () => {
+                const result = await printPayoutReceipt();
+                if (result.printed) {
+                  setActionSuccess("Payment receipt sent to printer.");
+                } else if (result.reason === "service_unreachable") {
+                  setPayoutError(
+                    "Local print service unreachable. Download PDF or start PrinterBridge.exe.",
+                  );
+                }
+              }}
+              className="rounded-sm bg-[var(--accent)] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+            >
+              Print Receipt
+            </button>
+          </div>
+        </div>
+      </Modal>
+
       <div className="thermal-print-area" aria-hidden>
         {ticketForPrint && (
           <TicketTemplate
@@ -1424,6 +1575,17 @@ export default function CashierTicketsPage() {
             barcodeDataUrl={barcodeDataUrl}
             width="80mm"
             platformWinningsTax={platformWinningsTax}
+          />
+        )}
+        {ticketForPayoutReceipt && (
+          <PayoutReceiptTemplate
+            ref={payoutReceiptRef}
+            ticket={ticketForPayoutReceipt}
+            barcodeDataUrl={payoutBarcodeDataUrl}
+            width="80mm"
+            platformWinningsTax={platformWinningsTax}
+            contactEntries={payoutContactEntries}
+            paidByName={user?.name || ""}
           />
         )}
       </div>

@@ -44,6 +44,7 @@ const CMD = {
 
 const CHARS_80MM = 48;
 const CHARS_58MM = 32;
+const TICKET_BOTTOM_FEED_LINES = 6;
 
 /** Target raster width in dots (~203 dpi layouts) */
 const LOGO_DOTS = {
@@ -399,16 +400,16 @@ function buildTicketEscPosParts(ticket, opts) {
       const market = sel?.marketLabel || "";
       const odds = formatOdds(sel?.odds);
 
-      const matchLines = wrapText(`${i + 1}. ${matchName}`, chars);
-      for (const ml of matchLines) {
-        parts.push(line(ml));
-      }
-
       if (leagueLine) {
-        const leagueLines = wrapText(`   ${leagueLine}`, chars);
+        const leagueLines = wrapText(leagueLine, chars);
         for (const ll of leagueLines) {
           parts.push(line(ll));
         }
+      }
+
+      const matchLines = wrapText(`${i + 1}. ${matchName}`, chars);
+      for (const ml of matchLines) {
+        parts.push(line(ml));
       }
 
       const marketLabel = market || "-";
@@ -468,7 +469,7 @@ export function encodeTicket(ticket, opts = {}) {
   const parts = [new Uint8Array(CMD.INIT)];
   parts.push(...buildTicketEscPosParts(ticket, opts));
   appendTicketFooterParts(parts, chars);
-  parts.push(new Uint8Array(CMD.FEED_LINES(2)));
+  parts.push(new Uint8Array(CMD.FEED_LINES(TICKET_BOTTOM_FEED_LINES)));
   parts.push(new Uint8Array(CMD.CUT_PARTIAL));
   return concat(...parts);
 }
@@ -504,7 +505,7 @@ export async function encodeTicketAsync(ticket, opts = {}) {
   }
 
   appendTicketFooterParts(parts, chars);
-  parts.push(new Uint8Array(CMD.FEED_LINES(2)));
+  parts.push(new Uint8Array(CMD.FEED_LINES(TICKET_BOTTOM_FEED_LINES)));
   parts.push(new Uint8Array(CMD.CUT_PARTIAL));
   return concat(...parts);
 }

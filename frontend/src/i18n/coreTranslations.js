@@ -75,6 +75,25 @@ export const translations = Object.freeze({
       slip: "SLIP",
       betSlip: "Bet Slip",
     }),
+    footer: Object.freeze({
+      tagline: "Your trusted online betting platform",
+      sports: "Sports",
+      games: "Games",
+      promotions: "Promotions",
+      deposit: "Deposit",
+      rightsReserved: "All rights reserved.",
+      ageNotice: "Must be 21+ to play.",
+      gambleResponsibly: "Gamble responsibly.",
+    }),
+    age: Object.freeze({
+      badge: "21+",
+      playersOnly: "For players 21 years and older only.",
+    }),
+    pagination: Object.freeze({
+      prev: "Prev",
+      next: "Next",
+      aria: "Match list pages",
+    }),
     sidebar: Object.freeze({
       infoSection: "Info",
       searchClubsPlaceholder: "Search clubs…",
@@ -171,6 +190,25 @@ export const translations = Object.freeze({
       deposit: "ዲፖዚት",
       slip: "ቁራጭ",
       betSlip: "የውርርድ ቁራጭ",
+    }),
+    footer: Object.freeze({
+      tagline: "የተማመኑ የመስመር ላይ ውርርድ መድረክ",
+      sports: "ስፖርት",
+      games: "ጨዋታዎች",
+      promotions: "ማስተዋወቂያዎች",
+      deposit: "ዲፖዚት",
+      rightsReserved: "ሁሉም መብቶች የተጠበቁ ናቸው።",
+      ageNotice: "ለመጫወት 21+ መሆን አለቦት።",
+      gambleResponsibly: "በሃላፊነት ይጫወቱ።",
+    }),
+    age: Object.freeze({
+      badge: "21+",
+      playersOnly: "ለ21 ዓመት እና ከዚያ በላይ ተጫዋቾች ብቻ።",
+    }),
+    pagination: Object.freeze({
+      prev: "ቀዳሚ",
+      next: "ቀጣይ",
+      aria: "የጨዋታ ዝርዝር ገጾች",
     }),
     sidebar: Object.freeze({
       infoSection: "መረጃ",

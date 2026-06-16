@@ -1,4 +1,8 @@
 import { prisma } from "../Config/db.js";
+import {
+  aggregateShopStatsForWalletIds,
+  emptyShopStats,
+} from "../services/shopReportStats.js";
 
 function parseDateYmd(value) {
   if (!value) return null;
@@ -374,6 +378,7 @@ export async function getAgentReports(req, res) {
           wonTickets: 0,
           lostTickets: 0,
           paidTickets: 0,
+          shop: emptyShopStats(),
         },
         byBranch: [],
         byCashier: [],
@@ -384,9 +389,17 @@ export async function getAgentReports(req, res) {
       ...new Set(cashiers.map((cashier) => cashier.branch_name).filter(Boolean)),
     ].sort((a, b) => a.localeCompare(b));
 
-    const scopedCashierIds = cashiers
-      .filter((cashier) => !branchName || cashier.branch_name === branchName)
-      .map((cashier) => cashier.id);
+    const scopedCashiers = cashiers.filter(
+      (cashier) => !branchName || cashier.branch_name === branchName,
+    );
+    const scopedCashierIds = scopedCashiers.map((cashier) => cashier.id);
+    const scopedWalletIds = scopedCashiers
+      .map((cashier) => cashier.wallet_id)
+      .filter(Boolean);
+    const shopStats = await aggregateShopStatsForWalletIds(scopedWalletIds, {
+      start,
+      end,
+    });
 
     const ticketCashierIds = branchName ? scopedCashierIds : cashierIds;
     const tickets = await prisma.ticket.findMany({
@@ -468,6 +481,7 @@ export async function getAgentReports(req, res) {
         wonTickets: tickets.filter((ticket) => ticket.status === "WON").length,
         lostTickets: tickets.filter((ticket) => ticket.status === "LOST").length,
         paidTickets: tickets.filter((ticket) => ticket.status === "PAID").length,
+        shop: shopStats,
       },
       byBranch: [...branchMap.values()].sort((a, b) =>
         a.branchName.localeCompare(b.branchName),

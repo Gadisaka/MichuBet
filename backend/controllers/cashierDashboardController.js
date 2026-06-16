@@ -5,6 +5,7 @@
  * @module controllers/cashierDashboardController
  */
 import { prisma } from "../Config/db.js";
+import { aggregateShopStatsForWalletIds } from "../services/shopReportStats.js";
 
 function parseDateOnlyStart(value) {
   if (!value || typeof value !== "string") return null;
@@ -26,18 +27,6 @@ function parseDateOnlyEnd(value) {
   const d = Number(m[3]);
   const dt = new Date(y, mo - 1, d, 23, 59, 59, 999);
   return Number.isNaN(dt.getTime()) ? null : dt;
-}
-
-/** @param {{ selection_snapshot?: unknown }} ticket */
-function isJackpotTicket(ticket) {
-  const snap = ticket.selection_snapshot;
-  if (snap == null) return false;
-  if (typeof snap === "object" && !Array.isArray(snap)) {
-    if (snap.isJackpot === true) return true;
-    if (snap.gameMode === "jackpot" || snap.type === "jackpot") return true;
-    if (snap.product === "jackpot") return true;
-  }
-  return false;
 }
 
 async function resolveCashierByUserId(userId) {
@@ -90,111 +79,10 @@ export async function getCashierDashboardStats(req, res) {
       return res.status(400).json({ message: "Valid from and to dates (YYYY-MM-DD) are required" });
     }
 
-    const walletId = cashier.wallet_id;
-
-    // --- Sold (print-confirmed stakes): BET ticket-print:* — cashier float charged at print ---
-    const betTxs = await prisma.transaction.findMany({
-      where: {
-        wallet_id: walletId,
-        type: "BET",
-        reference: { startsWith: "ticket-print:" },
-        created_at: { gte: from, lte: to },
-      },
+    const shopStats = await aggregateShopStatsForWalletIds([cashier.wallet_id], {
+      start: from,
+      end: to,
     });
-
-    const betTicketIds = betTxs
-      .map((tx) => {
-        const ref = String(tx.reference || "");
-        return ref.startsWith("ticket-print:") ? ref.slice("ticket-print:".length) : null;
-      })
-      .filter(Boolean);
-
-    const betTickets =
-      betTicketIds.length > 0
-        ? await prisma.ticket.findMany({
-            where: { id: { in: betTicketIds } },
-            select: { id: true, selection_snapshot: true },
-          })
-        : [];
-
-    const jackpotSoldIds = new Set(
-      betTickets.filter((t) => isJackpotTicket(t)).map((t) => t.id),
-    );
-
-    const soldBets = betTxs.filter((tx) => {
-      const ref = String(tx.reference || "");
-      const tid = ref.startsWith("ticket-print:") ? ref.slice("ticket-print:".length) : "";
-      return tid && !jackpotSoldIds.has(tid);
-    });
-
-    const totalTicketsSold = soldBets.length;
-    const totalSoldPrice = soldBets.reduce((s, tx) => s + Number(tx.amount), 0);
-
-    // --- Paid winning tickets: PAYOUT ticket:* ---
-    const payoutTxs = await prisma.transaction.findMany({
-      where: {
-        wallet_id: walletId,
-        type: "PAYOUT",
-        reference: { startsWith: "ticket:" },
-        created_at: { gte: from, lte: to },
-      },
-    });
-
-    const payoutTicketIds = payoutTxs
-      .map((tx) => {
-        const ref = String(tx.reference || "");
-        return ref.startsWith("ticket:") ? ref.slice("ticket:".length) : null;
-      })
-      .filter(Boolean);
-
-    const payoutTickets =
-      payoutTicketIds.length > 0
-        ? await prisma.ticket.findMany({
-            where: { id: { in: payoutTicketIds } },
-            select: { id: true, selection_snapshot: true },
-          })
-        : [];
-
-    const jackpotPaidIds = new Set(
-      payoutTickets.filter((t) => isJackpotTicket(t)).map((t) => t.id),
-    );
-
-    const payoutsNonJackpot = payoutTxs.filter((tx) => {
-      const ref = String(tx.reference || "");
-      const tid = ref.startsWith("ticket:") ? ref.slice("ticket:".length) : "";
-      return tid && !jackpotPaidIds.has(tid);
-    });
-
-    const totalPaidTickets = payoutsNonJackpot.length;
-    const totalPaidAmount = payoutsNonJackpot.reduce((s, tx) => s + Number(tx.amount), 0);
-
-    // --- Player wallet: cashier deposited (WITHDRAW on cashier) ---
-    const depositTxs = await prisma.transaction.findMany({
-      where: {
-        wallet_id: walletId,
-        type: "WITHDRAW",
-        created_at: { gte: from, lte: to },
-        reference: { startsWith: "cashier-deposit:" },
-      },
-    });
-    const totalDepositAmount = depositTxs.reduce((s, tx) => s + Number(tx.amount), 0);
-
-    // --- Player withdraw approved into cashier float (DEPOSIT on cashier) ---
-    const withdrawTxs = await prisma.transaction.findMany({
-      where: {
-        wallet_id: walletId,
-        type: "DEPOSIT",
-        created_at: { gte: from, lte: to },
-        reference: { startsWith: "cashier-withdraw-approve:" },
-      },
-    });
-    const totalWithdrawAmount = withdrawTxs.reduce((s, tx) => s + Number(tx.amount), 0);
-
-    const grandNet =
-      totalSoldPrice -
-      totalPaidAmount -
-      totalDepositAmount +
-      totalWithdrawAmount;
 
     return res.json({
       from: from.toISOString(),
@@ -211,13 +99,7 @@ export async function getCashierDashboardStats(req, res) {
       cashierName: String(cashier.user?.name || "").trim(),
       branchName: String(cashier.branch_name || "").trim(),
       branchLocation: String(cashier.branch_location || "").trim(),
-      totalTicketsSold,
-      totalSoldPrice,
-      totalDepositAmount,
-      totalWithdrawAmount,
-      totalPaidTickets,
-      totalPaidAmount,
-      grandNet,
+      ...shopStats,
     });
   } catch (error) {
     console.error("getCashierDashboardStats error:", error);

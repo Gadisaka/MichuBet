@@ -56,6 +56,24 @@ function toCategoryOdds(lines = []) {
   return out;
 }
 
+/** Count priced selection cells across all markets (matches expansion UI). */
+export function countOddCellsFromMarkets(markets = []) {
+  let total = 0;
+  for (const market of markets) {
+    total += toCategoryOdds(market.odd_lines || []).length;
+  }
+  return total;
+}
+
+export function countOddCellsFromDetailedOdds(detailedOdds) {
+  if (!detailedOdds) return 0;
+  const categories = [
+    ...(detailedOdds.main || []),
+    ...(detailedOdds.extra || []),
+  ];
+  return categories.reduce((sum, cat) => sum + (cat.odds?.length || 0), 0);
+}
+
 // Categories we consider "main" — they feed the compact summary row
 // (1 / X / 2 / 1X / X2 / 12) shown on every match card.
 const MAIN_MARKET_NAMES = new Set(["Match Winner", "Double Chance"]);
@@ -80,6 +98,9 @@ function toDetailedOdds(markets = []) {
  * - **Detail** (`GET /odds/:id`): merged via `applyOddsToMatch` into `detailedOdds` /
  *   `sideBets` only; the six-cell `markets` strip stays from the list payload so
  *   prices do not jump when the row expands.
+ *
+ * `sideBets` is the badge on the row — total priced odd cells across all markets
+ * (deduped per market the same way as the expansion panel), not market count.
  *
  * `toSummaryMarkets` builds the compact strip using `toCategoryOdds` per market
  * (first priced line wins per selection label).
@@ -138,14 +159,12 @@ export function mapFixtureToMatch(fixture, oddsPayload = null) {
   const markets = oddsPayload?.markets || fixture?.markets || [];
   const detailedOdds = toDetailedOdds(markets);
 
-  // "sideBets" is the badge on the row — it's the number of non-main markets
-  // that actually have priced odds. Using normalized length keeps it honest
-  // even when the upstream returned an empty market (which we filter out).
-  // List responses may omit full markets but set `extra_markets_count` from DB.
-  const rawExtraCount = fixture?.extra_markets_count;
-  const sideBets = Number.isFinite(rawExtraCount)
-    ? rawExtraCount
-    : detailedOdds.extra.length;
+  const fromMarkets = countOddCellsFromMarkets(markets);
+  const storedCells = Number(fixture?.available_odd_cells_count);
+  const sideBets =
+    Number.isFinite(storedCells) && storedCells > fromMarkets
+      ? storedCells
+      : fromMarkets;
 
   const kickoffAt = fixture?.start_time
     ? new Date(fixture.start_time).toISOString()

@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import AppIcon from "../common/AppIcon";
-import CouponReceipt from "../common/CouponReceipt";
+import CouponCheckPreview from "../common/CouponCheckPreview";
 import {
   fetchPublicCouponTicket,
-  fetchPublicReceiptTicket,
+  fetchPublicCouponCheck,
   hasAuthToken,
   placeBet,
 } from "../../services/api";
@@ -117,6 +117,7 @@ function BetSlipPanel({
   activeSlip,
   onChangeSlip,
   onReplaceSelections = () => {},
+  onSelectionClick,
 }) {
   const [stakeInput, setStakeInput] = useState("20");
   const [placing, setPlacing] = useState(false);
@@ -128,7 +129,7 @@ function BetSlipPanel({
   const [checkCouponInput, setCheckCouponInput] = useState("");
   const [couponLoadingLoad, setCouponLoadingLoad] = useState(false);
   const [couponLoadingCheck, setCouponLoadingCheck] = useState(false);
-  const [couponCheckPreview, setCouponCheckPreview] = useState(null);
+  const [couponCheckTickets, setCouponCheckTickets] = useState(null);
   const [lockedByFixture, setLockedByFixture] = useState({});
   const [, setTick] = useState(0);
   const { limits, winningsTax } = usePlatformSettings();
@@ -465,8 +466,8 @@ function BetSlipPanel({
     setCouponLoadingCheck(true);
     setBetResult(null);
     try {
-      const data = await fetchPublicReceiptTicket(trimmed);
-      setCouponCheckPreview(data);
+      const data = await fetchPublicCouponCheck(trimmed);
+      setCouponCheckTickets(data.tickets || []);
     } catch (err) {
       setBetResult({
         type: "error",
@@ -549,14 +550,14 @@ function BetSlipPanel({
               onKeyDown={(e) => {
                 if (e.key === "Enter") handleCheckCouponSubmit();
               }}
-              placeholder="Check Receipt..."
+              placeholder="Check Coupon..."
               disabled={couponLoadingCheck}
               autoComplete="off"
               className="h-10 min-w-0 flex-1 rounded-xl border-0 bg-[#0a0a0a]/80 px-3 text-[13px] text-[#ffffff] shadow-inner shadow-black/25 ring-1 ring-white/10 outline-none transition-all placeholder:text-[rgba(255,255,255,0.72)] focus:ring-2 focus:ring-(--sb-accent-fill)/45 disabled:opacity-60"
             />
             <button
               type="button"
-              title="Check receipt status"
+              title="Check coupon status"
               disabled={couponLoadingCheck}
               onClick={handleCheckCouponSubmit}
               className="flex h-10 w-11 shrink-0 cursor-pointer items-center justify-center rounded-xl border-0 bg-[#0a0a0a]/80 text-[#9aaed1] shadow-inner shadow-black/20 ring-1 ring-white/10 transition-all hover:ring-(--sb-accent-fill)/35 disabled:pointer-events-none disabled:opacity-50"
@@ -583,6 +584,9 @@ function BetSlipPanel({
               {selections.map((sel) => {
                 const expired = isSelectionExpired(sel);
                 const rowEnter = enterAnimIds.has(sel.id);
+                const canOpenMatch =
+                  typeof onSelectionClick === "function" &&
+                  sel?.apiFixtureId != null;
                 return (
                   <div
                     key={sel.id}
@@ -597,7 +601,16 @@ function BetSlipPanel({
                     >
                       <AppIcon name="trash" size={14} />
                     </button>
-                    <div className="min-w-0 flex-1">
+                    <button
+                      type="button"
+                      disabled={!canOpenMatch}
+                      onClick={() => canOpenMatch && onSelectionClick(sel)}
+                      className={`min-w-0 flex-1 border-0 bg-transparent p-0 text-left ${
+                        canOpenMatch
+                          ? "cursor-pointer"
+                          : "cursor-default"
+                      }`}
+                    >
                       <div className="flex flex-wrap items-center gap-1.5">
                         <div
                           className={`text-[13px] font-bold ${
@@ -621,7 +634,7 @@ function BetSlipPanel({
                       >
                         {sel.marketLabel} : {sel.label}
                       </div>
-                    </div>
+                    </button>
                     <span
                       className={`shrink-0 text-[15px] font-extrabold ${
                         expired
@@ -811,16 +824,16 @@ function BetSlipPanel({
           {placing ? "PLACING..." : "PLACE BET"}
         </button>
       </section>
-      {couponCheckPreview &&
+      {couponCheckTickets && couponCheckTickets.length > 0 &&
         createPortal(
           <div className={modalBackdrop} style={{ zIndex: 2147483646 }}>
             <div className={modalPanel}>
               <ModalClose
-                onClick={() => setCouponCheckPreview(null)}
+                onClick={() => setCouponCheckTickets(null)}
                 label="Close ticket preview"
               />
               <div className="flex justify-center">
-                <CouponReceipt ticket={couponCheckPreview} />
+                <CouponCheckPreview tickets={couponCheckTickets} />
               </div>
             </div>
           </div>,

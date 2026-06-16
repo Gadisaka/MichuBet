@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import AppIcon from "../common/AppIcon";
 import MobileBetSlip from "../sections/MobileBetSlip";
@@ -12,8 +12,8 @@ const navItems = [
   { id: "leagues", icon: "trophy" },
   { id: "live", icon: "radio" },
   { id: "menu", icon: "menu" },
-  { id: "games", icon: "gamepad" },
   { id: "slip", icon: "ticket" },
+  { id: "games", icon: "gamepad" },
 ];
 
 function MobileBottomBar({
@@ -21,6 +21,7 @@ function MobileBottomBar({
   onRemoveSelection = () => {},
   onClearSelections = () => {},
   onReplaceSelections = () => {},
+  onSelectionClick,
   leaguesSidebarProps = null,
 }) {
   const { t } = useTranslation();
@@ -69,6 +70,22 @@ function MobileBottomBar({
         : navItems.filter((item) => item.id !== "menu"),
     [isLoggedIn],
   );
+
+  const defaultSelectionClick = useCallback(
+    (sel) => {
+      if (sel?.apiFixtureId == null) return;
+      setSlipOpen(false);
+      navigate("/", {
+        state: {
+          openFixtureId: sel.apiFixtureId,
+          kickoffAt: sel.kickoffAt ?? null,
+        },
+      });
+    },
+    [navigate],
+  );
+
+  const handleSelectionClick = onSelectionClick ?? defaultSelectionClick;
 
   const bottomNav = (
     <nav className="fixed inset-x-0 bottom-0 z-50 flex items-stretch justify-around border-t border-white/10 bg-[#000000] lg:hidden">
@@ -146,6 +163,7 @@ function MobileBottomBar({
         onRemoveSelection={onRemoveSelection}
         onClearSelections={onClearSelections}
         onReplaceSelections={onReplaceSelections}
+        onSelectionClick={handleSelectionClick}
         stakeInput={stakeInput}
         onStakeInputChange={setStakeInput}
         limits={limits}

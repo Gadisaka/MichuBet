@@ -1,9 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import MainLayout from "../components/layout/MainLayout";
 import MobileBottomBar from "../components/layout/MobileBottomBar";
 import PageContainer from "../components/layout/PageContainer";
 import PrimaryNav from "../components/layout/PrimaryNav";
+import SiteFooter from "../components/layout/SiteFooter";
 import TopHeader from "../components/layout/TopHeader";
+import MatchesPagination from "../components/common/MatchesPagination";
 import BetSlipPanel from "../components/sections/BetSlipPanel";
 import HeroBanner from "../components/sections/HeroBanner";
 import MatchesTable from "../components/sections/MatchesTable";
@@ -30,6 +33,13 @@ import {
   persistBetSlipState,
 } from "../utils/betSlipPersistence";
 import { usePlayerSiteBranding } from "../hooks/usePlayerSiteBranding";
+import { normalizeApiFixtureId } from "../utils/fixtureId";
+import {
+  filtersToRevealMatch,
+  findMatchByFixtureId,
+  matchIdFromFixtureId,
+} from "../utils/openSlipSelectionOnHome";
+import { slicePageItems } from "../utils/pagination";
 
 /** History keys for SPA back handling on Home (fixture expand + scroll). */
 const HISTORY_HOME_FIXTURE = "__home_fixture_drop";
@@ -38,6 +48,8 @@ const SCROLL_PIN_THRESHOLD_PX = 56;
 
 function Home() {
   const initialBet = loadBetSlipState();
+  const location = useLocation();
+  const navigate = useNavigate();
   const { loadingLogo } = usePlayerSiteBranding();
   const defaultSportId = sportsbookToolbar.sports?.[0]?.id || "football";
   const allLeaguesId = "all-leagues";
@@ -53,7 +65,10 @@ function Home() {
   const [selectedTimeId, setSelectedTimeId] = useState(defaultTimeId);
   const [selectedLeagueId, setSelectedLeagueId] = useState(allLeaguesId);
   const [clubSearch, setClubSearch] = useState("");
+  const [matchesPage, setMatchesPage] = useState(1);
   const [expandedMatchId, setExpandedMatchId] = useState(null);
+  const [pendingOpenFixtureId, setPendingOpenFixtureId] = useState(null);
+  const pendingOpenKickoffRef = useRef(null);
   const [activeSlip, setActiveSlip] = useState(initialBet.activeSlip);
   const [slips, setSlips] = useState(initialBet.slips);
   const selectedOdds = useMemo(
@@ -82,6 +97,26 @@ function Home() {
   const { catalogItems } = useFootballSidebarCatalog();
 
   const selections = slips[activeSlip];
+
+  useEffect(() => {
+    setMatchesPage(1);
+  }, [selectedSportId, selectedTimeId, selectedLeagueId, clubSearch]);
+
+  const matchesPagination = useMemo(
+    () => slicePageItems(matches, matchesPage),
+    [matches, matchesPage],
+  );
+
+  useEffect(() => {
+    if (matchesPagination.page !== matchesPage) {
+      setMatchesPage(matchesPagination.page);
+    }
+  }, [matchesPagination.page, matchesPage]);
+
+  const handleMatchesPageChange = useCallback((nextPage) => {
+    setMatchesPage(nextPage);
+    setExpandedMatchId(null);
+  }, []);
 
   const expandedMatchIdRef = useRef(expandedMatchId);
   useEffect(() => {
@@ -241,6 +276,78 @@ function Home() {
     },
     [activeSlip],
   );
+
+  const applyFiltersToRevealMatch = useCallback((match, kickoffAt) => {
+    const filters = filtersToRevealMatch(match, kickoffAt);
+    if (filters.sportId) setSelectedSportId(filters.sportId);
+    setSelectedLeagueId(filters.leagueId);
+    if (filters.timeId) setSelectedTimeId(filters.timeId);
+    setClubSearch(filters.clubSearch);
+  }, []);
+
+  const openFixtureOnHome = useCallback(
+    async (fixtureId, kickoffAt, match) => {
+      const normalized = normalizeApiFixtureId(fixtureId);
+      if (normalized == null) return;
+
+      applyFiltersToRevealMatch(match, kickoffAt);
+
+      const matchId = matchIdFromFixtureId(normalized);
+      if (matchId) setExpandedMatchId(matchId);
+
+      try {
+        await hydrateMatchOdds(normalized);
+      } catch (err) {
+        console.error("Failed to hydrate match odds:", err);
+      }
+    },
+    [applyFiltersToRevealMatch, hydrateMatchOdds],
+  );
+
+  const handleOpenSelectionOnHome = useCallback(
+    (selection) => {
+      const fixtureId = normalizeApiFixtureId(selection?.apiFixtureId);
+      if (fixtureId == null) return;
+
+      const kickoffAt = selection?.kickoffAt ?? null;
+      const match = findMatchByFixtureId(allMatches, fixtureId);
+
+      if (match) {
+        setPendingOpenFixtureId(null);
+        pendingOpenKickoffRef.current = null;
+        void openFixtureOnHome(fixtureId, kickoffAt, match);
+        return;
+      }
+
+      pendingOpenKickoffRef.current = kickoffAt;
+      setPendingOpenFixtureId(fixtureId);
+      applyFiltersToRevealMatch(null, kickoffAt);
+    },
+    [allMatches, applyFiltersToRevealMatch, openFixtureOnHome],
+  );
+
+  useEffect(() => {
+    if (pendingOpenFixtureId == null) return;
+    const match = findMatchByFixtureId(allMatches, pendingOpenFixtureId);
+    if (!match) return;
+
+    const fixtureId = pendingOpenFixtureId;
+    const kickoffAt = pendingOpenKickoffRef.current;
+    setPendingOpenFixtureId(null);
+    pendingOpenKickoffRef.current = null;
+    void openFixtureOnHome(fixtureId, kickoffAt, match);
+  }, [allMatches, openFixtureOnHome, pendingOpenFixtureId]);
+
+  useEffect(() => {
+    const fixtureId = location.state?.openFixtureId;
+    if (fixtureId == null) return;
+
+    handleOpenSelectionOnHome({
+      apiFixtureId: fixtureId,
+      kickoffAt: location.state?.kickoffAt ?? null,
+    });
+    navigate(".", { replace: true, state: {} });
+  }, [handleOpenSelectionOnHome, location.state?.openFixtureId, location.state?.kickoffAt, navigate]);
 
   const sportCounts = useMemo(() => {
     const counts = new Map();
@@ -407,12 +514,17 @@ function Home() {
                 onSearchChange={setClubSearch}
               />
               <MatchesTable
-                matches={matches}
+                matches={matchesPagination.items}
                 onMatchClick={handleMatchClick}
                 onOddsClick={handleOddsClick}
                 selectedOdds={selectedOdds}
                 expandedMatchId={expandedMatchId}
                 oddsDetailByFixtureId={oddsDetailByFixtureId}
+              />
+              <MatchesPagination
+                page={matchesPagination.page}
+                totalPages={matchesPagination.totalPages}
+                onPageChange={handleMatchesPageChange}
               />
               {!loading && !String(clubSearch).trim() ? (
                 <NextCalendarDayFooter
@@ -432,6 +544,7 @@ function Home() {
               onReplaceSelections={handleReplaceSlipSelections}
               activeSlip={activeSlip}
               onChangeSlip={setActiveSlip}
+              onSelectionClick={handleOpenSelectionOnHome}
             />
           }
         />
@@ -457,12 +570,13 @@ function Home() {
           </div>
         </div>
       ) : null}
-      {/* <SiteFooter /> */}
+      <SiteFooter />
       <MobileBottomBar
         selections={selections}
         onRemoveSelection={handleRemoveSelection}
         onClearSelections={handleClearSelections}
         onReplaceSelections={handleReplaceSlipSelections}
+        onSelectionClick={handleOpenSelectionOnHome}
         leaguesSidebarProps={topLeaguesSidebarProps}
       />
       <div className="h-16 lg:hidden" />

@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "../../context/AuthContext";
 import AdminShell from "../../components/layout/AdminShell";
 import PanelCard from "../../components/ui/PanelCard";
+import ShopReportSummary, { emptyShopSummary } from "../../components/reports/ShopReportSummary";
+import { getReportDatePreset } from "../../components/reports/reportDatePresets";
 import {
   useAdminAgentsForReportsQuery,
   useAdminCashiersForReportsQuery,
@@ -12,6 +14,12 @@ import {
 const TABS = [
   { key: "wallet", label: "Wallet activity" },
   { key: "sales", label: "Sales (tickets)" },
+];
+
+const DATE_PRESETS = [
+  { key: "today", label: "Today" },
+  { key: "last7", label: "Last 7 days" },
+  { key: "thisMonth", label: "This month" },
 ];
 
 function formatYmd(date) {
@@ -123,6 +131,7 @@ export default function AdminReportsPage() {
     wonTickets: 0,
     lostTickets: 0,
     paidTickets: 0,
+    shop: emptyShopSummary(),
   };
   const salesByDay = salesQuery.data?.byDay || [];
   const salesByBranch = salesQuery.data?.byBranch || [];
@@ -153,6 +162,22 @@ export default function AdminReportsPage() {
         cashierProfileId: cashierIdDraft,
       });
     }
+  }
+
+  function applySalesFilters(nextFrom, nextTo) {
+    setFromDate(nextFrom);
+    setToDate(nextTo);
+    setAppliedSales({
+      from: nextFrom,
+      to: nextTo,
+      agentId: agentIdDraft,
+      cashierProfileId: cashierIdDraft,
+    });
+  }
+
+  function onSalesPreset(presetKey) {
+    const { from, to } = getReportDatePreset(presetKey);
+    applySalesFilters(from, to);
   }
 
   return (
@@ -246,6 +271,20 @@ export default function AdminReportsPage() {
             >
               Apply
             </button>
+            {activeTab === "sales" ? (
+              <div className="flex flex-wrap gap-2">
+                {DATE_PRESETS.map((preset) => (
+                  <button
+                    key={preset.key}
+                    type="button"
+                    onClick={() => onSalesPreset(preset.key)}
+                    className="rounded-sm border border-(--border) bg-(--surface) px-3 py-2 text-xs font-semibold text-(--text) hover:bg-(--surface-2)"
+                  >
+                    {preset.label}
+                  </button>
+                ))}
+              </div>
+            ) : null}
           </form>
         </PanelCard>
 
@@ -410,41 +449,12 @@ export default function AdminReportsPage() {
               </PanelCard>
             ) : null}
 
-            <section className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
-              <PanelCard className="p-4">
-                <p className="text-xs uppercase tracking-wide text-(--muted)">
-                  Total tickets
-                </p>
-                <p className="mt-2 text-xl font-semibold">
-                  {number(salesSummary.totalTickets).toLocaleString()}
-                </p>
-              </PanelCard>
-              <PanelCard className="p-4">
-                <p className="text-xs uppercase tracking-wide text-(--muted)">
-                  Total stake
-                </p>
-                <p className="mt-2 text-xl font-semibold">
-                  {number(salesSummary.totalStake).toLocaleString()} ETB
-                </p>
-              </PanelCard>
-              <PanelCard className="p-4">
-                <p className="text-xs uppercase tracking-wide text-(--muted)">
-                  Average stake
-                </p>
-                <p className="mt-2 text-xl font-semibold">
-                  {number(salesSummary.averageStake).toLocaleString()} ETB
-                </p>
-              </PanelCard>
-              <PanelCard className="p-4">
-                <p className="text-xs uppercase tracking-wide text-(--muted)">
-                  Open / Won / Lost
-                </p>
-                <p className="mt-2 text-xl font-semibold">
-                  {number(salesSummary.openTickets)} /{" "}
-                  {number(salesSummary.wonTickets)} /{" "}
-                  {number(salesSummary.lostTickets)}
-                </p>
-              </PanelCard>
+            <section>
+              <ShopReportSummary
+                shop={salesSummary.shop}
+                loading={salesQuery.isLoading}
+                error={salesQuery.isError ? errorMessage(salesQuery.error) : null}
+              />
             </section>
 
             <section className="grid grid-cols-1 gap-5 xl:grid-cols-2">

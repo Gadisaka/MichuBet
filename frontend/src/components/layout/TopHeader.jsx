@@ -3,11 +3,8 @@ import { Link } from "react-router-dom";
 import AppIcon from "../common/AppIcon";
 import DesktopUserSidebar from "./DesktopUserSidebar";
 import MobileMenu from "./MobileMenu";
-import {
-  fetchNotificationUnreadCount,
-  fetchPlayerInfoPages,
-  fetchPlayerWallet,
-} from "../../services/api";
+import { fetchNotificationUnreadCount, fetchPlayerInfoPages, fetchPlayerWallet } from "../../services/api";
+import { pickTelegramContactFromPages } from "../../utils/telegramContact";
 import NotificationsDialog from "../notifications/NotificationsDialog";
 import { usePlayerSiteBranding } from "../../hooks/usePlayerSiteBranding";
 import { useLanguage, useTranslation } from "../../i18n/LanguageContext.jsx";
@@ -20,30 +17,6 @@ const LANG_FLAG = Object.freeze({
 
 function flagSrc(iso2) {
   return `https://flagcdn.com/w40/${iso2}.png`;
-}
-
-function pickTelegramContactFromPages(pages) {
-  const entries = Array.isArray(pages?.["contact-us"]?.entries)
-    ? pages["contact-us"].entries
-    : [];
-  if (entries.length === 0) return null;
-
-  const looksLikeTelegram = (row) => {
-    const name = String(row?.name || "").toLowerCase();
-    const link = String(row?.link || "").toLowerCase();
-    return (
-      name.includes("telegram") ||
-      link.includes("t.me/") ||
-      link.includes("telegram.me/") ||
-      link.includes("telegram")
-    );
-  };
-
-  const preferred = entries.find(looksLikeTelegram) || entries[0];
-  const logo = typeof preferred?.logo === "string" ? preferred.logo.trim() : "";
-  const link = typeof preferred?.link === "string" ? preferred.link.trim() : "";
-  if (!logo || !link) return null;
-  return { logo, link };
 }
 
 function TopHeader() {
@@ -133,7 +106,9 @@ function TopHeader() {
       try {
         const data = await fetchPlayerInfoPages();
         if (cancelled) return;
-        setTelegramCta(pickTelegramContactFromPages(data?.pages));
+        setTelegramCta(
+          pickTelegramContactFromPages(data?.pages, data?.telegramHref),
+        );
       } catch {
         if (!cancelled) setTelegramCta(null);
       }
@@ -278,13 +253,17 @@ function TopHeader() {
               className="inline-flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#111111] max-lg:h-7 max-lg:w-7"
               aria-label={t("header.telegram")}
             >
-              <img
-                src={telegramCta.logo}
-                alt=""
-                className="h-full w-full object-cover"
-                loading="lazy"
-                decoding="async"
-              />
+              {telegramCta.logo ? (
+                <img
+                  src={telegramCta.logo}
+                  alt=""
+                  className="h-full w-full object-cover"
+                  loading="lazy"
+                  decoding="async"
+                />
+              ) : (
+                <AppIcon name="send" size={16} strokeWidth={2} className="text-[#229ED9]" />
+              )}
             </a>
           ) : null}
 

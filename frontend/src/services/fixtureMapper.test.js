@@ -127,9 +127,35 @@ describe("mapFixtureToMatch summary strip", () => {
     expect(merged.sideBets).not.toEqual(listMatch.sideBets);
   });
 
-  it("uses extra_markets_count from list API when full markets are not included", () => {
+  it("counts priced odd cells from markets when no stored total exists", () => {
     const match = mapFixtureToMatch({
       ...baseFx(),
+      markets: [
+        {
+          name: "Match Winner",
+          odd_lines: [
+            { value: "1", odd: 2.1 },
+            { value: "Draw", odd: 3.2 },
+            { value: "2", odd: 4.3 },
+          ],
+        },
+        {
+          name: "Goals Over/Under",
+          odd_lines: [
+            { value: "Over 2.5", odd: 1.9 },
+            { value: "Under 2.5", odd: 1.95 },
+          ],
+        },
+      ],
+    });
+
+    expect(match.sideBets).toBe(5);
+  });
+
+  it("prefers stored available_odd_cells_count when list payload is summary-only", () => {
+    const match = mapFixtureToMatch({
+      ...baseFx(),
+      available_odd_cells_count: 142,
       extra_markets_count: 98,
       markets: [
         {
@@ -151,7 +177,6 @@ describe("mapFixtureToMatch summary strip", () => {
       ],
     });
 
-    expect(match.sideBets).toBe(98);
-    expect(match.detailedOdds.extra).toHaveLength(0);
+    expect(match.sideBets).toBe(142);
   });
 });

@@ -137,43 +137,47 @@
 }
 
 .coupon-receipt__ticket-status--won {
-  background: #dcfce7;
-  color: #15803d;
+  background: #16a34a;
+  color: #ffffff;
 }
 
 .coupon-receipt__ticket-status--lost {
-  background: #fee2e2;
-  color: #b91c1c;
+  background: #dc2626;
+  color: #ffffff;
 }
 
 .coupon-receipt__ticket-status--pending {
-  background: #fef9c3;
-  color: #a16207;
+  background: #f59e0b;
+  color: #111111;
 }
 
 .coupon-receipt__ticket-status--cancelled {
-  background: #e2e8f0;
-  color: #475569;
+  background: #475569;
+  color: #ffffff;
 }
 
 .coupon-receipt__leg--won {
-  background: #dcfce7;
-  color: #15803d;
+  background: #bbf7d0;
+  box-shadow: inset 4px 0 0 #16a34a;
+  color: #14532d;
 }
 
 .coupon-receipt__leg--lost {
-  background: #fee2e2;
-  color: #b91c1c;
+  background: #fecaca;
+  box-shadow: inset 4px 0 0 #dc2626;
+  color: #7f1d1d;
 }
 
 .coupon-receipt__leg--pending {
-  background: #fef9c3;
-  color: #a16207;
+  background: #fde68a;
+  box-shadow: inset 4px 0 0 #f59e0b;
+  color: #78350f;
 }
 
 .coupon-receipt__summary-highlight {
-  background: #14532d;
+  background: #0f6b35;
   color: #ffffff;
+  box-shadow: inset 4px 0 0 #22c55e;
 }
 
 .coupon-receipt__summary-highlight span {

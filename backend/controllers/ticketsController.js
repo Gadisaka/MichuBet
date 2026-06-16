@@ -38,6 +38,7 @@ import {
   couponLookupCandidates,
   normalizeCouponLookupInput,
 } from "../lib/couponNumber.js";
+import { refundTicketWalletsOnCancelInTx } from "../services/ticketCancelRefunds.js";
 
 
 /**
@@ -104,6 +105,46 @@ async function reserveUniqueReceiptNumber(client) {
     if (!clash) return candidate;
   }
   throw new Error("RECEIPT_NUMBER_EXHAUSTED");
+}
+
+/**
+ * @param {import("@prisma/client").PrismaClient | import("@prisma/client").Prisma.TransactionClient} client
+ * @returns {Promise<string>}
+ */
+async function reserveUniquePaymentReceiptNumber(client) {
+  for (let i = 0; i < RECEIPT_ASSIGN_MAX_ATTEMPTS; i++) {
+    const candidate = buildReceiptNumber();
+    const clash = await client.ticket.findFirst({
+      where: { payment_receipt_number: candidate },
+      select: { id: true },
+    });
+    if (!clash) return candidate;
+  }
+  throw new Error("PAYMENT_RECEIPT_NUMBER_EXHAUSTED");
+}
+
+function buildPayoutSummary(selections) {
+  const list = Array.isArray(selections) ? selections : [];
+  return {
+    totalBets: list.length,
+    wonBets: list.filter((s) => s.result === "WON").length,
+    refundedBets: list.filter((s) => s.result === "VOID").length,
+  };
+}
+
+async function loadMappedTicketForResponse(ticketId, cashierId) {
+  const reloaded = await prisma.ticket.findUnique({
+    where: { id: ticketId },
+    include: ticketDetailInclude,
+  });
+  if (!reloaded) return null;
+  const printed = cashierId
+    ? await getPrintedTicketIdSet({
+        cashierId,
+        ticketIds: [ticketId],
+      })
+    : new Set();
+  return mapTicket(reloaded, { printed: printed.has(ticketId) });
 }
 
 function stableMarketParams(params) {
@@ -432,7 +473,7 @@ function mapSnapshotSelections(ticket) {
 }
 
 /** Normalize DB ticket + nested selections/matches for JSON responses */
-function mapTicket(ticket, { printed = false } = {}) {
+function mapTicket(ticket, { printed = false, omitReceipt = false } = {}) {
   const snapshot = Array.isArray(ticket.selection_snapshot)
     ? ticket.selection_snapshot
     : [];
@@ -459,11 +500,15 @@ function mapTicket(ticket, { printed = false } = {}) {
     normalSelections.length === 0 ? mapSnapshotSelections(ticket) : [];
 
   const taxBreakdown = ticketWinningsTaxBreakdown(ticket);
+  const resolvedSelections =
+    normalSelections.length > 0 ? normalSelections : snapshotSelections;
 
   return {
     id: ticket.id,
     couponNumber: ticket.coupon_number,
-    receiptNumber: ticket.receipt_number ?? null,
+    receiptNumber: omitReceipt ? null : (ticket.receipt_number ?? null),
+    paymentReceiptNumber: ticket.payment_receipt_number ?? null,
+    paidAt: toIsoOrNull(ticket.paid_at),
     userId: ticket.user_id,
     cashierId: ticket.cashier_id,
     cashierName: ticket.cashier?.user?.name ?? null,
@@ -477,11 +522,11 @@ function mapTicket(ticket, { printed = false } = {}) {
     winningsTaxRate: ticket.winnings_tax_rate ?? null,
     winningsTaxAmount: taxBreakdown.taxAmount,
     netPayout: taxBreakdown.netPayout,
+    payoutSummary: buildPayoutSummary(resolvedSelections),
     status: ticket.status,
     createdAt: ticket.created_at,
     printed,
-    selections:
-      normalSelections.length > 0 ? normalSelections : snapshotSelections,
+    selections: resolvedSelections,
   };
 }
 
@@ -534,9 +579,18 @@ function mapPublicCouponPayload(ticket) {
               ? snap.kickoffAt
               : selectionKickoffTime(selection);
           const kickoffAt = toIsoOrNull(start);
+          const country = String(matchPayload?.country || "").trim();
+          const leagueName = String(matchPayload?.leagueName || "").trim();
+          const leagueLine =
+            country && leagueName
+              ? `${country} - ${leagueName}`
+              : leagueName || country || "";
 
           return {
             matchName: String(snap?.matchName ?? "").trim() || derivedMatchName,
+            country,
+            leagueName,
+            league: leagueLine,
             marketLabel,
             label: String(snap?.label ?? selection.selection ?? "").trim(),
             odds: Number(selection.odds),
@@ -550,6 +604,13 @@ function mapPublicCouponPayload(ticket) {
         })
       : snapshot.map((snap) => {
           const teams = parseTeamsFromMatchName(snap?.matchName);
+          const leagueMeta = leagueMetaFromSelection(null, snap);
+          const country = String(leagueMeta.country || "").trim();
+          const leagueName = String(leagueMeta.leagueName || "").trim();
+          const leagueLine =
+            country && leagueName
+              ? `${country} - ${leagueName}`
+              : leagueName || country || "";
           const derivedMatchName =
             teams.awayTeam && String(teams.awayTeam).trim()
               ? `${teams.homeTeam} vs ${teams.awayTeam}`
@@ -564,6 +625,9 @@ function mapPublicCouponPayload(ticket) {
           }
           return {
             matchName: String(snap?.matchName ?? "").trim() || derivedMatchName,
+            country,
+            leagueName,
+            league: leagueLine,
             marketLabel: String(snap?.marketLabel ?? "").trim(),
             label: String(snap?.label ?? "").trim(),
             odds: Number(snap?.odds ?? 0),
@@ -674,6 +738,140 @@ export async function getPublicReceiptTicket(req, res) {
     return res.json(mapPublicCouponPayload(ticket));
   } catch (error) {
     console.error("getPublicReceiptTicket error:", error);
+    return res.status(500).json({ message: "Failed to load ticket" });
+  }
+}
+
+/**
+ * Minimal payload for coupon check — no stake/financial info.
+ * Used by getPublicCouponCheck to return only selections and status.
+ */
+function mapPublicCouponCheckPayload(ticket) {
+  const snapshot = Array.isArray(ticket.selection_snapshot)
+    ? ticket.selection_snapshot
+    : [];
+  const rows = ticket.selections ?? [];
+
+  const selectionLegs =
+    rows.length > 0
+      ? rows.map((selection, index) => {
+          const snap = snapshot[index] ?? {};
+          const matchPayload = buildMatchPayloadForTicketSelection(
+            selection,
+            snap,
+          );
+          const marketLabelFromSnap = String(snap?.marketLabel ?? "").trim();
+          const marketLabel =
+            marketLabelFromSnap ||
+            (selection.market_code ? String(selection.market_code).trim() : "");
+          const home = matchPayload?.homeTeam ?? "";
+          const away = matchPayload?.awayTeam ?? "";
+          const derivedMatchName =
+            away && `${String(away).trim()}`.length > 0
+              ? `${home} vs ${away}`
+              : String(home || "Match");
+
+          const start =
+            snap?.kickoffAt != null
+              ? snap.kickoffAt
+              : selectionKickoffTime(selection);
+          const kickoffAt = toIsoOrNull(start);
+          const country = String(matchPayload?.country || "").trim();
+          const leagueName = String(matchPayload?.leagueName || "").trim();
+          const leagueLine =
+            country && leagueName
+              ? `${country} - ${leagueName}`
+              : leagueName || country || "";
+
+          return {
+            matchName: String(snap?.matchName ?? "").trim() || derivedMatchName,
+            country,
+            leagueName,
+            league: leagueLine,
+            marketLabel,
+            label: String(snap?.label ?? selection.selection ?? "").trim(),
+            odds: Number(selection.odds),
+            kickoffAt,
+            result: selection.result ?? "PENDING",
+          };
+        })
+      : snapshot.map((snap) => {
+          const teams = parseTeamsFromMatchName(snap?.matchName);
+          const leagueMeta = leagueMetaFromSelection(null, snap);
+          const country = String(leagueMeta.country || "").trim();
+          const leagueName = String(leagueMeta.leagueName || "").trim();
+          const leagueLine =
+            country && leagueName
+              ? `${country} - ${leagueName}`
+              : leagueName || country || "";
+          const derivedMatchName =
+            teams.awayTeam && String(teams.awayTeam).trim()
+              ? `${teams.homeTeam} vs ${teams.awayTeam}`
+              : teams.homeTeam || "Match";
+          return {
+            matchName: String(snap?.matchName ?? "").trim() || derivedMatchName,
+            country,
+            leagueName,
+            league: leagueLine,
+            marketLabel: String(snap?.marketLabel ?? "").trim(),
+            label: String(snap?.label ?? "").trim(),
+            odds: Number(snap?.odds ?? 0),
+            kickoffAt: toIsoOrNull(snap?.kickoffAt),
+            result: "PENDING",
+          };
+        });
+
+  return {
+    couponNumber: ticket.coupon_number,
+    receiptNumber: ticket.receipt_number ?? null,
+    status: ticket.status,
+    createdAt: ticket.created_at,
+    selections: selectionLegs,
+  };
+}
+
+/**
+ * GET /api/cms/check-coupon?couponNumber=
+ * Public coupon check — returns list of paid tickets (those with receipt_number).
+ * Unpaid tickets (no receipt_number) are filtered out.
+ * Returns minimal fields: couponNumber, receiptNumber, status, selections.
+ */
+export async function getPublicCouponCheck(req, res) {
+  try {
+    const queryRaw = req.query.couponNumber ?? req.query.coupon ?? "";
+    const { compact, compactLower } = normalizeCouponLookupInput(queryRaw);
+    if (!compactLower) {
+      return res.status(400).json({ message: "couponNumber is required" });
+    }
+
+    const candidates = couponLookupCandidates(compact, compactLower);
+
+    const ticketInclude = {
+      selections: ticketSelectionRelationArgs,
+    };
+
+    const allTickets = await prisma.ticket.findMany({
+      where: { coupon_number: { in: candidates } },
+      include: ticketInclude,
+      orderBy: { created_at: "desc" },
+    });
+
+    const paidTickets = allTickets.filter(
+      (ticket) => ticket.receipt_number && ticket.receipt_number.trim() !== "",
+    );
+
+    if (paidTickets.length === 0) {
+      return res.status(404).json({
+        message: "Ticket not found",
+        code: "TICKET_NOT_FOUND",
+      });
+    }
+
+    return res.json({
+      tickets: paidTickets.map(mapPublicCouponCheckPayload),
+    });
+  } catch (error) {
+    console.error("getPublicCouponCheck error:", error);
     return res.status(500).json({ message: "Failed to load ticket" });
   }
 }
@@ -1711,8 +1909,13 @@ export async function listTickets(req, res) {
       });
     }
 
+    const responseItems =
+      req.user.role === "AGENT"
+        ? items.map(({ receipt_number: _receipt, ...rest }) => rest)
+        : items;
+
     return res.json({
-      items,
+      items: responseItems,
       page,
       limit,
       total,
@@ -1767,7 +1970,12 @@ export async function getTicketById(req, res) {
           ticketIds: [ticket.id],
         })
       : new Set();
-    return res.json(mapTicket(ticket, { printed: printed.has(ticket.id) }));
+    return res.json(
+      mapTicket(ticket, {
+        printed: printed.has(ticket.id),
+        omitReceipt: req.user.role === "AGENT",
+      }),
+    );
   } catch (error) {
     console.error("getTicketById error:", error);
     return res.status(500).json({ message: "Failed to get ticket" });
@@ -1833,7 +2041,9 @@ export async function getTicketByReceipt(req, res) {
 
 /**
  * PATCH /api/tickets/:id/cancel
- * Sets status CANCELED if OPEN or PRINTED (sold), within cancel window, and all match start_times are in the future.
+ * Sets status CANCELED if OPEN or PRINTED (sold), within cancel window, and all
+ * match start_times are in the future. Refunds cashier print stake and/or online
+ * player stake when applicable (idempotent wallet credits).
  */
 export async function cancelTicket(req, res) {
   try {
@@ -1873,7 +2083,6 @@ export async function cancelTicket(req, res) {
       ticket.created_at.getTime() + cancelWindowMinutes * 60 * 1000,
     );
 
-    // Window length comes from admin `Setting` (see settingsController)
     if (now > windowEndsAt) {
       return res.status(400).json({
         message: "Ticket cancellation window has passed",
@@ -1892,15 +2101,29 @@ export async function cancelTicket(req, res) {
       });
     }
 
-    const { count } = await prisma.ticket.updateMany({
-      where: { id: ticket.id, status: { in: ["OPEN", "PRINTED"] } },
-      data: { status: "CANCELED" },
-    });
-    if (count === 0) {
-      return res.status(409).json({
-        message: "Ticket status changed concurrently; cancel rejected",
-        code: "status_conflict",
+    let refundSummary;
+    try {
+      refundSummary = await prisma.$transaction(async (tx) => {
+        const { count } = await tx.ticket.updateMany({
+          where: { id: ticket.id, status: { in: ["OPEN", "PRINTED"] } },
+          data: { status: "CANCELED" },
+        });
+        if (count === 0) {
+          throw Object.assign(new Error("STATUS_CONFLICT"), {
+            statusCode: 409,
+          });
+        }
+
+        return refundTicketWalletsOnCancelInTx(tx, ticket);
       });
+    } catch (txErr) {
+      if (txErr?.statusCode === 409 || txErr?.message === "STATUS_CONFLICT") {
+        return res.status(409).json({
+          message: "Ticket status changed concurrently; cancel rejected",
+          code: "status_conflict",
+        });
+      }
+      throw txErr;
     }
 
     await logAuditEvent({
@@ -1911,11 +2134,13 @@ export async function cancelTicket(req, res) {
       entityId: ticket.id,
       before: { status: ticket.status },
       after: { status: "CANCELED" },
+      meta: refundSummary,
     });
 
     return res.json({
       message: "Ticket canceled successfully",
       ticket: { ...ticket, status: "CANCELED" },
+      refunds: refundSummary,
     });
   } catch (error) {
     console.error("cancelTicket error:", error);
@@ -2107,9 +2332,14 @@ export async function payoutTicket(req, res) {
       select: { id: true },
     });
     if (alreadyPaid) {
+      const existingTicket = await loadMappedTicketForResponse(
+        ticket.id,
+        effectiveCashierId,
+      );
       return res.status(409).json({
         message: "Ticket has already been paid out",
         code: "already_paid",
+        ticket: existingTicket,
       });
     }
 
@@ -2143,9 +2373,18 @@ export async function payoutTicket(req, res) {
           },
         });
 
+        const paymentReceiptNumber =
+          ticket.payment_receipt_number ??
+          (await reserveUniquePaymentReceiptNumber(tx));
+        const paidAt = new Date();
+
         const { count } = await tx.ticket.updateMany({
           where: { id: ticket.id, status: "WON" },
-          data: { status: "PAID" },
+          data: {
+            status: "PAID",
+            payment_receipt_number: paymentReceiptNumber,
+            paid_at: paidAt,
+          },
         });
         if (count === 0) {
           throw Object.assign(new Error("STATUS_CONFLICT"), {
@@ -2154,15 +2393,20 @@ export async function payoutTicket(req, res) {
         }
 
         return {
-          paidTicket: { ...ticket, status: "PAID" },
+          ticketId: ticket.id,
           walletBalance: balanceAfter,
         };
       });
     } catch (err) {
       if (err?.code === "P2002") {
+        const existingTicket = await loadMappedTicketForResponse(
+          ticket.id,
+          effectiveCashierId,
+        );
         return res.status(409).json({
           message: "Ticket has already been paid out",
           code: "already_paid",
+          ticket: existingTicket,
         });
       }
       if (err?.statusCode === 409) {
@@ -2181,15 +2425,20 @@ export async function payoutTicket(req, res) {
       entityId: ticket.id,
       before: { status: ticket.status },
       after: {
-        status: result.paidTicket.status,
+        status: "PAID",
         cashierWalletBalance: result.walletBalance,
       },
       meta: { cashierId: effectiveCashierId },
     });
 
+    const mappedTicket = await loadMappedTicketForResponse(
+      result.ticketId,
+      effectiveCashierId,
+    );
+
     return res.json({
       message: "Ticket paid successfully",
-      ticket: result.paidTicket,
+      ticket: mappedTicket,
       cashierWalletBalance: result.walletBalance,
     });
   } catch (error) {
