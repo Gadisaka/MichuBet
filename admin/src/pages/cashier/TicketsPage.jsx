@@ -35,6 +35,7 @@ import CashierInboxList from "../../components/notifications/CashierInboxList";
 import { formatSelectionResult } from "../../components/ticket/receiptFormat";
 import { capGrossPotentialWin } from "../../utils/bettingStakeLimits";
 import { isSelectionRemovable } from "../../utils/selectionExpiry";
+import { formatCouponNumberInput } from "../../utils/couponNumber";
 import {
   formatTaxLineLabel,
   slipGrossTaxNetForTicket,
@@ -1079,7 +1080,9 @@ export default function CashierTicketsPage() {
                   <input
                     type="text"
                     value={sellCouponInput}
-                    onChange={(event) => setSellCouponInput(event.target.value)}
+                    onChange={(event) =>
+                      setSellCouponInput(formatCouponNumberInput(event.target.value))
+                    }
                     placeholder="e.g. 12345-67890"
                     className="w-full rounded-sm border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5 text-sm outline-none focus:border-[var(--accent)]"
                   />
