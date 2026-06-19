@@ -14,6 +14,7 @@ import {
   CMD,
   CHARS_58MM,
   CHARS_80MM,
+  appendReceiptCutTail,
   center,
   concat,
   divider,
@@ -25,7 +26,6 @@ import {
 } from "./escpos.js";
 import { getPayoutBarcodePayload } from "./ticketBarcode.js";
 
-const TICKET_BOTTOM_FEED_LINES = 6;
 const RECEIPT_WEBSITE = "WWW.MICHOT.BET";
 const RECEIPT_SLOGAN = "BY ETHIOPIANS FOR ETHIOPIANS.";
 
@@ -210,8 +210,7 @@ export async function encodePayoutReceiptAsync(ticket, opts = {}) {
     }
   }
 
-  parts.push(new Uint8Array(CMD.FEED_LINES(TICKET_BOTTOM_FEED_LINES)));
-  parts.push(new Uint8Array(CMD.CUT_PARTIAL));
+  appendReceiptCutTail(parts);
   return concat(...parts);
 }
 

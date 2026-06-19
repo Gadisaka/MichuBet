@@ -6,6 +6,7 @@ import {
   CMD,
   CHARS_80MM,
   CHARS_58MM,
+  appendReceiptCutTail,
   concat,
   line,
   center,
@@ -91,6 +92,29 @@ function buildSalesReportEscPosParts(report, opts = {}) {
 
   parts.push(line(sectionDivider(chars)));
   parts.push(new Uint8Array(CMD.BOLD_ON));
+  parts.push(line("CANCELLED"));
+  parts.push(new Uint8Array(CMD.BOLD_OFF));
+  parts.push(
+    line(
+      leftRight(
+        "Total Cancelled",
+        formatCount(report?.totalCancelledTickets),
+        chars,
+      ),
+    ),
+  );
+  parts.push(
+    line(
+      leftRight(
+        "Total Amount",
+        formatMoney(report?.totalCancelledAmount),
+        chars,
+      ),
+    ),
+  );
+
+  parts.push(line(sectionDivider(chars)));
+  parts.push(new Uint8Array(CMD.BOLD_ON));
   parts.push(line("DEPOSIT/WITHDRAWAL"));
   parts.push(new Uint8Array(CMD.BOLD_OFF));
   parts.push(
@@ -147,10 +171,11 @@ export async function encodeSalesReportAsync(report, opts = {}) {
     if (barcodeBytes.length > 0) {
       parts.push(new Uint8Array(CMD.ALIGN_CENTER));
       parts.push(barcodeBytes);
+      parts.push(new Uint8Array(CMD.DEFAULT_LINE_SPACING));
+      parts.push(line(""));
     }
   }
 
-  parts.push(new Uint8Array(CMD.FEED_LINES(2)));
-  parts.push(new Uint8Array(CMD.CUT_PARTIAL));
+  appendReceiptCutTail(parts);
   return concat(...parts);
 }

@@ -4,7 +4,7 @@ import {
   slipGrossTaxNetForTicket,
 } from "../../utils/winningsTax";
 import receiptLogo from "../../assets/image.png";
-import { formatCashierReceiptLine } from "./receiptFormat";
+import { formatCashierReceiptLine, formatSelectionLabelForPrint } from "./receiptFormat";
 import { TICKET_FOOTER_LINES } from "./ticketFooter";
 
 /**
@@ -75,7 +75,9 @@ function buildSelectionLines(ticket) {
         selection?.match?.leagueName,
       ),
       matchName,
-      pick: selection?.selection || selection?.pick || "-",
+      pick: formatSelectionLabelForPrint(
+        selection?.selection || selection?.pick || "-",
+      ),
       market: selection?.marketLabel || "",
       odds: formatOdds(selection?.odds),
     };

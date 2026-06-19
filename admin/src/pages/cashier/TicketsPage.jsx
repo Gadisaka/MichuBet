@@ -140,16 +140,26 @@ function TicketStatusBadge({ status }) {
       </span>
     );
   }
+  if (normalized === "EXPIRED") {
+    return (
+      <span className="rounded-sm bg-[var(--surfaceMuted)] px-2 py-0.5 text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
+        Expired
+      </span>
+    );
+  }
   return <span className="font-mono">{normalized || "-"}</span>;
 }
 
-function TicketDetail({
+function isFirstSaleTicket(ticket) {
+  return (
+    ticket?.status === "OPEN" && !String(ticket?.receiptNumber ?? "").trim()
+  );
+}
+
+function TicketSummary({
   ticket,
   platformWinningsTax = null,
-  canRemoveSelections = false,
-  onRemoveSelection,
-  removingSelectionId = "",
-  showSelectionResults = false,
+  className = "",
 }) {
   if (!ticket) return null;
 
@@ -159,6 +169,56 @@ function TicketDetail({
   );
   const showTax = tax != null && tax > 0;
   const taxLabel = formatTaxLineLabel(ticket, platformWinningsTax);
+
+  return (
+    <div className={`space-y-1 text-sm ${className}`}>
+      <p>
+        <span className="font-semibold">Stake:</span>{" "}
+        {formatCurrency(ticket.stake)}
+      </p>
+      <p>
+        <span className="font-semibold">Total Odds:</span>{" "}
+        {toNumber(ticket.totalOdds).toFixed(2)}
+      </p>
+      {showTax ? (
+        <>
+          <p>
+            <span className="font-semibold">Gross win:</span>{" "}
+            {formatCurrency(gross)}
+          </p>
+          <p>
+            <span className="font-semibold">{taxLabel}:</span>{" "}
+            {formatCurrency(tax)}
+          </p>
+          <p>
+            <span className="font-semibold">Net payout:</span>{" "}
+            {formatCurrency(net)}
+          </p>
+        </>
+      ) : (
+        <p>
+          <span className="font-semibold">Possible Win:</span>{" "}
+          {formatCurrency(ticket.potentialWin)}
+        </p>
+      )}
+      <p>
+        <span className="font-semibold">Status:</span>{" "}
+        <TicketStatusBadge status={ticket.status} />
+      </p>
+    </div>
+  );
+}
+
+function TicketDetail({
+  ticket,
+  platformWinningsTax = null,
+  canRemoveSelections = false,
+  onRemoveSelection,
+  removingSelectionId = "",
+  showSelectionResults = false,
+  hideSummary = false,
+}) {
+  if (!ticket) return null;
 
   return (
     <div className="mt-4 overflow-hidden rounded-sm border border-[var(--border)]">
@@ -249,42 +309,23 @@ function TicketDetail({
         </table>
       </div>
 
-      <div className="space-y-1 border-t border-[var(--border)] px-3 py-3 text-sm">
-        <p>
-          <span className="font-semibold">Stake:</span>{" "}
-          {formatCurrency(ticket.stake)}
-        </p>
-        <p>
-          <span className="font-semibold">Total Odds:</span>{" "}
-          {toNumber(ticket.totalOdds).toFixed(2)}
-        </p>
-        {showTax ? (
-          <>
-            <p>
-              <span className="font-semibold">Gross win:</span>{" "}
-              {formatCurrency(gross)}
-            </p>
-            <p>
-              <span className="font-semibold">{taxLabel}:</span>{" "}
-              {formatCurrency(tax)}
-            </p>
-            <p>
-              <span className="font-semibold">Net payout:</span>{" "}
-              {formatCurrency(net)}
-            </p>
-          </>
-        ) : (
-          <p>
-            <span className="font-semibold">Possible Win:</span>{" "}
-            {formatCurrency(ticket.potentialWin)}
-          </p>
-        )}
-        <p>
-          <span className="font-semibold">Status:</span>{" "}
-          <TicketStatusBadge status={ticket.status} />
-        </p>
-      </div>
+      {!hideSummary ? (
+        <TicketSummary
+          ticket={ticket}
+          platformWinningsTax={platformWinningsTax}
+          className="border-t border-[var(--border)] px-3 py-3"
+        />
+      ) : null}
     </div>
+  );
+}
+
+function canRepeatSlip(ticket) {
+  const status = String(ticket?.status || "").toUpperCase();
+  return (
+    ticket?.printed &&
+    status !== "CANCELED" &&
+    status !== "EXPIRED"
   );
 }
 
@@ -306,6 +347,7 @@ function SlipsTable({
               <th className="px-3 py-3">Coupon</th>
               <th className="px-3 py-3">Amount</th>
               <th className="px-3 py-3">Possible Win</th>
+              <th className="px-3 py-3">Status</th>
               <th className="px-3 py-3">Printed</th>
             </tr>
           </thead>
@@ -313,7 +355,7 @@ function SlipsTable({
             {items.length === 0 ? (
               <tr>
                 <td
-                  colSpan={5}
+                  colSpan={6}
                   className="px-3 py-8 text-center text-xs text-[var(--muted)]"
                 >
                   No slips found for today.
@@ -344,7 +386,10 @@ function SlipsTable({
                     {formatCurrency(ticket.potentialWin)}
                   </td>
                   <td className="px-3 py-3 text-xs">
-                    {ticket.printed ? (
+                    <TicketStatusBadge status={ticket.status} />
+                  </td>
+                  <td className="px-3 py-3 text-xs">
+                    {canRepeatSlip(ticket) ? (
                       <button
                         type="button"
                         className="rounded-sm border border-[var(--border)] bg-[var(--surfaceMuted)] px-2 py-1 text-[11px] font-semibold"
@@ -352,6 +397,8 @@ function SlipsTable({
                       >
                         Repeat
                       </button>
+                    ) : ticket.printed ? (
+                      <span className="text-[var(--muted)]">Yes</span>
                     ) : (
                       <span className="text-[var(--muted)]">No</span>
                     )}
@@ -665,6 +712,33 @@ export default function CashierTicketsPage() {
     setActionSuccess("Ticket confirmed. You can print now.");
   };
 
+  const handleSellRepeat = async () => {
+    if (!sellTicket) return;
+    setSellError("");
+
+    const parsedStake = Number(sellStakeInput);
+    if (!Number.isFinite(parsedStake) || parsedStake <= 0) {
+      setSellError("Stake must be a positive number");
+      return;
+    }
+
+    try {
+      let newTicket = await repeatTicket.mutateAsync(sellTicket.id);
+      const currentStake = toNumber(newTicket.stake);
+      if (parsedStake !== currentStake) {
+        newTicket = await updateStake.mutateAsync({
+          ticketId: newTicket.id,
+          stake: parsedStake,
+        });
+      }
+      setSellTicket(newTicket);
+      setSellConfirmed(true);
+      setActionSuccess("New ticket ready. You can print now.");
+    } catch (error) {
+      setSellError(error?.message || "Failed to repeat ticket");
+    }
+  };
+
   const handlePrint = async () => {
     if (!sellTicket || printInFlightRef.current) return;
     printInFlightRef.current = true;
@@ -869,7 +943,7 @@ export default function CashierTicketsPage() {
 
   const handleUseCouponFromTable = (ticket) => {
     if (!ticket?.id) return;
-    setSellCouponInput(ticket.couponNumber || "");
+    setSellCouponInput(formatCouponNumberInput(ticket.couponNumber || ""));
     if (leftTab === "sell") {
       void (async () => {
         setSellError("");
@@ -894,25 +968,22 @@ export default function CashierTicketsPage() {
         receiptNumber: ticket.receiptNumber,
         payoutMode: payoutAction,
       });
+      setPayoutReceiptInput(
+        formatCouponNumberInput(ticket.receiptNumber || ""),
+      );
     }
   };
 
-  const handleRepeat = async (ticket) => {
-    if (!ticket?.id) return;
+  const handleRepeat = (ticket) => {
+    if (!ticket?.couponNumber) return;
+    setLeftTab("sell");
+    setSellCouponInput(formatCouponNumberInput(ticket.couponNumber || ""));
+    setSellTicket(null);
+    setSellStakeInput("");
+    setSellConfirmed(false);
+    setTicketPreviewOpen(false);
     setSellError("");
-    try {
-      const detail = await repeatTicket.mutateAsync(ticket.id);
-      setLeftTab("sell");
-      setSellTicket(detail);
-      setSellCouponInput(detail.couponNumber || "");
-      setSellStakeInput(String(toNumber(detail?.stake)));
-      setSellConfirmed(false);
-      setTicketPreviewOpen(false);
-      setActionSuccess("Ticket loaded for a new sale. Confirm and print.");
-    } catch (e) {
-      setSellError(e?.message || "Failed to repeat ticket");
-      setActionSuccess("");
-    }
+    setActionSuccess("Coupon loaded. Search to continue.");
   };
 
   const handleRemoveSelection = async (selectionId) => {
@@ -1096,14 +1167,29 @@ export default function CashierTicketsPage() {
                 </form>
 
                 <div className="mt-3 flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={handleSellConfirm}
-                    disabled={!sellTicket || isBusy || sellConfirmed}
-                    className="rounded-sm bg-[var(--accent)] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
-                  >
-                    {updateStake.isPending ? "Saving..." : "Confirm"}
-                  </button>
+                  {sellTicket && isFirstSaleTicket(sellTicket) ? (
+                    <button
+                      type="button"
+                      onClick={handleSellConfirm}
+                      disabled={!sellTicket || isBusy || sellConfirmed}
+                      className="rounded-sm bg-[var(--accent)] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+                    >
+                      {updateStake.isPending ? "Saving..." : "Confirm"}
+                    </button>
+                  ) : sellTicket ? (
+                    <button
+                      type="button"
+                      onClick={handleSellRepeat}
+                      disabled={!sellTicket || isBusy || sellConfirmed}
+                      className="rounded-sm bg-[var(--accent)] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+                    >
+                      {repeatTicket.isPending
+                        ? "Repeating..."
+                        : updateStake.isPending
+                          ? "Saving..."
+                          : "Repeat"}
+                    </button>
+                  ) : null}
                   <PrimaryButton
                     className="max-w-none px-4 py-2 text-sm"
                     onClick={handlePrint}
@@ -1119,6 +1205,7 @@ export default function CashierTicketsPage() {
                       setSellConfirmed(false);
                       setTicketPreviewOpen(false);
                       setSellError("");
+                      setActionSuccess("");
                     }}
                     disabled={!sellTicket}
                     className="rounded-sm border border-[var(--border)] px-4 py-2 text-sm font-semibold text-[var(--muted)] disabled:opacity-60"
@@ -1139,14 +1226,10 @@ export default function CashierTicketsPage() {
                   </div>
                 ) : (
                   <>
-                    <TicketDetail
+                    <TicketSummary
                       ticket={sellTicket}
                       platformWinningsTax={platformWinningsTax}
-                      canRemoveSelections={
-                        sellTicket.status === "OPEN" && !sellConfirmed
-                      }
-                      onRemoveSelection={handleRemoveSelection}
-                      removingSelectionId={removingSelectionId}
+                      className="mt-4 rounded-sm border border-[var(--border)] bg-[var(--surfaceMuted)] px-3 py-3"
                     />
 
                     <div className="mt-4 rounded-sm border border-[var(--border)] bg-[var(--surfaceMuted)] px-3 py-3">
@@ -1212,6 +1295,17 @@ export default function CashierTicketsPage() {
                         </p>
                       )}
                     </div>
+
+                    <TicketDetail
+                      ticket={sellTicket}
+                      platformWinningsTax={platformWinningsTax}
+                      canRemoveSelections={
+                        sellTicket.status === "OPEN" && !sellConfirmed
+                      }
+                      onRemoveSelection={handleRemoveSelection}
+                      removingSelectionId={removingSelectionId}
+                      hideSummary
+                    />
                   </>
                 )}
               </div>
@@ -1247,7 +1341,9 @@ export default function CashierTicketsPage() {
                     type="text"
                     value={payoutReceiptInput}
                     onChange={(event) =>
-                      setPayoutReceiptInput(event.target.value)
+                      setPayoutReceiptInput(
+                        formatCouponNumberInput(event.target.value),
+                      )
                     }
                     placeholder="Receipt #####-#####"
                     className="w-full rounded-sm border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5 text-sm outline-none focus:border-[var(--accent)]"

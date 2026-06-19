@@ -14,8 +14,8 @@ export function mapTicketUiStatus(rawStatus) {
   if (key === "LOST") {
     return { key: "lost", label: "LOST" };
   }
-  if (key === "VOID" || key === "CANCELED" || key === "CASHED_OUT") {
-    return { key: "cancelled", label: "CANCELLED" };
+  if (key === "VOID" || key === "CANCELED" || key === "CASHED_OUT" || key === "EXPIRED") {
+    return { key: "cancelled", label: key === "EXPIRED" ? "EXPIRED" : "CANCELLED" };
   }
   return { key: "pending", label: "PENDING" };
 }

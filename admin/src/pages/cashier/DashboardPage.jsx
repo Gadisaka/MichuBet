@@ -183,6 +183,8 @@ function DashboardContent() {
           <StatCard title="Total Withdraw Amount" value={fmtMoney(s.totalWithdrawAmount)} />
           <StatCard title="Total paid tickets" value={fmtCount(s.totalPaidTickets)} isCount />
           <StatCard title="Total paid amount" value={fmtMoney(s.totalPaidAmount)} />
+          <StatCard title="Cancelled tickets" value={fmtCount(s.totalCancelledTickets)} isCount />
+          <StatCard title="Cancelled amount" value={fmtMoney(s.totalCancelledAmount)} />
           <div className="sm:col-span-2">
             <StatCard title="Grand Net" value={fmtMoney(s.grandNet)} />
           </div>

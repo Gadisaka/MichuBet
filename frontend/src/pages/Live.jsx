@@ -922,6 +922,11 @@ function Live() {
               onReplaceSelections={handleReplaceSlipSelections}
               activeSlip={activeSlip}
               onChangeSlip={setActiveSlip}
+              slipCounts={{
+                betslip1: slips.betslip1.length,
+                betslip2: slips.betslip2.length,
+                betslip3: slips.betslip3.length,
+              }}
             />
           }
         />

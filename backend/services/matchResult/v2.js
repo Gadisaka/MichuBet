@@ -201,10 +201,12 @@ function detectInconsistency(payload) {
   return null;
 }
 
-function logInconsistency(source, id, reason) {
-  // Structured, single-line; scraped by ops dashboards.
+function logInconsistency(source, id, reason, action) {
+  // Structured, single-line; scraped by ops dashboards. `action` states what
+  // we actually did: PENDING downgrade (no score) vs events-distrusted (score
+  // kept, score-only markets still settle).
   console.warn(
-    `[matchResult/v2] inconsistent_payload source=${source} id=${id} reason=${reason} — downgraded finality to PENDING`,
+    `[matchResult/v2] inconsistent_payload source=${source} id=${id} reason=${reason} — ${action}`,
   );
 }
 
@@ -289,9 +291,31 @@ export function buildMatchResultV2FromFixture(fixture, extras = {}) {
   };
 
   const inconsistency = detectInconsistency(payload);
-  if (inconsistency) {
+  if (inconsistency === "final_without_scores") {
+    // No usable final score on a terminal fixture — nothing can be graded yet.
+    // Downgrade to PENDING so a retry settles it once the score lands.
     payload.finality = "PENDING";
-    logInconsistency("FIXTURE", fixture.id ?? fixture.api_fixture_id, inconsistency);
+    logInconsistency(
+      "FIXTURE",
+      fixture.id ?? fixture.api_fixture_id,
+      inconsistency,
+      "downgraded finality to PENDING (no usable score)",
+    );
+  } else if (inconsistency) {
+    // Score is present and trusted, but the goal EVENTS don't reconcile to it
+    // (sparse/incomplete feed, own-goal mis-attribution, late VAR edit). On a
+    // terminal fixture the SCORE is authoritative, so we keep finality FINAL —
+    // score-derived markets (match winner, double chance, O/U, BTTS, handicaps,
+    // totals) settle normally. We distrust only the events: null them so
+    // event-derived markets (goalscorer, correct-score-by-events) fail
+    // canEvaluate() and VOID/refund instead of grading against a broken feed.
+    payload.events = null;
+    logInconsistency(
+      "FIXTURE",
+      fixture.id ?? fixture.api_fixture_id,
+      inconsistency,
+      "events distrusted (nulled); score kept, finality stays FINAL",
+    );
   }
 
   payload.hash = hashPayload(payload);

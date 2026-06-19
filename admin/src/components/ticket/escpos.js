@@ -12,7 +12,7 @@ import {
   formatTaxLineLabel,
   slipGrossTaxNetForTicket,
 } from "../../utils/winningsTax.js";
-import { formatCashierReceiptLine } from "./receiptFormat.js";
+import { formatCashierReceiptLine, formatSelectionLabelForPrint } from "./receiptFormat.js";
 import { TICKET_FOOTER_LINES } from "./ticketFooter.js";
 import {
   createBarcodeCanvasForPrint,
@@ -44,7 +44,13 @@ const CMD = {
 
 const CHARS_80MM = 48;
 const CHARS_58MM = 32;
-const TICKET_BOTTOM_FEED_LINES = 6;
+export const TICKET_BOTTOM_FEED_LINES = 6;
+
+/** Shared feed + partial cut tail for all thermal receipt encoders. */
+export function appendReceiptCutTail(parts) {
+  parts.push(new Uint8Array(CMD.FEED_LINES(TICKET_BOTTOM_FEED_LINES)));
+  parts.push(new Uint8Array(CMD.CUT_PARTIAL));
+}
 
 /** Target raster width in dots (~203 dpi layouts) */
 const LOGO_DOTS = {
@@ -396,7 +402,9 @@ function buildTicketEscPosParts(ticket, opts) {
         sel?.match?.leagueName,
       );
       const kickoff = formatKickoff(sel?.match?.startTime);
-      const pick = sel?.selection || sel?.pick || "-";
+      const pick = formatSelectionLabelForPrint(
+        sel?.selection || sel?.pick || "-",
+      );
       const market = sel?.marketLabel || "";
       const odds = formatOdds(sel?.odds);
 
@@ -469,8 +477,7 @@ export function encodeTicket(ticket, opts = {}) {
   const parts = [new Uint8Array(CMD.INIT)];
   parts.push(...buildTicketEscPosParts(ticket, opts));
   appendTicketFooterParts(parts, chars);
-  parts.push(new Uint8Array(CMD.FEED_LINES(TICKET_BOTTOM_FEED_LINES)));
-  parts.push(new Uint8Array(CMD.CUT_PARTIAL));
+  appendReceiptCutTail(parts);
   return concat(...parts);
 }
 
@@ -505,8 +512,7 @@ export async function encodeTicketAsync(ticket, opts = {}) {
   }
 
   appendTicketFooterParts(parts, chars);
-  parts.push(new Uint8Array(CMD.FEED_LINES(TICKET_BOTTOM_FEED_LINES)));
-  parts.push(new Uint8Array(CMD.CUT_PARTIAL));
+  appendReceiptCutTail(parts);
   return concat(...parts);
 }
 

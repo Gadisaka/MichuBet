@@ -13,6 +13,7 @@ import {
 import { topHeaderData, topNavItems } from "../data/homepageData";
 import { fetchPublicCouponCheck } from "../services/api";
 import CouponCheckPreview from "../components/common/CouponCheckPreview";
+import { formatCouponNumberInput } from "../utils/couponNumber";
 
 function CheckTicket() {
   const navigate = useNavigate();
@@ -82,8 +83,10 @@ function CheckTicket() {
               <input
                 type="text"
                 value={couponInput}
-                onChange={(e) => setCouponInput(e.target.value)}
-                placeholder="e.g. AB12CD"
+                onChange={(e) =>
+                  setCouponInput(formatCouponNumberInput(e.target.value))
+                }
+                placeholder="e.g. 12345-67890"
                 disabled={loading}
                 autoComplete="off"
                 className={`${accountInputCls} min-h-[3rem] flex-1`}

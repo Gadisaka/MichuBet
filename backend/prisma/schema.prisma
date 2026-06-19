@@ -48,6 +48,7 @@ enum TicketStatus {
   CANCELED
   PAID
   CASHED_OUT
+  EXPIRED
 }
 
 enum SelectionResult {

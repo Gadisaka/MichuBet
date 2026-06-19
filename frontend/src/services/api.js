@@ -542,6 +542,7 @@ function mapPlayerTicketToBet(ticket) {
     VOID: "cancelled",
     CANCELED: "cancelled",
     CASHED_OUT: "cancelled",
+    EXPIRED: "cancelled",
   };
   const key = String(ticket.status || "").toUpperCase();
   const uiStatus = statusMap[key] || "pending";

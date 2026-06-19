@@ -21,6 +21,7 @@ import {
   stakeLimitsHintParts,
 } from "../../utils/stakeLimits";
 import { mapCouponSelectionsToSlipRows } from "../../utils/couponTicketToSlip";
+import { formatCouponNumberInput } from "../../utils/couponNumber";
 import { slipGrossTaxNet, winningsTaxLabel } from "../../utils/winningsTax";
 import { useActiveBonuses } from "../../hooks/useActiveBonuses";
 import {
@@ -521,7 +522,9 @@ function MobileBetSlip({
             <input
               type="text"
               value={loadCouponInput}
-              onChange={(e) => setLoadCouponInput(e.target.value)}
+              onChange={(e) =>
+                setLoadCouponInput(formatCouponNumberInput(e.target.value))
+              }
               onKeyDown={(e) => {
                 if (e.key === "Enter") handleLoadCouponSubmit();
               }}
@@ -548,7 +551,9 @@ function MobileBetSlip({
             <input
               type="text"
               value={checkCouponInput}
-              onChange={(e) => setCheckCouponInput(e.target.value)}
+              onChange={(e) =>
+                setCheckCouponInput(formatCouponNumberInput(e.target.value))
+              }
               onKeyDown={(e) => {
                 if (e.key === "Enter") handleCheckCouponSubmit();
               }}

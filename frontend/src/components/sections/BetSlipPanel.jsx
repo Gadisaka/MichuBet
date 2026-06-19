@@ -24,6 +24,7 @@ import {
   stakeLimitsHintParts,
 } from "../../utils/stakeLimits";
 import { mapCouponSelectionsToSlipRows } from "../../utils/couponTicketToSlip";
+import { formatCouponNumberInput } from "../../utils/couponNumber";
 import {
   accumulatorBonusExtraGrossFormatted,
   accumulatorPercentFromBonusesList,
@@ -118,6 +119,7 @@ function BetSlipPanel({
   onChangeSlip,
   onReplaceSelections = () => {},
   onSelectionClick,
+  slipCounts = {},
 }) {
   const [stakeInput, setStakeInput] = useState("20");
   const [placing, setPlacing] = useState(false);
@@ -486,20 +488,35 @@ function BetSlipPanel({
         <div
           className={`flex items-center border-b bg-[#0a0a0a]/35 p-2 backdrop-blur-md ${slipDivider}`}
         >
-          {tabs.map((tab) => (
+          {tabs.map((tab) => {
+            const tabCount = Number(slipCounts[tab.id] ?? 0);
+            const showTabBadge = tabCount > 1;
+            return (
             <button
               key={tab.id}
               type="button"
               onClick={() => onChangeSlip(tab.id)}
-              className={`mx-0.5 flex-1 cursor-pointer rounded-xl border py-2 text-[11px] font-bold transition-all duration-200 ${
+              className={`relative mx-0.5 flex-1 cursor-pointer rounded-xl border py-2 text-[11px] font-bold transition-all duration-200 ${
                 activeSlip === tab.id
                   ? "border-transparent bg-[#F6AF01] text-[#000000] shadow-[0_6px_16px_-6px_rgba(246,175,1,0.3)]"
                   : "border-transparent bg-[#0a0a0a]/45 text-[rgba(255,255,255,0.72)] hover:bg-[#111111]"
               }`}
             >
               {tab.label}
+              {showTabBadge ? (
+                <span
+                  className={`absolute -right-0.5 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[9px] font-extrabold leading-none ${
+                    activeSlip === tab.id
+                      ? "bg-[#000000] text-[#F6AF01]"
+                      : "bg-(--sb-accent-fill) text-[#000000]"
+                  }`}
+                >
+                  {tabCount > 99 ? "99+" : tabCount}
+                </span>
+              ) : null}
             </button>
-          ))}
+            );
+          })}
 
           {selections.length > 0 && (
             <button
@@ -519,7 +536,9 @@ function BetSlipPanel({
             <input
               type="text"
               value={loadCouponInput}
-              onChange={(e) => setLoadCouponInput(e.target.value)}
+              onChange={(e) =>
+                setLoadCouponInput(formatCouponNumberInput(e.target.value))
+              }
               onKeyDown={(e) => {
                 if (e.key === "Enter") handleLoadCouponSubmit();
               }}
@@ -546,7 +565,9 @@ function BetSlipPanel({
             <input
               type="text"
               value={checkCouponInput}
-              onChange={(e) => setCheckCouponInput(e.target.value)}
+              onChange={(e) =>
+                setCheckCouponInput(formatCouponNumberInput(e.target.value))
+              }
               onKeyDown={(e) => {
                 if (e.key === "Enter") handleCheckCouponSubmit();
               }}

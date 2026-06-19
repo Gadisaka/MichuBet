@@ -113,6 +113,8 @@ export class PrinterManager {
     this.cachedPrintersAt = 0;
     /** Timestamp of the last successful queue resolution (for connection caching). */
     this.lastConnectVerifiedAt = 0;
+    /** Coalesce concurrent probe() calls (duplicate admin status polls). */
+    this.probeInFlight = null;
     this.psPrinter = new PowerShellPrinter();
   }
 
@@ -159,14 +161,16 @@ export class PrinterManager {
     const preferred = String(
       process.env.PRINTER_NAME || config.printerName || DEFAULT_PRINTER_NAME,
     ).trim();
+    if (!preferred) return "";
 
-    // PowerShell path: never enumerate ALL queues (Get-Printer can block for
-    // minutes on offline/network/redirected printers). Query just the
-    // configured queue by name.
+    // Always scope by queue name first. Full enumeration (native or Get-Printer)
+    // can stall for minutes on machines with offline/network/RDP printers and
+    // makes /status exceed the admin app's 3s fetch timeout → false "offline".
+    const scoped = await getWindowsPrinterByName(preferred);
+    if (scoped) return scoped.name || preferred;
+
     if (nativePrinterDisabled) {
-      if (!preferred) return "";
-      const scoped = await getWindowsPrinterByName(preferred);
-      return scoped ? scoped.name || preferred : "";
+      return "";
     }
 
     const printers = await this.listQueues();
@@ -357,6 +361,19 @@ export class PrinterManager {
   }
 
   async probe() {
+    if (this.probeInFlight) {
+      return this.probeInFlight;
+    }
+
+    this.probeInFlight = this._probeImpl();
+    try {
+      return await this.probeInFlight;
+    } finally {
+      this.probeInFlight = null;
+    }
+  }
+
+  async _probeImpl() {
     // Status is polled frequently; serve a recently verified connection from
     // cache instead of re-resolving the queue (and spawning PowerShell) each
     // time. A failed write resets lastConnectVerifiedAt, so genuine printer

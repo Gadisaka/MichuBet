@@ -31,6 +31,40 @@ export function formatSelectionResult(result) {
   }
 }
 
+const PRINT_SIDE_TOKEN = {
+  1: "Home",
+  2: "Away",
+  x: "Draw",
+};
+
+const PRINT_DOUBLE_CHANCE_TOKEN = {
+  "1x": "Home or Draw",
+  "12": "Home or Away",
+  x2: "Draw or Away",
+};
+
+function mapPrintSideToken(token) {
+  const key = String(token).toLowerCase();
+  const doubleChance = PRINT_DOUBLE_CHANCE_TOKEN[key];
+  if (doubleChance) return doubleChance;
+  const mapped = PRINT_SIDE_TOKEN[key];
+  return mapped ?? token;
+}
+
+/** Print-only: map 1/2/X pick tokens to Home/Away/Draw on thermal + PDF slips. */
+export function formatSelectionLabelForPrint(label) {
+  const raw = String(label ?? "").trim();
+  if (!raw) return "-";
+
+  if (raw.includes("/")) {
+    return raw
+      .split("/")
+      .map((seg) => mapPrintSideToken(seg.trim()))
+      .join("/");
+  }
+  return mapPrintSideToken(raw);
+}
+
 /** Display handle for CMS contact entries on thermal receipts. */
 export function formatContactHandle(entry) {
   const name = String(entry?.name ?? "").trim();

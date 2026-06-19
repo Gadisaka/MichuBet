@@ -55,11 +55,19 @@ function seedFixture({ id, status, homeScore, awayScore }) {
   });
 }
 
-function seedTicket({ id, userId = null, stake, totalOdds, status = "OPEN" }) {
+function seedTicket({
+  id,
+  userId = null,
+  stake,
+  totalOdds,
+  status = "OPEN",
+  receiptNumber = `${id}-receipt`,
+}) {
   const store = getStore();
   store.ticket.set(id, {
     id,
     coupon_number: id,
+    receipt_number: receiptNumber,
     user_id: userId,
     cashier_id: null,
     branch_name: "",
@@ -636,4 +644,34 @@ test("LOST ticket with a postponed leg is NOT eligible for tiered cashback", asy
   const bonusTx = [...store.transaction.values()].find((t) => t.type === "BONUS");
   assert.equal(bonusTx, undefined, "postponed leg must block cashback");
   assert.equal(store.wallet.get("w-d").balance, 0);
+});
+
+test("unpaid OPEN ticket (no receipt) is not settled", async () => {
+  resetStore();
+  const store = getStore();
+  seedFixture({ id: "fx-unpaid", status: "FT", homeScore: 2, awayScore: 0 });
+  seedTicket({
+    id: "tk-unpaid",
+    userId: null,
+    stake: 20,
+    totalOdds: 2,
+    receiptNumber: null,
+  });
+  seedSelection({
+    id: "sel-unpaid",
+    ticketId: "tk-unpaid",
+    fixtureId: "fx-unpaid",
+    selection: "1",
+    marketCode: "MATCH_WINNER",
+    odds: 2,
+  });
+
+  const summary = await settlement.settleFixture("fx-unpaid");
+  assert.equal(summary.ticketsWon, 0);
+  assert.equal(summary.ticketsLost, 0);
+
+  const selection = store.ticketSelection.get("sel-unpaid");
+  assert.equal(selection.result, SELECTION_RESULT.PENDING);
+  const ticket = store.ticket.get("tk-unpaid");
+  assert.equal(ticket.status, "OPEN");
 });

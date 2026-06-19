@@ -149,6 +149,18 @@ function buildRepeatables() {
         jobId: toJobId(REPEATABLE_JOB_NAMES.SETTLEMENT_RETRY),
       },
     },
+    {
+      // Expire unpaid OPEN tickets (no receipt) once the earliest leg kicks off.
+      queue: QUEUE_NAMES.EXPIRE_UNPAID_TICKETS,
+      name: REPEATABLE_JOB_NAMES.EXPIRE_UNPAID_TICKETS,
+      data: {},
+      opts: {
+        repeat: {
+          every: envMinutes("EXPIRE_UNPAID_TICKETS_MINUTES", 3 * MINUTES),
+        },
+        jobId: toJobId(REPEATABLE_JOB_NAMES.EXPIRE_UNPAID_TICKETS),
+      },
+    },
   ];
 }
 

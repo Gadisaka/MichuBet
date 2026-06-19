@@ -547,6 +547,11 @@ function Home() {
               activeSlip={activeSlip}
               onChangeSlip={setActiveSlip}
               onSelectionClick={handleOpenSelectionOnHome}
+              slipCounts={{
+                betslip1: slips.betslip1.length,
+                betslip2: slips.betslip2.length,
+                betslip3: slips.betslip3.length,
+              }}
             />
           }
         />

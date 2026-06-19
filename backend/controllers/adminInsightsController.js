@@ -1,4 +1,5 @@
 import { prisma } from "../Config/db.js";
+import { applyExcludeExpiredFilter } from "../lib/ticketExpiry.js";
 
 function parseDateYmd(value) {
   if (!value) return null;
@@ -107,7 +108,9 @@ export async function getAdminDashboardInsights(req, res) {
       prisma.user.count({ where: { status: true, role: { name: "CASHIER" } } }),
       prisma.user.count({ where: { status: true, role: { name: "AGENT" } } }),
       prisma.ticket.findMany({
-        where: { created_at: { gte: start, lte: end } },
+        where: applyExcludeExpiredFilter({
+          created_at: { gte: start, lte: end },
+        }),
         select: {
           id: true,
           coupon_number: true,
@@ -120,11 +123,15 @@ export async function getAdminDashboardInsights(req, res) {
         },
       }),
       prisma.ticket.findMany({
-        where: { created_at: { gte: chartStart, lte: chartEnd } },
+        where: applyExcludeExpiredFilter({
+          created_at: { gte: chartStart, lte: chartEnd },
+        }),
         select: { created_at: true, stake: true },
       }),
       prisma.ticket.findMany({
-        where: { created_at: { gte: start, lte: end } },
+        where: applyExcludeExpiredFilter({
+          created_at: { gte: start, lte: end },
+        }),
         include: {
           cashier: { include: { user: { select: { name: true } } } },
           user: { select: { name: true } },
@@ -194,6 +201,7 @@ export async function getAdminDashboardInsights(req, res) {
       CANCELED: 0,
       PAID: 0,
       CASHED_OUT: 0,
+      EXPIRED: 0,
     };
     let totalStake = 0;
     let totalPotentialWin = 0;

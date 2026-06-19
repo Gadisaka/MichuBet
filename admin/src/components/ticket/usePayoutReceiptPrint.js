@@ -5,12 +5,7 @@ import {
   getPayoutBarcodePayload,
   renderBarcodeToDataURL,
 } from "./ticketBarcode";
-import {
-  checkBridgeCompatibility,
-  getStatus as getLocalPrinterStatus,
-  print as printViaLocalService,
-  STATUS_POLL_MS,
-} from "../../services/localPrinter";
+import { print as printViaLocalService } from "../../services/localPrinter";
 
 function buildPayoutPdfFilename(ticket) {
   const id =
@@ -35,53 +30,10 @@ export function usePayoutReceiptPrint(
     paidByName = "",
   } = {},
 ) {
-  const MAX_STATUS_FAILURES = 3;
   const receiptRef = useRef(null);
-  const statusFailuresRef = useRef(0);
   const [barcodeDataUrl, setBarcodeDataUrl] = useState("");
   const [pdfBusy, setPdfBusy] = useState(false);
   const [lastError, setLastError] = useState("");
-  const [printerStatus, setPrinterStatus] = useState({
-    connected: false,
-    port: "",
-    message: "",
-    queueLength: 0,
-    processing: false,
-    lastError: null,
-    reconnectAttempts: 0,
-    lastSuccessfulPrintAt: null,
-  });
-
-  const applyStatus = useCallback((status) => {
-    if (status.success) {
-      statusFailuresRef.current = 0;
-      setPrinterStatus({
-        connected: status.connected,
-        port: status.port || "",
-        message: status.message || "",
-        queueLength: status.queueLength ?? 0,
-        processing: Boolean(status.processing),
-        lastError: status.lastError || null,
-        reconnectAttempts: status.reconnectAttempts ?? 0,
-        lastSuccessfulPrintAt: status.lastSuccessfulPrintAt || null,
-      });
-      return;
-    }
-    statusFailuresRef.current += 1;
-    if (statusFailuresRef.current < MAX_STATUS_FAILURES) {
-      return;
-    }
-    setPrinterStatus((prev) => ({
-      connected: false,
-      port: "",
-      message: status.message || "",
-      queueLength: 0,
-      processing: false,
-      lastError: status.code === "service_unreachable" ? null : prev.lastError,
-      reconnectAttempts: 0,
-      lastSuccessfulPrintAt: prev.lastSuccessfulPrintAt,
-    }));
-  }, []);
 
   const barcodePayload = getPayoutBarcodePayload(ticket);
 
@@ -99,48 +51,6 @@ export function usePayoutReceiptPrint(
       alive = false;
     };
   }, [barcodePayload]);
-
-  const refreshPrinterStatus = useCallback(async () => {
-    const status = await getLocalPrinterStatus();
-    applyStatus(status);
-    return status;
-  }, [applyStatus]);
-
-  useEffect(() => {
-    let active = true;
-    void (async () => {
-      const compatibility = await checkBridgeCompatibility();
-      if (!active) return;
-      if (compatibility.warning) {
-        setPrinterStatus((prev) => ({
-          ...prev,
-          message: compatibility.warning,
-        }));
-      }
-    })();
-    return () => {
-      active = false;
-    };
-  }, []);
-
-  useEffect(() => {
-    let active = true;
-    let timer = null;
-
-    const run = async () => {
-      const status = await getLocalPrinterStatus();
-      if (!active) return;
-      applyStatus(status);
-      timer = window.setTimeout(run, STATUS_POLL_MS);
-    };
-
-    void run();
-
-    return () => {
-      active = false;
-      if (timer) window.clearTimeout(timer);
-    };
-  }, [applyStatus]);
 
   const downloadPdf = useCallback(async () => {
     if (!receiptRef.current) {
@@ -226,7 +136,5 @@ export function usePayoutReceiptPrint(
     pdfBusy,
     print,
     lastError,
-    printerStatus,
-    refreshPrinterStatus,
   };
 }

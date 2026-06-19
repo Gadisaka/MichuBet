@@ -39,6 +39,11 @@ import {
   normalizeCouponLookupInput,
 } from "../lib/couponNumber.js";
 import { refundTicketWalletsOnCancelInTx } from "../services/ticketCancelRefunds.js";
+import {
+  applyExcludeExpiredFilter,
+  expireTicketIfDue,
+  ticketExpiredResponse,
+} from "../lib/ticketExpiry.js";
 
 
 /**
@@ -688,18 +693,37 @@ export async function getPublicCouponTicket(req, res) {
     };
 
     const ticket = await prisma.ticket.findFirst({
-      where: { coupon_number: { in: candidates } },
+      where: {
+        coupon_number: { in: candidates },
+        status: { not: "EXPIRED" },
+      },
       include: ticketInclude,
+      orderBy: { created_at: "desc" },
     });
 
     if (!ticket) {
+      const expiredTicket = await prisma.ticket.findFirst({
+        where: {
+          coupon_number: { in: candidates },
+          status: "EXPIRED",
+        },
+        orderBy: { created_at: "desc" },
+      });
+      if (expiredTicket) {
+        return res.status(410).json(ticketExpiredResponse(expiredTicket));
+      }
       return res.status(404).json({
         message: "Ticket not found",
         code: "TICKET_NOT_FOUND",
       });
     }
 
-    return res.json(mapPublicCouponPayload(ticket));
+    const resolved = await expireTicketIfDue(prisma, ticket);
+    if (resolved.status === "EXPIRED") {
+      return res.status(410).json(ticketExpiredResponse(resolved));
+    }
+
+    return res.json(mapPublicCouponPayload(resolved));
   } catch (error) {
     console.error("getPublicCouponTicket error:", error);
     return res.status(500).json({ message: "Failed to load ticket" });
@@ -1889,6 +1913,8 @@ export async function listTickets(req, res) {
       where.created_at = { gte: start, lte: end };
     }
 
+    applyExcludeExpiredFilter(where, status);
+
     const [items, total] = await Promise.all([
       prisma.ticket.findMany({
         where,
@@ -2571,6 +2597,13 @@ export async function validatePrintTicket(req, res) {
     if (ticket.cashier_id && ticket.cashier_id !== cashier.id) {
       return res.status(403).json({ message: "Access denied" });
     }
+    if (ticket.status === "EXPIRED") {
+      return res.status(400).json(ticketExpiredResponse(ticket));
+    }
+    const expiredNow = await expireTicketIfDue(prisma, ticket);
+    if (expiredNow.status === "EXPIRED") {
+      return res.status(400).json(ticketExpiredResponse(expiredNow));
+    }
     if (ticket.status !== "OPEN") {
       return res.status(400).json({
         message: "Only OPEN tickets can be validated for print",
@@ -2693,6 +2726,13 @@ export async function confirmPrintTicket(req, res) {
     }
     if (ticket.cashier_id && ticket.cashier_id !== cashier.id) {
       return res.status(403).json({ message: "Access denied" });
+    }
+    if (ticket.status === "EXPIRED") {
+      return res.status(400).json(ticketExpiredResponse(ticket));
+    }
+    const expiredNow = await expireTicketIfDue(prisma, ticket);
+    if (expiredNow.status === "EXPIRED") {
+      return res.status(400).json(ticketExpiredResponse(expiredNow));
     }
     const printReference = `ticket-print:${ticket.id}`;
     const existingPrint = await prisma.transaction.findFirst({

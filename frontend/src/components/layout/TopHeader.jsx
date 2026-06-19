@@ -3,8 +3,7 @@ import { Link } from "react-router-dom";
 import AppIcon from "../common/AppIcon";
 import DesktopUserSidebar from "./DesktopUserSidebar";
 import MobileMenu from "./MobileMenu";
-import { fetchNotificationUnreadCount, fetchPlayerInfoPages, fetchPlayerWallet } from "../../services/api";
-import { pickTelegramContactFromPages } from "../../utils/telegramContact";
+import { fetchNotificationUnreadCount, fetchPlayerWallet } from "../../services/api";
 import NotificationsDialog from "../notifications/NotificationsDialog";
 import { usePlayerSiteBranding } from "../../hooks/usePlayerSiteBranding";
 import { useLanguage, useTranslation } from "../../i18n/LanguageContext.jsx";
@@ -30,7 +29,6 @@ function TopHeader() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [, forceUpdate] = useState(0);
   const [walletBalance, setWalletBalance] = useState(null);
-  const [telegramCta, setTelegramCta] = useState(null);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
 
@@ -98,24 +96,6 @@ function TopHeader() {
     const onSession = () => forceUpdate((n) => n + 1);
     window.addEventListener("authSessionUpdated", onSession);
     return () => window.removeEventListener("authSessionUpdated", onSession);
-  }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const data = await fetchPlayerInfoPages();
-        if (cancelled) return;
-        setTelegramCta(
-          pickTelegramContactFromPages(data?.pages, data?.telegramHref),
-        );
-      } catch {
-        if (!cancelled) setTelegramCta(null);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
   }, []);
 
   useEffect(() => {
@@ -245,28 +225,6 @@ function TopHeader() {
         )}
 
         <div className="flex shrink-0 items-center gap-1.5 max-lg:gap-1">
-          {telegramCta ? (
-            <a
-              href={telegramCta.link}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#111111] max-lg:h-7 max-lg:w-7"
-              aria-label={t("header.telegram")}
-            >
-              {telegramCta.logo ? (
-                <img
-                  src={telegramCta.logo}
-                  alt=""
-                  className="h-full w-full object-cover"
-                  loading="lazy"
-                  decoding="async"
-                />
-              ) : (
-                <AppIcon name="send" size={16} strokeWidth={2} className="text-[#229ED9]" />
-              )}
-            </a>
-          ) : null}
-
           <div className="relative z-20 shrink-0" ref={langMenuRef}>
             <button
               type="button"

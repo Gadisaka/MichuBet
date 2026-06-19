@@ -58,6 +58,7 @@ import {
 } from "../lib/bettingLimits.js";
 import { logAuditEvent } from "../lib/auditLog.js";
 import { recordUngradedLeg } from "../lib/settlementMetrics.js";
+import { isTicketSettleable } from "../lib/ticketExpiry.js";
 
 const FINAL_FIXTURE_STATUSES = new Set(["FT", "AET", "PEN", "AWD", "WO"]);
 const VOID_FIXTURE_STATUSES = new Set(["CANC", "ABD", "PST"]);
@@ -70,6 +71,7 @@ const TERMINAL_TICKET_STATUSES = new Set([
   "VOID",
   "CANCELED",
   "CASHED_OUT",
+  "EXPIRED",
 ]);
 
 export function isFinalFixtureStatus(status) {
@@ -206,6 +208,9 @@ export async function recomputeTicketStatus(tx, ticketId) {
     return { status: null, transitioned: false, allVoid: false };
   }
   if (!SETTLEABLE_TICKET_STATUSES.has(ticket.status)) {
+    return { status: ticket.status, transitioned: false, allVoid: false };
+  }
+  if (!isTicketSettleable(ticket)) {
     return { status: ticket.status, transitioned: false, allVoid: false };
   }
 
@@ -446,7 +451,25 @@ async function gradeSelectionsInTx(tx, selections, matchResults, marketResultOve
   const ungraded = [];
   let updated = 0;
   let pendingAfter = 0;
+
+  const uniqueTicketIds = [
+    ...new Set(selections.map((sel) => sel.ticket_id).filter(Boolean)),
+  ];
+  const ticketsById = new Map();
+  if (uniqueTicketIds.length > 0) {
+    const ticketRows = await tx.ticket.findMany({
+      where: { id: { in: uniqueTicketIds } },
+      select: { id: true, status: true, receipt_number: true },
+    });
+    for (const row of ticketRows) ticketsById.set(row.id, row);
+  }
+
   for (const sel of selections) {
+    const ownerTicket = ticketsById.get(sel.ticket_id);
+    if (ownerTicket && !isTicketSettleable(ownerTicket)) {
+      continue;
+    }
+
     if (sel.result !== SELECTION_RESULT.PENDING) {
       ticketIds.add(sel.ticket_id);
       continue;

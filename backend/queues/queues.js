@@ -14,6 +14,7 @@ export const QUEUE_NAMES = {
   LIVE: "sync-live",
   LEAGUES_META: "sync-leagues-meta",
   SETTLEMENT_RETRY: "settlement-retry",
+  EXPIRE_UNPAID_TICKETS: "expire-unpaid-tickets",
 };
 
 export const REPEATABLE_JOB_NAMES = {
@@ -24,6 +25,7 @@ export const REPEATABLE_JOB_NAMES = {
   LIVE_TICK: "live:tick",
   LEAGUES_META: "leagues:meta",
   SETTLEMENT_RETRY: "settlement:retry",
+  EXPIRE_UNPAID_TICKETS: "tickets:expire-unpaid",
 };
 
 const DEFAULT_JOB_OPTIONS = {
