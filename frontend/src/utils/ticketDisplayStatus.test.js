@@ -44,13 +44,24 @@ describe("mapLegUiStatus", () => {
     });
   });
 
-  it("maps unsettled legs to pending", () => {
+  it("maps upcoming legs to notplayed (no highlight)", () => {
     expect(mapLegUiStatus({ result: "PENDING", status: "NS" })).toEqual({
-      key: "pending",
+      key: "notplayed",
       label: "PENDING",
     });
+  });
+
+  it("maps in-progress and postponed legs to yellow postponed bucket", () => {
+    expect(mapLegUiStatus({ result: "PENDING", status: "LIVE" })).toEqual({
+      key: "postponed",
+      label: "PENDING",
+    });
+    expect(mapLegUiStatus({ result: "PENDING", status: "PST" })).toEqual({
+      key: "postponed",
+      label: "POSTPONED",
+    });
     expect(mapLegUiStatus({ result: "VOID" })).toEqual({
-      key: "pending",
+      key: "postponed",
       label: "PENDING",
     });
   });

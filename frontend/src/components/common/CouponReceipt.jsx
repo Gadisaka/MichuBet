@@ -25,7 +25,8 @@ const TICKET_STATUS_CLS = {
 const LEG_STATUS_CLS = {
   won: "coupon-receipt__leg--won",
   lost: "coupon-receipt__leg--lost",
-  pending: "coupon-receipt__leg--pending",
+  postponed: "coupon-receipt__leg--postponed",
+  notplayed: "coupon-receipt__leg--notplayed",
 };
 
 function formatReceiptKickoff(value) {
@@ -123,7 +124,7 @@ function CouponReceipt({ ticket, className = "" }) {
           const leagueLine = formatLeagueLine(sel);
           const legStatus = mapLegUiStatus(sel);
           const legCls =
-            LEG_STATUS_CLS[legStatus.key] ?? LEG_STATUS_CLS.pending;
+            LEG_STATUS_CLS[legStatus.key] ?? LEG_STATUS_CLS.notplayed;
 
           return (
             <div

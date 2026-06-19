@@ -168,10 +168,15 @@
   color: #7f1d1d;
 }
 
-.coupon-receipt__leg--pending {
+.coupon-receipt__leg--postponed {
   background: #fde68a;
   box-shadow: inset 4px 0 0 #f59e0b;
   color: #78350f;
+}
+
+.coupon-receipt__leg--notplayed {
+  background: transparent;
+  color: #0a0a0a;
 }
 
 .coupon-receipt__summary-highlight {

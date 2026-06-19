@@ -817,6 +817,7 @@ function mapPublicCouponCheckPayload(ticket) {
             odds: Number(selection.odds),
             kickoffAt,
             result: selection.result ?? "PENDING",
+            status: matchPayload?.status ?? null,
           };
         })
       : snapshot.map((snap) => {
@@ -842,6 +843,7 @@ function mapPublicCouponCheckPayload(ticket) {
             odds: Number(snap?.odds ?? 0),
             kickoffAt: toIsoOrNull(snap?.kickoffAt),
             result: "PENDING",
+            status: null,
           };
         });
 
