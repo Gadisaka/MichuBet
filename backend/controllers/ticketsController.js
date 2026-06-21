@@ -1920,19 +1920,17 @@ export async function listTickets(req, res) {
     // Admin and Agent views: hide unpaid OPEN tickets (no receipt_number).
     // These are draft/prebook slips only relevant to cashiers who may claim them.
     if (req.user.role === "ADMIN" || req.user.role === "AGENT") {
-      where.NOT = {
-        ...(where.NOT || {}),
-        AND: [
-          { status: "OPEN" },
-          {
-            OR: [
-              { receipt_number: null },
-              { receipt_number: { isSet: false } },
-              { receipt_number: "" },
-            ],
-          },
+      const unpaidOpenFilter = {
+        status: "OPEN",
+        OR: [
+          { receipt_number: null },
+          { receipt_number: { isSet: false } },
+          { receipt_number: "" },
         ],
       };
+      where.NOT = where.NOT
+        ? { AND: [where.NOT, unpaidOpenFilter] }
+        : unpaidOpenFilter;
     }
 
     const [items, total] = await Promise.all([
