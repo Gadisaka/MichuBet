@@ -273,7 +273,7 @@ async function resolveCouponNumberForCreate(
 
   const template = await client.ticket.findFirst({
     where: { coupon_number: { in: candidates } },
-    include: ticketSelectionRelationArgs,
+    include: { selections: ticketSelectionRelationArgs },
   });
 
   if (!template?.selections?.length) {
@@ -3030,7 +3030,7 @@ export async function repeatTicket(req, res) {
   try {
     const source = await prisma.ticket.findUnique({
       where: { id: req.params.id },
-      include: ticketSelectionRelationArgs,
+      include: { selections: ticketSelectionRelationArgs },
     });
     if (!source) {
       return res.status(404).json({ message: "Ticket not found" });
