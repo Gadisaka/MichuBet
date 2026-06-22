@@ -1917,9 +1917,9 @@ export async function listTickets(req, res) {
 
     applyExcludeExpiredFilter(where, status);
 
-    // Admin and Agent views: hide unpaid OPEN tickets (no receipt_number).
+    // Non-cashier views: hide unpaid OPEN tickets (no receipt_number).
     // These are draft/prebook slips only relevant to cashiers who may claim them.
-    if (req.user.role === "ADMIN" || req.user.role === "AGENT") {
+    if (req.user.role !== "CASHIER") {
       const unpaidOpenFilter = {
         status: "OPEN",
         OR: [
