@@ -6,7 +6,7 @@ import {
 
 /**
  * Coupon check preview — displays list of paid tickets for a coupon number.
- * Shows selections, odds, and status but NOT stake/financial info.
+ * Shows coupon, selections, odds, and status — not stake/financial info or receipt number.
  *
  * Used by the "Check Coupon" feature in betslip and CheckTicket page.
  * `tickets` is the array from `fetchPublicCouponCheck`:
@@ -75,16 +75,6 @@ function SingleTicketCard({ ticket, className = "" }) {
         <p className="break-all text-base font-extrabold tracking-[0.08em] text-[#0a0a0a]">
           {ticket.couponNumber || "—"}
         </p>
-        {ticket.receiptNumber ? (
-          <>
-            <p className="mt-2 text-[10px] font-bold uppercase tracking-[0.15em] text-[#777]">
-              Receipt
-            </p>
-            <p className="break-all text-sm font-bold tracking-[0.08em] text-[#333]">
-              {ticket.receiptNumber}
-            </p>
-          </>
-        ) : null}
         <p
           className={`coupon-receipt__ticket-status mt-2 inline-block px-3 py-1 text-[12px] font-black uppercase tracking-[0.15em] ${TICKET_STATUS_CLS[ticketStatus.key] ?? TICKET_STATUS_CLS.pending}`}
         >

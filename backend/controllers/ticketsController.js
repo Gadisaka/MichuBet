@@ -331,6 +331,32 @@ async function getPrintedTicketIdSet({ cashierId, ticketIds }) {
   );
 }
 
+/** Ticket ids this cashier confirmed print on (wallet BET `ticket-print:*` refs). */
+async function listCashierPrintedTicketIds(cashierId) {
+  if (!cashierId) return [];
+
+  const cashier = await prisma.cashier.findUnique({
+    where: { id: cashierId },
+    select: { wallet_id: true },
+  });
+  if (!cashier?.wallet_id) return [];
+
+  const prints = await prisma.transaction.findMany({
+    where: {
+      wallet_id: cashier.wallet_id,
+      type: "BET",
+      reference: { startsWith: "ticket-print:" },
+    },
+    select: { reference: true },
+  });
+
+  return prints
+    .map((entry) =>
+      String(entry.reference || "").replace("ticket-print:", ""),
+    )
+    .filter(Boolean);
+}
+
 function parseTeamsFromMatchName(matchName) {
   const text = String(matchName || "").trim();
   if (!text) return { homeTeam: "Match", awayTeam: "" };
@@ -1885,7 +1911,7 @@ export async function listTickets(req, res) {
     }
 
     // Cashier view:
-    // - normal lists: only own sold tickets
+    // - normal lists (All Slips): own tickets confirmed printed by this cashier
     // - coupon lookup: own sold tickets + unclaimed prebook tickets
     if (req.user.role === "CASHIER") {
       if (couponNumber) {
@@ -1916,6 +1942,26 @@ export async function listTickets(req, res) {
     }
 
     applyExcludeExpiredFilter(where, status);
+
+    // Cashier All Slips: only tickets this cashier confirmed print on.
+    if (
+      req.user.role === "CASHIER" &&
+      !couponNumber &&
+      status !== "CANCELED"
+    ) {
+      const printedTicketIds =
+        await listCashierPrintedTicketIds(loggedInCashierId);
+      if (printedTicketIds.length === 0) {
+        return res.json({
+          items: [],
+          page,
+          limit,
+          total: 0,
+          totalPages: 1,
+        });
+      }
+      where.id = { in: printedTicketIds };
+    }
 
     // Non-cashier views: hide unpaid OPEN tickets (no receipt_number).
     // These are draft/prebook slips only relevant to cashiers who may claim them.
