@@ -617,11 +617,12 @@ reg("RESULT_TOTAL_FT", {
   },
 });
 
-// Total Goals / Both Teams To Score (e.g. "Over 2.5/Yes")
+// Total Goals / Both Teams To Score (e.g. "Over 2.5/Yes" or "U/YES 2.5")
 function totalBttsValidate(params, ctx) {
   const parts = String(ctx?.label || "").split("/");
   const ouSide = ouOf(params?.ouSide ?? parts[0]);
-  const line = params?.line != null ? Number(params.line) : numFrom(parts[0]);
+  // Line can be in either part depending on API format (e.g. "Over 2.5/Yes" vs "U/YES 2.5")
+  const line = params?.line != null ? Number(params.line) : (numFrom(parts[0]) ?? numFrom(parts[1]));
   const bttsPick = bttsOf(params?.btts ?? parts[1]);
   if (!ouSide || line == null || !Number.isFinite(line) || !bttsPick) {
     throw new ValidationError("invalid_combo", { field: "combo" });
