@@ -78,6 +78,17 @@ describe("sportsbookDay (7 PM → 6:59 PM EAT boundary)", () => {
     expect(dates.length).toBeGreaterThanOrEqual(2);
   });
 
+  it("screenshot scenario: early 24/06 games today, 22:00 tomorrow (23/06 23:00 EAT now)", () => {
+    const now = new Date("2026-06-23T20:00:00.000Z"); // 23/06 23:00 EAT
+    const early = new Date("2026-06-23T23:00:00.000Z"); // 24/06 02:00 EAT
+    const morning = new Date("2026-06-24T02:00:00.000Z"); // 24/06 05:00 EAT
+    const evening = new Date("2026-06-24T19:00:00.000Z"); // 24/06 22:00 EAT
+
+    expect(getSportsbookDayOffset(early, now)).toBe(0);
+    expect(getSportsbookDayOffset(morning, now)).toBe(0);
+    expect(getSportsbookDayOffset(evening, now)).toBe(1);
+  });
+
   it("eatLocalToUtc matches getZonedParts for noon EAT", () => {
     const utc = eatLocalToUtc(2026, 6, 22, 12, 0, 0);
     const parts = getZonedParts(utc);

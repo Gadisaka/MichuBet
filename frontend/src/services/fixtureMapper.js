@@ -1,17 +1,21 @@
+import { SPORTSBOOK_TIMEZONE } from "../utils/sportsbookDay.js";
+
 function formatDateForUi(isoDate) {
   const d = new Date(isoDate);
   if (Number.isNaN(d.getTime())) return "";
 
   const datePart = d.toLocaleDateString("en-GB", {
+    timeZone: SPORTSBOOK_TIMEZONE,
     day: "2-digit",
     month: "2-digit",
   });
   const timePart = d.toLocaleTimeString("en-GB", {
+    timeZone: SPORTSBOOK_TIMEZONE,
     hour: "2-digit",
     minute: "2-digit",
     hour12: false,
   });
-  return `${datePart} ${timePart} ${d.getFullYear()}`;
+  return `${datePart} ${timePart} ${d.toLocaleDateString("en-GB", { timeZone: SPORTSBOOK_TIMEZONE, year: "numeric" })}`;
 }
 
 function toUiOdd(value) {

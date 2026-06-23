@@ -81,7 +81,7 @@ function matchesTimeFilter(matchDate, timeId, kickoffAt, now = new Date()) {
   }
 
   const dayOffset = getCalendarDayOffset(matchDate, now, kickoffAt);
-  if (dayOffset === null) return true;
+  if (dayOffset === null) return false;
 
   if (timeId === "today") return dayOffset === 0;
   if (timeId === "tomorrow") return dayOffset === 1;

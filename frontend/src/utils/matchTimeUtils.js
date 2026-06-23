@@ -1,4 +1,7 @@
-import { getSportsbookDayOffset } from "./sportsbookDay.js";
+import {
+  eatLocalToUtc,
+  getSportsbookDayOffset,
+} from "./sportsbookDay.js";
 
 /** Today as UTC calendar date `YYYY-MM-DD`. */
 export function utcTodayYmd() {
@@ -18,7 +21,7 @@ export function addUtcDaysYmd(ymd, deltaDays) {
   return dt.toISOString().slice(0, 10);
 }
 
-/** Parse UI date string produced by fixtureMapper (`dd/mm hh:mm yyyy`). */
+/** Parse UI date string (`dd/mm hh:mm yyyy`) as EAT wall-clock time. */
 export function parseUiDateToDate(uiDate) {
   const [datePart = "", timePart = "", yearPart = ""] =
     String(uiDate || "").split(" ");
@@ -31,7 +34,7 @@ export function parseUiDateToDate(uiDate) {
   const min = Number.parseInt(minute, 10);
 
   if (![year, d, m, h, min].every(Number.isFinite)) return null;
-  return new Date(year, m - 1, d, h, min);
+  return eatLocalToUtc(year, m, d, h, min);
 }
 
 /**
