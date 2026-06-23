@@ -11,6 +11,9 @@ import {
   shouldExpireUnpaidTicket,
   isTicketSettleable,
   applyExcludeExpiredFilter,
+  applyExcludeUnpaidOpenFilter,
+  applyReportableTicketFilter,
+  UNPAID_OPEN_FILTER,
 } from "../lib/ticketExpiry.js";
 
 describe("getEarliestKickoff", () => {
@@ -114,6 +117,32 @@ describe("applyExcludeExpiredFilter", () => {
     const where = { status: "OPEN" };
     applyExcludeExpiredFilter(where, "EXPIRED");
     assert.deepEqual(where, { status: "OPEN" });
+  });
+});
+
+describe("applyExcludeUnpaidOpenFilter", () => {
+  it("adds NOT clause to empty where", () => {
+    const where = {};
+    applyExcludeUnpaidOpenFilter(where);
+    assert.deepEqual(where, { NOT: UNPAID_OPEN_FILTER });
+  });
+
+  it("composes with existing NOT clause", () => {
+    const existing = { id: "abc" };
+    const where = { NOT: existing };
+    applyExcludeUnpaidOpenFilter(where);
+    assert.deepEqual(where, {
+      NOT: { AND: [existing, UNPAID_OPEN_FILTER] },
+    });
+  });
+
+  it("works after applyExcludeExpiredFilter", () => {
+    const where = {};
+    applyReportableTicketFilter(where);
+    assert.deepEqual(where, {
+      status: { notIn: ["EXPIRED", "CANCELED"] },
+      NOT: UNPAID_OPEN_FILTER,
+    });
   });
 });
 

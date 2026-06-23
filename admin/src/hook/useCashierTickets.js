@@ -324,3 +324,21 @@ export function useRemoveTicketSelectionMutation() {
     },
   });
 }
+
+export function useAddTicketSelectionMutation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ ticketId, selection }) => {
+      const tid = String(ticketId || "").trim();
+      if (!tid) throw new Error("Ticket id is required");
+      const payload = await apiRequest(`/tickets/${tid}/selections`, {
+        method: "POST",
+        body: JSON.stringify({ selection }),
+      });
+      return mapTicketDetail(payload);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: TICKETS_KEY });
+    },
+  });
+}

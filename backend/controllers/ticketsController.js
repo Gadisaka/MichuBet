@@ -41,6 +41,7 @@ import {
 import { refundTicketWalletsOnCancelInTx } from "../services/ticketCancelRefunds.js";
 import {
   applyExcludeExpiredFilter,
+  applyExcludeUnpaidOpenFilter,
   expireTicketIfDue,
   ticketExpiredResponse,
 } from "../lib/ticketExpiry.js";
@@ -1966,17 +1967,7 @@ export async function listTickets(req, res) {
     // Non-cashier views: hide unpaid OPEN tickets (no receipt_number).
     // These are draft/prebook slips only relevant to cashiers who may claim them.
     if (req.user.role !== "CASHIER") {
-      const unpaidOpenFilter = {
-        status: "OPEN",
-        OR: [
-          { receipt_number: null },
-          { receipt_number: { isSet: false } },
-          { receipt_number: "" },
-        ],
-      };
-      where.NOT = where.NOT
-        ? { AND: [where.NOT, unpaidOpenFilter] }
-        : unpaidOpenFilter;
+      applyExcludeUnpaidOpenFilter(where);
     }
 
     const [items, total] = await Promise.all([
@@ -3086,7 +3077,7 @@ function cloneSelectionRowsForRepeat(selections = []) {
 
 /**
  * POST /api/tickets/:id/repeat
- * Clones a ticket as a new OPEN sale (same coupon/selections, new receipt on print).
+ * Clones a ticket as a new OPEN sale (new unique coupon, same selections, new receipt on print).
  */
 export async function repeatTicket(req, res) {
   try {
@@ -3114,10 +3105,11 @@ export async function repeatTicket(req, res) {
       ? source.selection_snapshot
       : [];
     const selectionRows = cloneSelectionRowsForRepeat(source.selections || []);
+    const newCouponNumber = await reserveUniqueCouponNumber(prisma);
 
     const created = await prisma.ticket.create({
       data: {
-        coupon_number: source.coupon_number,
+        coupon_number: newCouponNumber,
         user_id: source.user_id,
         cashier_id: null,
         branch_name: "",
@@ -3153,6 +3145,262 @@ export async function repeatTicket(req, res) {
   } catch (error) {
     console.error("repeatTicket error:", error);
     return res.status(500).json({ message: "Failed to repeat ticket" });
+  }
+}
+
+async function assertOpenTicketEditableBeforePrint(req, res, ticket) {
+  if (ticket.status !== "OPEN") {
+    res.status(400).json({
+      message: "Only OPEN tickets can be edited before print",
+    });
+    return false;
+  }
+
+  if (String(ticket.receipt_number ?? "").trim()) {
+    res.status(400).json({
+      message: "Ticket already has a receipt number and cannot be edited",
+    });
+    return false;
+  }
+
+  if (req.user.role === "CASHIER") {
+    const cashier = await resolveCashierByUserId(req.user.sub);
+    if (!cashier) {
+      res.status(404).json({ message: CASHIER_PROFILE_MISSING_MESSAGE });
+      return false;
+    }
+    if (ticket.cashier_id && ticket.cashier_id !== cashier.id) {
+      res.status(403).json({ message: "Access denied" });
+      return false;
+    }
+  }
+
+  const printReference = `ticket-print:${ticket.id}`;
+  const existingPrint = await prisma.transaction.findFirst({
+    where: { type: "BET", reference: printReference },
+    select: { id: true },
+  });
+  if (existingPrint) {
+    res.status(400).json({
+      message: "Selections cannot be changed after the ticket has been printed",
+    });
+    return false;
+  }
+
+  return true;
+}
+
+function incomingEventKeyFromPrebookSelection(item) {
+  const apiFixtureId = Number.parseInt(item?.apiFixtureId, 10);
+  if (Number.isFinite(apiFixtureId)) {
+    return `f:${apiFixtureId}`;
+  }
+  if (item?.matchId) {
+    return `m:${item.matchId}`;
+  }
+  return null;
+}
+
+function ticketHasSelectionForEventKey(selections, eventKey) {
+  if (!eventKey) return false;
+  return (selections || []).some(
+    (sel) => eventKeyFromDbSelection(sel) === eventKey,
+  );
+}
+
+/**
+ * POST /api/tickets/:id/selections
+ * Adds one leg to an OPEN ticket before print.
+ */
+export async function addTicketSelection(req, res) {
+  try {
+    const ticket = await prisma.ticket.findUnique({
+      where: { id: req.params.id },
+      include: { selections: ticketSelectionRelationArgs },
+    });
+    if (!ticket) {
+      return res.status(404).json({ message: "Ticket not found" });
+    }
+
+    if (!(await assertOpenTicketEditableBeforePrint(req, res, ticket))) {
+      return;
+    }
+
+    const rawSelection = req.body?.selection;
+    if (!rawSelection || typeof rawSelection !== "object") {
+      return res.status(400).json({ message: "selection object is required" });
+    }
+
+    const { normalizedSelections, validationErrors } =
+      normalizePrebookSelectionsInput([rawSelection]);
+    if (validationErrors.length) {
+      return res.status(400).json({
+        message: "Invalid selection",
+        errors: validationErrors,
+      });
+    }
+    if (normalizedSelections.length === 0) {
+      return res.status(400).json({ message: "Selection odds are invalid" });
+    }
+
+    const incoming = normalizedSelections[0];
+    const incomingEventKey = incomingEventKeyFromPrebookSelection(incoming);
+    if (
+      ticketHasSelectionForEventKey(ticket.selections || [], incomingEventKey)
+    ) {
+      return res.status(400).json({
+        message: "A selection for this match already exists on the ticket",
+      });
+    }
+
+    const validated = await validatePlacementSelections({
+      prismaClient: prisma,
+      rawSelections: [
+        {
+          apiFixtureId: incoming.apiFixtureId,
+          marketLabel: incoming.marketLabel,
+          marketCode: incoming.marketCode,
+          marketParams: incoming.marketParams,
+          label: incoming.label,
+          odds: incoming.odds,
+          marketVersion: incoming.marketVersion,
+        },
+      ],
+      live: Boolean(incoming.fromLive),
+      actorId: req.user?.sub ? `cashier:${req.user.sub}` : null,
+      writeFreeze: false,
+    });
+
+    if (!validated.ok) {
+      return res.status(409).json({
+        code: validated.code || "validation_failed",
+        message: "Selection failed validation",
+        selections:
+          validated.selections || validated.drift || validated.versionDrift || [],
+      });
+    }
+
+    const resolved = (validated.resolved || [])[0];
+    const lockedSelection = {
+      ...incoming,
+      odds: Number(resolved?.serverOdds ?? incoming.odds),
+      fixtureId: resolved?.fixtureId || null,
+      serverMarketVersion: Number(
+        resolved?.serverMarketVersion ?? incoming.marketVersion ?? 0,
+      ),
+      marketState: resolved?.marketState || "OPEN",
+      serverUpdatedAt: resolved?.serverUpdatedAt || null,
+    };
+
+    const snapshot = Array.isArray(ticket.selection_snapshot)
+      ? [...ticket.selection_snapshot]
+      : [];
+    snapshot.push({
+      apiFixtureId: lockedSelection.apiFixtureId,
+      matchName: lockedSelection.matchName,
+      league: lockedSelection.league,
+      marketLabel: lockedSelection.marketLabel,
+      marketCode: lockedSelection.marketCode,
+      marketParams: lockedSelection.marketParams,
+      label: lockedSelection.label,
+      odds: lockedSelection.odds,
+      marketVersion: lockedSelection.marketVersion,
+      fromLive: lockedSelection.fromLive,
+    });
+
+    const nextTotalOdds = Number(ticket.total_odds || 1) * lockedSelection.odds;
+    if (!Number.isFinite(nextTotalOdds) || nextTotalOdds <= 1) {
+      return res.status(400).json({ message: "Selection odds are invalid" });
+    }
+
+    const legCount = (ticket.selections?.length || 0) + 1;
+    const numericStake = Number(ticket.stake);
+    const [accResolved, limits] = await Promise.all([
+      resolveAccumulatorForNewTicket(
+        prisma,
+        legCount,
+        numericStake,
+        nextTotalOdds,
+      ),
+      resolveBettingLimits(prisma),
+    ]);
+    const nextPotentialWin = capGrossPotentialWin(
+      limits,
+      accResolved.potential_win,
+    );
+    const limitMsg = getStakeAndPotentialWinViolation(
+      limits,
+      numericStake,
+      nextPotentialWin,
+    );
+    if (limitMsg) {
+      return res.status(400).json({ message: limitMsg });
+    }
+
+    const selectionRow = {
+      fixture_id: lockedSelection.fixtureId || null,
+      selection: lockedSelection.label,
+      market_code: lockedSelection.marketCode || null,
+      market_params: lockedSelection.marketParams ?? undefined,
+      odds: lockedSelection.odds,
+      server_odds: lockedSelection.odds,
+      server_odds_at: lockedSelection.serverUpdatedAt
+        ? new Date(lockedSelection.serverUpdatedAt)
+        : new Date(),
+      market_state: lockedSelection.marketState || "OPEN",
+      market_version: Number.isFinite(Number(lockedSelection.marketVersion))
+        ? Number(lockedSelection.marketVersion)
+        : null,
+      server_market_version: Number.isFinite(
+        Number(lockedSelection.serverMarketVersion),
+      )
+        ? Number(lockedSelection.serverMarketVersion)
+        : null,
+      live_at_placement: Boolean(lockedSelection.fromLive),
+      result: "PENDING",
+    };
+
+    await prisma.$transaction(async (tx) => {
+      await tx.ticketSelection.create({
+        data: {
+          ticket_id: ticket.id,
+          ...selectionRow,
+        },
+      });
+      await tx.ticket.update({
+        where: { id: ticket.id },
+        data: {
+          total_odds: nextTotalOdds,
+          accumulator_bonus_percent: accResolved.accumulator_bonus_percent,
+          potential_win: nextPotentialWin,
+          selection_snapshot: snapshot,
+        },
+      });
+    });
+
+    const updated = await prisma.ticket.findUnique({
+      where: { id: ticket.id },
+      include: ticketDetailInclude,
+    });
+
+    await logAuditEvent({
+      req,
+      action: "TICKET_SELECTION_ADDED",
+      module: "TICKETS",
+      entityType: "TICKET",
+      entityId: ticket.id,
+      before: { legCount: ticket.selections?.length || 0 },
+      after: {
+        totalOdds: nextTotalOdds,
+        potentialWin: nextPotentialWin,
+        legCount,
+      },
+    });
+
+    return res.json(mapTicket(updated));
+  } catch (error) {
+    console.error("addTicketSelection error:", error);
+    return res.status(500).json({ message: "Failed to add selection" });
   }
 }
 

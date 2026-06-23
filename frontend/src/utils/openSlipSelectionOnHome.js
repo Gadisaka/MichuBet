@@ -22,9 +22,7 @@ function timeIdFromKickoffAt(kickoffAt) {
   if (!kickoffAt) return null;
   const d = new Date(kickoffAt);
   if (Number.isNaN(d.getTime())) return null;
-  const pad = (n) => String(n).padStart(2, "0");
-  const uiDate = `${pad(d.getDate())}/${pad(d.getMonth() + 1)} ${pad(d.getHours())}:${pad(d.getMinutes())} ${d.getFullYear()}`;
-  const offset = getCalendarDayOffset(uiDate);
+  const offset = getCalendarDayOffset(null, new Date(), kickoffAt);
   if (offset == null) return null;
   return dayOffsetToTimeId(offset);
 }
@@ -38,9 +36,14 @@ function timeIdFromKickoffAt(kickoffAt) {
  */
 export function filtersToRevealMatch(match, kickoffAt) {
   const sportId = match?.sportId ? String(match.sportId) : undefined;
-  const timeIdFromMatch =
-    match?.date != null ? dayOffsetToTimeId(getCalendarDayOffset(match.date)) : null;
-  const timeId = timeIdFromMatch ?? timeIdFromKickoffAt(kickoffAt);
+  const effectiveKickoff = kickoffAt ?? match?.kickoffAt ?? null;
+  const offset = getCalendarDayOffset(
+    match?.date,
+    new Date(),
+    effectiveKickoff,
+  );
+  const timeIdFromMatch = offset != null ? dayOffsetToTimeId(offset) : null;
+  const timeId = timeIdFromMatch ?? timeIdFromKickoffAt(effectiveKickoff);
 
   return {
     sportId,

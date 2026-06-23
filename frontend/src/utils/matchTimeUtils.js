@@ -1,3 +1,5 @@
+import { getSportsbookDayOffset } from "./sportsbookDay.js";
+
 /** Today as UTC calendar date `YYYY-MM-DD`. */
 export function utcTodayYmd() {
   return new Date().toISOString().slice(0, 10);
@@ -32,23 +34,24 @@ export function parseUiDateToDate(uiDate) {
   return new Date(year, m - 1, d, h, min);
 }
 
-/** Calendar day offset from local midnight "today". Null if unparsable. */
-export function getCalendarDayOffset(uiDate, now = new Date()) {
-  const date = parseUiDateToDate(uiDate);
-  if (!date) return null;
-
-  const hourMs = 24 * 60 * 60 * 1000;
-  const matchDay = new Date(
-    date.getFullYear(),
-    date.getMonth(),
-    date.getDate(),
-  ).getTime();
-  const today = new Date(
-    now.getFullYear(),
-    now.getMonth(),
-    now.getDate(),
-  ).getTime();
-  return Math.round((matchDay - today) / hourMs);
+/**
+ * Sportsbook day offset (7 PM EAT boundary): 0 = today, 1 = tomorrow, …
+ * Prefers ISO kickoff when available.
+ *
+ * @param {string} uiDate
+ * @param {Date} [now]
+ * @param {string | Date | null} [kickoffAt]
+ */
+export function getCalendarDayOffset(uiDate, now = new Date(), kickoffAt = null) {
+  let instant = null;
+  if (kickoffAt) {
+    instant = kickoffAt instanceof Date ? kickoffAt : new Date(kickoffAt);
+  }
+  if (!instant || Number.isNaN(instant.getTime())) {
+    instant = parseUiDateToDate(uiDate);
+  }
+  if (!instant || Number.isNaN(instant.getTime())) return null;
+  return getSportsbookDayOffset(instant, now);
 }
 
 export function matchesClubNameSearch(match, needle) {

@@ -1,5 +1,6 @@
 import express from "express";
 import {
+  addTicketSelection,
   cancelTicket,
   confirmPrintTicket,
   createTicket,
@@ -41,6 +42,11 @@ router.post(
   "/:id/repeat",
   authorizePermission("tickets:create"),
   repeatTicket,
+);
+router.post(
+  "/:id/selections",
+  authorizePermission("tickets:create"),
+  addTicketSelection,
 );
 router.delete(
   "/:id/selections/:selectionId",

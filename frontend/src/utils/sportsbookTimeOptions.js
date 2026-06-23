@@ -1,3 +1,10 @@
+import {
+  dateFromEatAnchorYmd,
+  getEatWeekdayIndex,
+  sportsbookAnchorAtOffset,
+  SPORTSBOOK_TIMEZONE,
+} from "./sportsbookDay.js";
+
 const HOUR_BUCKET_IDS = [
   { id: "1h", label: "1H", labelKey: "time.hour1h" },
   { id: "3h", label: "3H", labelKey: "time.hour3h" },
@@ -12,15 +19,15 @@ const WEEKDAY_KEY = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
  * Offsets 2–8 use short weekday; other offsets return null (use generated `label`).
  *
  * @param {number} offset
- * @param {Date} dateAtOffset
+ * @param {string} anchorYmd — sportsbook anchor date in EAT (`YYYY-MM-DD`)
  * @returns {string | null}
  */
-export function timeOptionLabelKey(offset, dateAtOffset) {
+export function timeOptionLabelKey(offset, anchorYmd) {
   const o = Number(offset);
   if (o === 0) return "time.today";
   if (o === 1) return "time.tomorrow";
-  if (o >= 2 && o <= 8 && dateAtOffset instanceof Date) {
-    const d = dateAtOffset.getDay();
+  if (o >= 2 && o <= 8 && anchorYmd) {
+    const d = getEatWeekdayIndex(anchorYmd);
     const key = WEEKDAY_KEY[d];
     return key ? `days.${key}` : null;
   }
@@ -39,20 +46,28 @@ export function buildDayTimeIds(windowDays = 14) {
 }
 
 /**
- * Labels for calendar offsets: Today / Tomorrow; offsets 2–8 short weekday;
+ * Labels for sportsbook-day offsets: Today / Tomorrow; offsets 2–8 short weekday;
  * offset ≥ 9 lowercase short month + day (e.g. `apr 4`).
  *
- * @param {Date} dateAtOffset — calendar date for this tab (local midnight + offset days from “today”).
- * @param {number} offset — 0-based day offset from local today.
+ * @param {string} anchorYmd — sportsbook anchor date in EAT
+ * @param {number} offset — 0-based offset from current sportsbook day
  */
-export function calendarDayTabLabel(dateAtOffset, offset) {
+export function calendarDayTabLabel(anchorYmd, offset) {
   if (offset === 0) return "Today";
   if (offset === 1) return "Tomorrow";
+  const d = dateFromEatAnchorYmd(anchorYmd);
   if (offset >= 2 && offset <= 8) {
-    return dateAtOffset.toLocaleDateString(undefined, { weekday: "short" });
+    return d.toLocaleDateString("en-GB", {
+      timeZone: SPORTSBOOK_TIMEZONE,
+      weekday: "short",
+    });
   }
-  return dateAtOffset
-    .toLocaleDateString("en-GB", { month: "short", day: "numeric" })
+  return d
+    .toLocaleDateString("en-GB", {
+      timeZone: SPORTSBOOK_TIMEZONE,
+      month: "short",
+      day: "numeric",
+    })
     .replace(/\s+/g, " ")
     .trim()
     .toLowerCase();
@@ -60,23 +75,21 @@ export function calendarDayTabLabel(dateAtOffset, offset) {
 
 /**
  * @param {Date} [now] — optional fixed date for testing
- * @param {number} [windowDays] — calendar offsets 0..windowDays-1 (default 14)
+ * @param {number} [windowDays] — sportsbook offsets 0..windowDays-1 (default 14)
  */
 export function buildSportsbookTimeOptions(now = new Date(), windowDays = 14) {
   const safe = Math.min(Math.max(Number(windowDays) || 14, 2), 31);
-  const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   /** @type {{ id: string, label: string, labelKey: string | null }[]} */
   const dayParts = [];
   for (let offset = 0; offset < safe; offset += 1) {
     const id = dayOffsetToTimeId(offset);
     if (!id) continue;
-    const d = new Date(start);
-    d.setDate(d.getDate() + offset);
-    const label = calendarDayTabLabel(d, offset);
+    const anchorYmd = sportsbookAnchorAtOffset(offset, now);
+    const label = calendarDayTabLabel(anchorYmd, offset);
     dayParts.push({
       id,
       label,
-      labelKey: timeOptionLabelKey(offset, d),
+      labelKey: timeOptionLabelKey(offset, anchorYmd),
     });
   }
 

@@ -3,7 +3,7 @@ import {
   aggregateShopStatsForWalletIds,
   emptyShopStats,
 } from "../services/shopReportStats.js";
-import { applyExcludeExpiredFilter } from "../lib/ticketExpiry.js";
+import { applyReportableTicketFilter } from "../lib/ticketExpiry.js";
 
 function parseDateYmd(value) {
   if (!value) return null;
@@ -101,7 +101,7 @@ export async function getAgentCashiers(req, res) {
     }
 
     const tickets = await prisma.ticket.findMany({
-      where: applyExcludeExpiredFilter({
+      where: applyReportableTicketFilter({
         cashier_id: { in: cashierIds },
         created_at: { gte: start, lte: end },
         ...(branchName ? { branch_name: branchName } : {}),
@@ -215,7 +215,7 @@ export async function getAgentDashboard(req, res) {
     const ticketCashierIds = branchName ? scopedCashierIds : cashierIds;
 
     const tickets = await prisma.ticket.findMany({
-      where: applyExcludeExpiredFilter({
+      where: applyReportableTicketFilter({
         cashier_id: { in: ticketCashierIds },
         created_at: { gte: start, lte: end },
       }),
@@ -404,7 +404,7 @@ export async function getAgentReports(req, res) {
 
     const ticketCashierIds = branchName ? scopedCashierIds : cashierIds;
     const tickets = await prisma.ticket.findMany({
-      where: applyExcludeExpiredFilter({
+      where: applyReportableTicketFilter({
         cashier_id: { in: ticketCashierIds },
         created_at: { gte: start, lte: end },
       }),

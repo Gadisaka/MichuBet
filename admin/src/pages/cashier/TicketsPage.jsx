@@ -22,6 +22,7 @@ import {
   usePreparePrintTicketMutation,
   useReceiptLookupMutation,
   useRemoveTicketSelectionMutation,
+  useAddTicketSelectionMutation,
   useRepeatTicketMutation,
   useTicketByIdLookupMutation,
   useTodayTicketsQuery,
@@ -32,6 +33,7 @@ import { useCashierHistoryQuery } from "../../hook/useCashierWallet";
 import { useNotificationUnreadCountQuery } from "../../hook/useNotifications";
 import { usePlayerInfoPagesQuery } from "../../hook/useSettingsQuery";
 import CashierInboxList from "../../components/notifications/CashierInboxList";
+import FixturesSelectionPanel from "../../components/cashier/FixturesSelectionPanel";
 import { formatSelectionResult } from "../../components/ticket/receiptFormat";
 import { capGrossPotentialWin } from "../../utils/bettingStakeLimits";
 import { isSelectionRemovable } from "../../utils/selectionExpiry";
@@ -460,6 +462,8 @@ export default function CashierTicketsPage() {
   const [platformWinningsTax, setPlatformWinningsTax] = useState(null);
   const [bettingLimits, setBettingLimits] = useState(null);
   const [removingSelectionId, setRemovingSelectionId] = useState("");
+  const [fixturesPanelOpen, setFixturesPanelOpen] = useState(false);
+  const [addSelectionError, setAddSelectionError] = useState("");
 
   useEffect(() => {
     let cancelled = false;
@@ -500,6 +504,7 @@ export default function CashierTicketsPage() {
   const updateStake = useUpdateTicketStakeMutation();
   const repeatTicket = useRepeatTicketMutation();
   const removeSelection = useRemoveTicketSelectionMutation();
+  const addSelection = useAddTicketSelectionMutation();
   const printInFlightRef = useRef(false);
   const playerInfoPagesQuery = usePlayerInfoPagesQuery();
   const payoutContactEntries =
@@ -601,7 +606,8 @@ export default function CashierTicketsPage() {
     preparePrint.isPending ||
     updateStake.isPending ||
     repeatTicket.isPending ||
-    removeSelection.isPending;
+    removeSelection.isPending ||
+    addSelection.isPending;
   const printerConnected = Boolean(printerStatus?.connected);
   const printerPort = printerStatus?.port || "";
   const printerQueueLength = Number(printerStatus?.queueLength) || 0;
@@ -732,6 +738,7 @@ export default function CashierTicketsPage() {
         });
       }
       setSellTicket(newTicket);
+      setSellCouponInput(formatCouponNumberInput(newTicket.couponNumber || ""));
       setSellConfirmed(true);
       setActionSuccess("New ticket ready. You can print now.");
     } catch (error) {
@@ -1005,6 +1012,25 @@ export default function CashierTicketsPage() {
     }
   };
 
+  const handleAddSelection = async (selection) => {
+    if (!sellTicket?.id || !selection) return;
+    setSellError("");
+    setAddSelectionError("");
+    try {
+      const updated = await addSelection.mutateAsync({
+        ticketId: sellTicket.id,
+        selection,
+      });
+      setSellTicket(updated);
+      setSellConfirmed(false);
+      setActionSuccess("Selection added. Review updated odds and confirm.");
+    } catch (error) {
+      const message = error?.message || "Failed to add selection";
+      setAddSelectionError(message);
+      setSellError(message);
+    }
+  };
+
   useEffect(() => {
     let cancelled = false;
     async function loadQuote() {
@@ -1204,6 +1230,8 @@ export default function CashierTicketsPage() {
                       setSellStakeInput("");
                       setSellConfirmed(false);
                       setTicketPreviewOpen(false);
+                      setFixturesPanelOpen(false);
+                      setAddSelectionError("");
                       setSellError("");
                       setActionSuccess("");
                     }}
@@ -1306,6 +1334,16 @@ export default function CashierTicketsPage() {
                       removingSelectionId={removingSelectionId}
                       hideSummary
                     />
+
+                    {sellTicket.status === "OPEN" && !sellConfirmed ? (
+                      <FixturesSelectionPanel
+                        open={fixturesPanelOpen}
+                        ticket={sellTicket}
+                        onAddSelection={handleAddSelection}
+                        adding={addSelection.isPending}
+                        error={addSelectionError}
+                      />
+                    ) : null}
                   </>
                 )}
               </div>
@@ -1484,6 +1522,10 @@ export default function CashierTicketsPage() {
               <div className="mt-2">
                 <button
                   type="button"
+                  onClick={() => {
+                    setLeftTab("sell");
+                    setFixturesPanelOpen(true);
+                  }}
                   className="rounded-sm border border-blue-400 bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white"
                 >
                   Launch Fixtures

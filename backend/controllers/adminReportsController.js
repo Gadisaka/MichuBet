@@ -3,7 +3,7 @@ import {
   aggregateShopStatsForWalletIds,
   emptyShopStats,
 } from "../services/shopReportStats.js";
-import { applyExcludeExpiredFilter } from "../lib/ticketExpiry.js";
+import { applyReportableTicketFilter } from "../lib/ticketExpiry.js";
 
 function parseDateYmd(value) {
   if (!value) return null;
@@ -190,7 +190,7 @@ export async function getAdminSalesReports(req, res) {
     }
 
     const tickets = await prisma.ticket.findMany({
-      where: applyExcludeExpiredFilter(where),
+      where: applyReportableTicketFilter(where),
       select: {
         id: true,
         cashier_id: true,

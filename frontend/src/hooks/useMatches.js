@@ -14,6 +14,10 @@ import {
   utcTodayYmd,
 } from "../utils/matchTimeUtils";
 import {
+  utcYmdDatesForSportsbookOffset,
+  utcYmdDatesForSportsbookOffsets,
+} from "../utils/sportsbookDay.js";
+import {
   buildSportsbookTimeOptions,
   calendarTimeIdToUtcDayOffset,
   dayOffsetToTimeId,
@@ -50,31 +54,34 @@ const PREMATCH_POLL_MS = Number.isFinite(PREMATCH_POLL_MS_RAW)
 
 const UPCOMING_FRONTEND_BUFFER_MS = 5 * 60 * 1000;
 const UPCOMING_FIXTURES_DAYS = 14;
+/** Preload this many sportsbook days on initial fetch (today + next tabs). */
+const INITIAL_SPORTSBOOK_DAYS_PRELOAD = 3;
 
-function matchesTimeFilter(matchDate, timeId) {
+function matchesTimeFilter(matchDate, timeId, kickoffAt, now = new Date()) {
   if (!timeId || timeId === "all") return true;
-  const date = parseUiDateToDate(matchDate);
-  if (!date) return true;
 
-  const now = new Date();
-  const msDiff = date.getTime() - now.getTime();
+  const msDiff = (() => {
+    const instant = kickoffAt
+      ? new Date(kickoffAt)
+      : parseUiDateToDate(matchDate);
+    if (!instant || Number.isNaN(instant.getTime())) return null;
+    return instant.getTime() - now.getTime();
+  })();
+
   const hourMs = 60 * 60 * 1000;
 
-  if (timeId === "1h") return msDiff >= 0 && msDiff <= hourMs;
-  if (timeId === "3h") return msDiff >= 0 && msDiff <= 3 * hourMs;
-  if (timeId === "12h") return msDiff >= 0 && msDiff <= 12 * hourMs;
+  if (timeId === "1h") {
+    return msDiff != null && msDiff >= 0 && msDiff <= hourMs;
+  }
+  if (timeId === "3h") {
+    return msDiff != null && msDiff >= 0 && msDiff <= 3 * hourMs;
+  }
+  if (timeId === "12h") {
+    return msDiff != null && msDiff >= 0 && msDiff <= 12 * hourMs;
+  }
 
-  const matchDay = new Date(
-    date.getFullYear(),
-    date.getMonth(),
-    date.getDate(),
-  ).getTime();
-  const today = new Date(
-    now.getFullYear(),
-    now.getMonth(),
-    now.getDate(),
-  ).getTime();
-  const dayOffset = Math.round((matchDay - today) / (24 * hourMs));
+  const dayOffset = getCalendarDayOffset(matchDate, now, kickoffAt);
+  if (dayOffset === null) return true;
 
   if (timeId === "today") return dayOffset === 0;
   if (timeId === "tomorrow") return dayOffset === 1;
@@ -211,7 +218,12 @@ export function useMatches({ includeLive = true, filters = {} } = {}) {
       if (USE_FIXTURES_BY_DATE) {
         loadedDatesRef.current.clear();
         setFixturesMap(new Map());
-        await loadDateImpl(utcTodayYmd(), { signal: ac.signal });
+        const initialDates = utcYmdDatesForSportsbookOffsets(
+          INITIAL_SPORTSBOOK_DAYS_PRELOAD - 1,
+        );
+        await Promise.all(
+          initialDates.map((ymd) => loadDateImpl(ymd, { signal: ac.signal })),
+        );
       } else {
         await refreshWindowLegacy(ac.signal);
       }
@@ -295,10 +307,13 @@ export function useMatches({ includeLive = true, filters = {} } = {}) {
     if (off === null) return undefined;
     if (off < 0 || off >= MAX_PREMATCH_DAYS) return undefined;
 
-    const ymd = addUtcDaysYmd(utcTodayYmd(), off);
-    if (fixturesMap.has(ymd)) return undefined;
+    const ymds = utcYmdDatesForSportsbookOffset(off);
+    const pending = ymds.filter((ymd) => !fixturesMap.has(ymd));
+    if (pending.length === 0) return undefined;
 
-    void loadDateImpl(ymd);
+    pending.forEach((ymd) => {
+      void loadDateImpl(ymd);
+    });
 
     return undefined;
   }, [filters.timeId, fixturesMap, loadDateImpl]);
@@ -391,7 +406,7 @@ export function useMatches({ includeLive = true, filters = {} } = {}) {
 
     const counts = new Map();
     for (const m of base) {
-      const off = getCalendarDayOffset(m.date);
+      const off = getCalendarDayOffset(m.date, undefined, m.kickoffAt);
       if (off === null || off < 0 || off > maxDayOffset) continue;
       counts.set(off, (counts.get(off) || 0) + 1);
     }
@@ -451,7 +466,9 @@ export function useMatches({ includeLive = true, filters = {} } = {}) {
         if (q) {
           return matchesClubNameSearch(match, q);
         }
-        if (!matchesTimeFilter(match.date, resolvedTimeId)) return false;
+        if (!matchesTimeFilter(match.date, resolvedTimeId, match.kickoffAt)) {
+          return false;
+        }
         return true;
       }),
     [

@@ -1,5 +1,5 @@
 import { prisma } from "../Config/db.js";
-import { applyExcludeExpiredFilter } from "../lib/ticketExpiry.js";
+import { applyReportableTicketFilter } from "../lib/ticketExpiry.js";
 
 function parseDateYmd(value) {
   if (!value) return null;
@@ -108,7 +108,7 @@ export async function getAdminDashboardInsights(req, res) {
       prisma.user.count({ where: { status: true, role: { name: "CASHIER" } } }),
       prisma.user.count({ where: { status: true, role: { name: "AGENT" } } }),
       prisma.ticket.findMany({
-        where: applyExcludeExpiredFilter({
+        where: applyReportableTicketFilter({
           created_at: { gte: start, lte: end },
         }),
         select: {
@@ -123,13 +123,13 @@ export async function getAdminDashboardInsights(req, res) {
         },
       }),
       prisma.ticket.findMany({
-        where: applyExcludeExpiredFilter({
+        where: applyReportableTicketFilter({
           created_at: { gte: chartStart, lte: chartEnd },
         }),
         select: { created_at: true, stake: true },
       }),
       prisma.ticket.findMany({
-        where: applyExcludeExpiredFilter({
+        where: applyReportableTicketFilter({
           created_at: { gte: start, lte: end },
         }),
         include: {

@@ -111,6 +111,40 @@ export function applyExcludeExpiredFilter(where, statusFilter = "") {
   return where;
 }
 
+/** Prisma NOT clause: OPEN drafts/prebooks with no receipt_number. */
+export const UNPAID_OPEN_FILTER = {
+  status: "OPEN",
+  OR: [
+    { receipt_number: null },
+    { receipt_number: { isSet: false } },
+    { receipt_number: "" },
+  ],
+};
+
+/**
+ * Hide unpaid OPEN tickets (no receipt_number) from reportable metrics.
+ *
+ * @param {Record<string, unknown>} where
+ */
+export function applyExcludeUnpaidOpenFilter(where) {
+  where.NOT = where.NOT
+    ? { AND: [where.NOT, UNPAID_OPEN_FILTER] }
+    : UNPAID_OPEN_FILTER;
+  return where;
+}
+
+/**
+ * Standard filter for dashboard/report ticket queries.
+ *
+ * @param {Record<string, unknown>} where
+ * @param {string} [statusFilter]
+ */
+export function applyReportableTicketFilter(where, statusFilter = "") {
+  applyExcludeExpiredFilter(where, statusFilter);
+  applyExcludeUnpaidOpenFilter(where);
+  return where;
+}
+
 /**
  * Flip OPEN unpaid ticket to EXPIRED when kickoff has passed.
  *
