@@ -646,6 +646,70 @@ test("LOST ticket with a postponed leg is NOT eligible for tiered cashback", asy
   assert.equal(store.wallet.get("w-d").balance, 0);
 });
 
+test("PENDING legs on terminal tickets (LOST/EXPIRED) are VOIDed so the fixture completes", async () => {
+  resetStore();
+  const store = getStore();
+  // Terminal fixture with a valid score.
+  seedFixture({ id: "fx-term", status: "FT", homeScore: 2, awayScore: 0 });
+
+  // One leg whose parent ticket is already LOST, one whose parent is EXPIRED.
+  seedTicket({ id: "tk-lost", userId: "u-lost", stake: 30, totalOdds: 2, status: "LOST" });
+  seedTicket({ id: "tk-exp", userId: "u-exp", stake: 40, totalOdds: 2, status: "EXPIRED" });
+  seedSelection({
+    id: "sel-lost",
+    ticketId: "tk-lost",
+    fixtureId: "fx-term",
+    selection: "1",
+    marketCode: "MATCH_WINNER",
+    odds: 2,
+  });
+  seedSelection({
+    id: "sel-exp",
+    ticketId: "tk-exp",
+    fixtureId: "fx-term",
+    selection: "1",
+    marketCode: "MATCH_WINNER",
+    odds: 2,
+  });
+  seedWallet({ id: "w-lost", userId: "u-lost", balance: 0 });
+  seedWallet({ id: "w-exp", userId: "u-exp", balance: 0 });
+
+  const lostBefore = { ...store.ticket.get("tk-lost") };
+  const expBefore = { ...store.ticket.get("tk-exp") };
+
+  const summary = await settlement.settleFixture("fx-term", { force: true });
+
+  // The fixture is no longer stuck: no pending legs, grading completed.
+  assert.equal(summary.pendingLegsRemaining, 0);
+  assert.equal(summary.gradingCompleted, true);
+
+  // Both legs are resolved (non-pending) to VOID with the terminal reason.
+  const legLost = store.ticketSelection.get("sel-lost");
+  const legExp = store.ticketSelection.get("sel-exp");
+  assert.notEqual(legLost.result, SELECTION_RESULT.PENDING);
+  assert.notEqual(legExp.result, SELECTION_RESULT.PENDING);
+  assert.equal(legLost.result, SELECTION_RESULT.VOID);
+  assert.equal(legExp.result, SELECTION_RESULT.VOID);
+  assert.equal(legLost.result_meta?.reason, "ticket_terminal");
+  assert.equal(legExp.result_meta?.reason, "ticket_terminal");
+
+  // The dead tickets are untouched: status, payout, refund all unchanged.
+  assert.equal(store.ticket.get("tk-lost").status, lostBefore.status);
+  assert.equal(store.ticket.get("tk-exp").status, expBefore.status);
+  assert.equal(store.ticket.get("tk-lost").potential_win, lostBefore.potential_win);
+  assert.equal(store.ticket.get("tk-exp").potential_win, expBefore.potential_win);
+  assert.equal(summary.payoutsCredited, 0);
+  assert.equal(summary.refundsIssued, 0);
+  assert.equal(summary.ticketsWon, 0);
+  assert.equal(summary.ticketsLost, 0);
+  assert.equal(summary.ticketsVoided, 0);
+
+  // No wallet movement of any kind for the terminal tickets.
+  assert.equal(store.wallet.get("w-lost").balance, 0);
+  assert.equal(store.wallet.get("w-exp").balance, 0);
+  assert.equal([...store.transaction.values()].length, 0);
+});
+
 test("unpaid OPEN ticket (no receipt) is not settled", async () => {
   resetStore();
   const store = getStore();

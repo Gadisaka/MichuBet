@@ -467,6 +467,23 @@ async function gradeSelectionsInTx(tx, selections, matchResults, marketResultOve
   for (const sel of selections) {
     const ownerTicket = ticketsById.get(sel.ticket_id);
     if (ownerTicket && !isTicketSettleable(ownerTicket)) {
+      // Parent ticket is already terminal (LOST/EXPIRED/VOID/...). The leg can't change
+      // the ticket outcome, but it MUST be resolved — otherwise it stays PENDING forever,
+      // the fixture never reaches grading_completed_at, and settlementRetry re-enriches it
+      // on every tick. Resolve to VOID and continue WITHOUT recomputing/crediting the
+      // ticket (do NOT add to ticketIds). Only do this for genuinely terminal tickets:
+      // an unpaid-but-OPEN ticket is also non-settleable, yet its legs must stay PENDING
+      // (it isn't dead — it just hasn't been paid), so leave those untouched as before.
+      if (
+        TERMINAL_TICKET_STATUSES.has(ownerTicket.status) &&
+        sel.result === SELECTION_RESULT.PENDING
+      ) {
+        await tx.ticketSelection.update({
+          where: { id: sel.id },
+          data: { result: SELECTION_RESULT.VOID, result_meta: { reason: "ticket_terminal" } },
+        });
+        updated++;
+      }
       continue;
     }
 
