@@ -13,6 +13,20 @@ const RETRY_BACKOFF_MS = 2000;
 const RATE_LIMIT_DELAY_MS = 7000;
 const DAILY_CALL_LIMIT = Number(process.env.API_SPORTS_DAILY_LIMIT || 75000);
 
+// The provider enforces a hard per-MINUTE ceiling (900/min on the Mega plan,
+// reported via the `x-ratelimit-limit` response header). All upstream calls
+// funnel through `request()`, and every queue in the worker (odds, live,
+// fixtures) shares this module, so a single global pacing gate is the only
+// place that can throttle the *aggregate* rate. Bursting past the ceiling is
+// what returns `errors.rateLimit` and yields zero usable data, so we default
+// to a conservative fraction of the cap and leave headroom for the API
+// process's own on-demand calls. Override with API_SPORTS_MAX_PER_MINUTE.
+const MAX_REQUESTS_PER_MINUTE = Math.max(
+  1,
+  Number(process.env.API_SPORTS_MAX_PER_MINUTE || 500),
+);
+const MIN_REQUEST_INTERVAL_MS = Math.ceil(60_000 / MAX_REQUESTS_PER_MINUTE);
+
 const clients = new Map();
 const dailyCalls = new Map();
 let lastResetDate = new Date().toISOString().split("T")[0];
@@ -45,6 +59,32 @@ export function getDailyCallCount(sport = "football") {
 
 export function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
+}
+
+// --- Global outbound rate gate -------------------------------------------
+// Serialises slot acquisition so concurrent callers (different queues firing
+// in parallel) are spaced at least MIN_REQUEST_INTERVAL_MS apart, keeping the
+// aggregate under MAX_REQUESTS_PER_MINUTE. `applyGlobalCooldown` lets a
+// rate-limit response push *every* pending caller back, not just itself.
+let nextSlotTs = 0;
+let rateGateChain = Promise.resolve();
+
+function applyGlobalCooldown(ms) {
+  nextSlotTs = Math.max(nextSlotTs, Date.now() + ms);
+}
+
+function acquireRateSlot() {
+  const wait = rateGateChain.then(async () => {
+    const now = Date.now();
+    const scheduled = Math.max(now, nextSlotTs);
+    nextSlotTs = scheduled + MIN_REQUEST_INTERVAL_MS;
+    const delay = scheduled - now;
+    if (delay > 0) await sleep(delay);
+  });
+  // Keep the chain alive even if a waiter rejects, so one failure can't wedge
+  // the gate for every subsequent call.
+  rateGateChain = wait.catch(() => {});
+  return wait;
 }
 
 function isRetriableNetworkError(err) {
@@ -127,6 +167,7 @@ async function request(sport, endpoint, params = {}, attempt = 0, opts = {}, rat
   }
 
   try {
+    await acquireRateSlot();
     incrCount(sport);
     const { data } = await client.get(endpoint, { params });
 
@@ -147,7 +188,11 @@ async function request(sport, endpoint, params = {}, attempt = 0, opts = {}, rat
         console.warn(
           `[API-Sports/${sport}] rate limited, retry ${rateLimitAttempt + 1}/${MAX_RATE_LIMIT_RETRIES} in ${RATE_LIMIT_DELAY_MS}ms…`,
         );
-        await sleep(RATE_LIMIT_DELAY_MS);
+        // Push the whole gate forward so concurrent callers also back off
+        // instead of every one independently slamming the ceiling again. The
+        // recursive call re-acquires a slot and naturally waits out the
+        // cooldown — no separate sleep needed.
+        applyGlobalCooldown(RATE_LIMIT_DELAY_MS);
         return request(sport, endpoint, params, attempt, opts, rateLimitAttempt + 1);
       }
       console.error(
