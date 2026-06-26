@@ -38,7 +38,7 @@ export function parseUiDateToDate(uiDate) {
 }
 
 /**
- * Sportsbook day offset (7 PM EAT boundary): 0 = today, 1 = tomorrow, …
+ * Betting-day offset (07:00 EAT boundary): 0 = today, 1 = tomorrow, …
  * Prefers ISO kickoff when available.
  *
  * @param {string} uiDate

@@ -567,15 +567,15 @@ reg("SHOTS_ON_TARGET_TEAM_AWAY", statMarket(pairStat("shotsOnTarget"), teamTotal
 // ===========================================================================
 const side3 = (s) => {
   const v = String(s || "").toLowerCase().trim();
-  if (/\bhome\b|^1$/.test(v)) return "HOME";
-  if (/\bdraw\b|^x$/.test(v)) return "DRAW";
-  if (/\baway\b|^2$/.test(v)) return "AWAY";
+  if (/\bhome\b|^1$|^h$/.test(v)) return "HOME";
+  if (/\bdraw\b|^x$|^d$/.test(v)) return "DRAW";
+  if (/\baway\b|^2$|^a$/.test(v)) return "AWAY";
   return null;
 };
 const ouOf = (s) => {
-  const v = String(s || "").toLowerCase();
-  if (/over|^o\b/.test(v)) return "OVER";
-  if (/under|^u\b/.test(v)) return "UNDER";
+  const v = String(s || "").toLowerCase().trim();
+  if (/^over|^o(\s|\d|$)/.test(v)) return "OVER";
+  if (/^under|^u(\s|\d|$)/.test(v)) return "UNDER";
   return null;
 };
 const bttsOf = (s) => {
@@ -585,6 +585,36 @@ const bttsOf = (s) => {
   return null;
 };
 const numFrom = (s) => { const m = String(s || "").match(/-?\d+(?:\.\d+)?/); return m ? Number(m[0]) : null; };
+const comboParts = (label) =>
+  String(label || "")
+    .split("/")
+    .map((p) => p.trim())
+    .filter(Boolean);
+const firstOf = (parts, fn, explicit) => {
+  if (explicit != null && explicit !== "") {
+    const hit = fn(explicit);
+    if (hit) return hit;
+  }
+  for (const p of parts) {
+    const hit = fn(p);
+    if (hit) return hit;
+  }
+  return null;
+};
+const lineFrom = (parts, explicit) => {
+  if (explicit != null && Number.isFinite(Number(explicit))) return Number(explicit);
+  for (const p of parts) {
+    if (ouOf(p)) {
+      const n = numFrom(p);
+      if (n != null && Number.isFinite(n)) return n;
+    }
+  }
+  for (const p of parts) {
+    const n = numFrom(p);
+    if (n != null && Number.isFinite(n) && !side3(p)) return n;
+  }
+  return null;
+};
 // Both legs must WIN; any VOID/PENDING leg → combo VOID (never a wrong grade).
 function combo(...rs) {
   if (rs.some((r) => r === "VOID" || r === "PENDING")) {
@@ -593,12 +623,12 @@ function combo(...rs) {
   return { result: rs.every((r) => r === "WON") ? "WON" : "LOST" };
 }
 
-// Result / Total Goals (e.g. "Home/Over 2.5")
+// Result / Total Goals (e.g. "Home/Over 2.5", "1/O 2.5", "U 2.5/1")
 function resultTotalValidate(params, ctx) {
-  const parts = String(ctx?.label || "").split("/");
-  const side = side3(params?.side ?? parts[0]);
-  const ouSide = ouOf(params?.ouSide ?? parts[1]);
-  const line = params?.line != null ? Number(params.line) : numFrom(parts[1]);
+  const parts = comboParts(ctx?.label);
+  const side = firstOf(parts, side3, params?.side);
+  const ouSide = firstOf(parts, ouOf, params?.ouSide);
+  const line = lineFrom(parts, params?.line);
   if (!side || !ouSide || line == null || !Number.isFinite(line)) {
     throw new ValidationError("invalid_combo", { field: "combo" });
   }
@@ -617,13 +647,12 @@ reg("RESULT_TOTAL_FT", {
   },
 });
 
-// Total Goals / Both Teams To Score (e.g. "Over 2.5/Yes" or "U/YES 2.5")
+// Total Goals / Both Teams To Score (e.g. "Over 2.5/Yes", "U/YES 2.5")
 function totalBttsValidate(params, ctx) {
-  const parts = String(ctx?.label || "").split("/");
-  const ouSide = ouOf(params?.ouSide ?? parts[0]);
-  // Line can be in either part depending on API format (e.g. "Over 2.5/Yes" vs "U/YES 2.5")
-  const line = params?.line != null ? Number(params.line) : (numFrom(parts[0]) ?? numFrom(parts[1]));
-  const bttsPick = bttsOf(params?.btts ?? parts[1]);
+  const parts = comboParts(ctx?.label);
+  const ouSide = firstOf(parts, ouOf, params?.ouSide);
+  const line = lineFrom(parts, params?.line);
+  const bttsPick = firstOf(parts, bttsOf, params?.btts);
   if (!ouSide || line == null || !Number.isFinite(line) || !bttsPick) {
     throw new ValidationError("invalid_combo", { field: "combo" });
   }
@@ -642,11 +671,11 @@ reg("TOTAL_GOALS_BTTS", {
   },
 });
 
-// Result / Both Teams Score (e.g. "Home/Yes")
+// Result / Both Teams Score (e.g. "Home/Yes", "1/YES", "YES/1", "H/NO")
 function resultBttsValidate(params, ctx) {
-  const parts = String(ctx?.label || "").split("/");
-  const side = side3(params?.side ?? parts[0]);
-  const bttsPick = bttsOf(params?.btts ?? parts[1]);
+  const parts = comboParts(ctx?.label);
+  const side = firstOf(parts, side3, params?.side);
+  const bttsPick = firstOf(parts, bttsOf, params?.btts);
   if (!side || !bttsPick) throw new ValidationError("invalid_combo", { field: "combo" });
   return { side, btts: bttsPick };
 }

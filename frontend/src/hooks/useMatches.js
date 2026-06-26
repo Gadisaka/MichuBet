@@ -7,15 +7,13 @@ import {
 } from "../services/api";
 import { applyOddsToMatch, mapFixtureToMatch } from "../services/fixtureMapper";
 import {
-  addUtcDaysYmd,
   getCalendarDayOffset,
   matchesClubNameSearch,
   parseUiDateToDate,
-  utcTodayYmd,
 } from "../utils/matchTimeUtils";
 import {
+  utcYmdDatesForPrematchHorizon,
   utcYmdDatesForSportsbookOffset,
-  utcYmdDatesForSportsbookOffsets,
 } from "../utils/sportsbookDay.js";
 import {
   buildSportsbookTimeOptions,
@@ -54,30 +52,31 @@ const PREMATCH_POLL_MS = Number.isFinite(PREMATCH_POLL_MS_RAW)
 
 const UPCOMING_FRONTEND_BUFFER_MS = 5 * 60 * 1000;
 const UPCOMING_FIXTURES_DAYS = 14;
-/** Preload this many sportsbook days on initial fetch (today + next tabs). */
-const INITIAL_SPORTSBOOK_DAYS_PRELOAD = 3;
+/** Include prior UTC day when prefetching fixtures for betting-day spillover. */
+const PREMATCH_UTC_DAYS_BACK = 1;
 
 function matchesTimeFilter(matchDate, timeId, kickoffAt, now = new Date()) {
   if (!timeId || timeId === "all") return true;
 
-  const msDiff = (() => {
-    const instant = kickoffAt
-      ? new Date(kickoffAt)
-      : parseUiDateToDate(matchDate);
-    if (!instant || Number.isNaN(instant.getTime())) return null;
-    return instant.getTime() - now.getTime();
-  })();
+  const instant = kickoffAt
+    ? new Date(kickoffAt)
+    : parseUiDateToDate(matchDate);
+  if (!instant || Number.isNaN(instant.getTime())) {
+    return !isCalendarDayTimeId(timeId);
+  }
+
+  const msDiff = instant.getTime() - now.getTime();
 
   const hourMs = 60 * 60 * 1000;
 
   if (timeId === "1h") {
-    return msDiff != null && msDiff >= 0 && msDiff <= hourMs;
+    return msDiff >= 0 && msDiff <= hourMs;
   }
   if (timeId === "3h") {
-    return msDiff != null && msDiff >= 0 && msDiff <= 3 * hourMs;
+    return msDiff >= 0 && msDiff <= 3 * hourMs;
   }
   if (timeId === "12h") {
-    return msDiff != null && msDiff >= 0 && msDiff <= 12 * hourMs;
+    return msDiff >= 0 && msDiff <= 12 * hourMs;
   }
 
   const dayOffset = getCalendarDayOffset(matchDate, now, kickoffAt);
@@ -218,8 +217,9 @@ export function useMatches({ includeLive = true, filters = {} } = {}) {
       if (USE_FIXTURES_BY_DATE) {
         loadedDatesRef.current.clear();
         setFixturesMap(new Map());
-        const initialDates = utcYmdDatesForSportsbookOffsets(
-          INITIAL_SPORTSBOOK_DAYS_PRELOAD - 1,
+        const initialDates = utcYmdDatesForPrematchHorizon(
+          MAX_PREMATCH_DAYS,
+          PREMATCH_UTC_DAYS_BACK,
         );
         await Promise.all(
           initialDates.map((ymd) => loadDateImpl(ymd, { signal: ac.signal })),

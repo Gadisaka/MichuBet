@@ -77,3 +77,52 @@ test("resolveCode maps API bet id string before textual aliases", () => {
 test("resolveCode accepts BET_ prefix bet ids", () => {
   assert.equal(MARKET_REGISTRY.resolveCode("BET_1"), "MATCH_WINNER");
 });
+
+test("validate: RESULT_TOTAL_FT accepts canonical and API-Sports combo labels", () => {
+  assert.deepEqual(
+    MARKET_REGISTRY.validate("RESULT_TOTAL_FT", {}, { label: "Home/Over 2.5" }),
+    { side: "HOME", ouSide: "OVER", line: 2.5 },
+  );
+  assert.deepEqual(
+    MARKET_REGISTRY.validate("RESULT_TOTAL_FT", {}, { label: "1/O 2.5" }),
+    { side: "HOME", ouSide: "OVER", line: 2.5 },
+  );
+  assert.deepEqual(
+    MARKET_REGISTRY.validate("RESULT_TOTAL_FT", {}, { label: "U 2.5/1" }),
+    { side: "HOME", ouSide: "UNDER", line: 2.5 },
+  );
+  assert.deepEqual(
+    MARKET_REGISTRY.validate("RESULT_TOTAL_FT", {}, { label: "2/U2.5" }),
+    { side: "AWAY", ouSide: "UNDER", line: 2.5 },
+  );
+});
+
+test("validate: RESULT_BTTS_FT accepts canonical and API-Sports combo labels", () => {
+  assert.deepEqual(
+    MARKET_REGISTRY.validate("RESULT_BTTS_FT", {}, { label: "Home/Yes" }),
+    { side: "HOME", btts: "YES" },
+  );
+  assert.deepEqual(
+    MARKET_REGISTRY.validate("RESULT_BTTS_FT", {}, { label: "1/YES" }),
+    { side: "HOME", btts: "YES" },
+  );
+  assert.deepEqual(
+    MARKET_REGISTRY.validate("RESULT_BTTS_FT", {}, { label: "YES/1" }),
+    { side: "HOME", btts: "YES" },
+  );
+  assert.deepEqual(
+    MARKET_REGISTRY.validate("RESULT_BTTS_FT", {}, { label: "H/NO" }),
+    { side: "HOME", btts: "NO" },
+  );
+});
+
+test("validate: TOTAL_GOALS_BTTS accepts canonical and API-Sports combo labels", () => {
+  assert.deepEqual(
+    MARKET_REGISTRY.validate("TOTAL_GOALS_BTTS", {}, { label: "Over 2.5/Yes" }),
+    { ouSide: "OVER", line: 2.5, btts: "YES" },
+  );
+  assert.deepEqual(
+    MARKET_REGISTRY.validate("TOTAL_GOALS_BTTS", {}, { label: "U/YES 2.5" }),
+    { ouSide: "UNDER", line: 2.5, btts: "YES" },
+  );
+});
