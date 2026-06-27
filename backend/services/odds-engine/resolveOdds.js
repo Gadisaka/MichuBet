@@ -18,6 +18,103 @@ const MATCH_WINNER_MARKET_NAMES = [
 
 const DOUBLE_CHANCE_MARKET_NAMES = ["Double Chance"];
 
+const COMBO_MARKET_NAMES = Object.freeze([
+  "Results/Both Teams Score",
+  "Result/Both Teams Score",
+  "Result/Total Goals",
+  "Total Goals/Both Teams To Score",
+]);
+
+const SIDE_LABELS = Object.freeze({
+  HOME: ["Home", "1", "H"],
+  DRAW: ["Draw", "X", "D"],
+  AWAY: ["Away", "2", "A"],
+});
+const BTTS_LABELS = Object.freeze({
+  YES: ["Yes", "YES", "Y"],
+  NO: ["No", "NO", "N"],
+});
+const OU_PREFIX = Object.freeze({
+  OVER: ["Over", "O", "OVER"],
+  UNDER: ["Under", "U", "UNDER"],
+});
+
+function titleCaseToken(token) {
+  const t = String(token || "").trim();
+  if (!t) return "";
+  return t.charAt(0).toUpperCase() + t.slice(1).toLowerCase();
+}
+
+function titleCaseComboLabel(label) {
+  return String(label || "")
+    .split("/")
+    .map((part) => titleCaseToken(part))
+    .join("/");
+}
+
+function addComboPair(candidates, left, right) {
+  const l = String(left || "").trim();
+  const r = String(right || "").trim();
+  if (!l || !r) return;
+  for (const pair of [`${l}/${r}`, `${l}/${r}`.toUpperCase(), `${l}/${r}`.toLowerCase()]) {
+    candidates.add(pair);
+    candidates.add(titleCaseComboLabel(pair));
+  }
+}
+
+function expandComboLabelParts(candidates, parts) {
+  if (parts.length !== 2) return;
+  addComboPair(candidates, parts[0], parts[1]);
+  addComboPair(candidates, parts[1], parts[0]);
+}
+
+function expandResultBttsFromParams(candidates, params = {}) {
+  const side = String(params.side || "").toUpperCase().trim();
+  const btts = String(params.btts || "").toUpperCase().trim();
+  const sides = SIDE_LABELS[side] || [];
+  const picks = BTTS_LABELS[btts] || [];
+  for (const s of sides) {
+    for (const p of picks) {
+      addComboPair(candidates, s, p);
+      addComboPair(candidates, p, s);
+    }
+  }
+}
+
+function expandResultTotalFromParams(candidates, params = {}) {
+  const side = String(params.side || "").toUpperCase().trim();
+  const ouSide = String(params.ouSide || "").toUpperCase().trim();
+  const line = Number(params.line);
+  if (!Number.isFinite(line)) return;
+  const sides = SIDE_LABELS[side] || [];
+  const ouPrefixes = OU_PREFIX[ouSide] || [];
+  for (const s of sides) {
+    for (const ou of ouPrefixes) {
+      addComboPair(candidates, s, `${ou} ${line}`);
+      addComboPair(candidates, s, `${ou}${line}`);
+      addComboPair(candidates, `${ou} ${line}`, s);
+      addComboPair(candidates, `${ou}${line}`, s);
+    }
+  }
+}
+
+function expandTotalBttsFromParams(candidates, params = {}) {
+  const ouSide = String(params.ouSide || "").toUpperCase().trim();
+  const btts = String(params.btts || "").toUpperCase().trim();
+  const line = Number(params.line);
+  if (!Number.isFinite(line)) return;
+  const ouPrefixes = OU_PREFIX[ouSide] || [];
+  const picks = BTTS_LABELS[btts] || [];
+  for (const ou of ouPrefixes) {
+    for (const p of picks) {
+      addComboPair(candidates, `${ou} ${line}`, p);
+      addComboPair(candidates, `${ou}${line}`, p);
+      addComboPair(candidates, p, `${ou} ${line}`);
+      addComboPair(candidates, p, `${ou}${line}`);
+    }
+  }
+}
+
 export function buildSelectionCandidates({
   selectionLabel,
   marketCode,
@@ -105,6 +202,26 @@ export function buildSelectionCandidates({
     }
   }
 
+  // Combination markets: the UI uppercases selection labels (e.g. "HOME/YES")
+  // but API-Sports stores mixed-case value strings ("Home/Yes", "1/YES",
+  // "YES/1"). Expand slash-separated aliases the same way Double Chance does.
+  if (raw.includes("/")) {
+    expandComboLabelParts(
+      candidates,
+      raw.split("/").map((p) => p.trim()).filter(Boolean),
+    );
+    candidates.add(titleCaseComboLabel(raw));
+  }
+  if (code === "RESULT_BTTS_FT") {
+    expandResultBttsFromParams(candidates, marketParams);
+  }
+  if (code === "RESULT_TOTAL_FT") {
+    expandResultTotalFromParams(candidates, marketParams);
+  }
+  if (code === "TOTAL_GOALS_BTTS") {
+    expandTotalBttsFromParams(candidates, marketParams);
+  }
+
   return [...candidates].filter(Boolean);
 }
 
@@ -123,6 +240,14 @@ export function buildMarketNameCandidates({ marketLabel, marketCode }) {
   }
   if (code === "DOUBLE_CHANCE" || label.toLowerCase().includes("double chance")) {
     for (const n of DOUBLE_CHANCE_MARKET_NAMES) names.add(n);
+  }
+  if (
+    code === "RESULT_BTTS_FT" ||
+    code === "RESULT_TOTAL_FT" ||
+    code === "TOTAL_GOALS_BTTS" ||
+    label.includes("/")
+  ) {
+    for (const n of COMBO_MARKET_NAMES) names.add(n);
   }
   return [...names].filter(Boolean);
 }

@@ -353,3 +353,123 @@ test("validatePlacementSelections resolves DOUBLE_CHANCE via marketCode + combin
   assert.equal(out.ok, true);
   assert.equal(out.code, "ok");
 });
+
+test("validatePlacementSelections resolves RESULT_BTTS_FT uppercase UI labels against stored Home/Yes values", async () => {
+  const prisma = makePrisma({
+    fixtures: [
+      {
+        id: "fx1",
+        api_fixture_id: 11,
+        status: "NS",
+        start_time: new Date(Date.now() + 60_000),
+      },
+    ],
+    oddLines: [
+      {
+        fixtureId: "fx1",
+        marketName: "Results/Both Teams Score",
+        value: "Home/Yes",
+        odd: 3.2,
+        bookmaker: { api_bookmaker_id: 8 },
+      },
+    ],
+  });
+
+  const out = await validatePlacementSelections({
+    prismaClient: prisma,
+    rawSelections: [
+      {
+        apiFixtureId: 11,
+        marketLabel: "Results/Both Teams Score",
+        marketCode: "RESULT_BTTS_FT",
+        marketParams: { side: "HOME", btts: "YES" },
+        label: "HOME/YES",
+        odds: 3.2,
+      },
+    ],
+    live: false,
+  });
+
+  assert.equal(out.ok, true);
+  assert.equal(out.code, "ok");
+});
+
+test("validatePlacementSelections resolves RESULT_TOTAL_FT compact labels against stored Home/Over 2.5 values", async () => {
+  const prisma = makePrisma({
+    fixtures: [
+      {
+        id: "fx1",
+        api_fixture_id: 11,
+        status: "NS",
+        start_time: new Date(Date.now() + 60_000),
+      },
+    ],
+    oddLines: [
+      {
+        fixtureId: "fx1",
+        marketName: "Result/Total Goals",
+        value: "Home/Over 2.5",
+        odd: 2.8,
+        bookmaker: { api_bookmaker_id: 8 },
+      },
+    ],
+  });
+
+  const out = await validatePlacementSelections({
+    prismaClient: prisma,
+    rawSelections: [
+      {
+        apiFixtureId: 11,
+        marketLabel: "Result/Total Goals",
+        marketCode: "RESULT_TOTAL_FT",
+        marketParams: { side: "HOME", ouSide: "OVER", line: 2.5 },
+        label: "1/O 2.5",
+        odds: 2.8,
+      },
+    ],
+    live: false,
+  });
+
+  assert.equal(out.ok, true);
+  assert.equal(out.code, "ok");
+});
+
+test("validatePlacementSelections resolves TOTAL_GOALS_BTTS uppercase UI labels against stored Over 2.5/Yes values", async () => {
+  const prisma = makePrisma({
+    fixtures: [
+      {
+        id: "fx1",
+        api_fixture_id: 11,
+        status: "NS",
+        start_time: new Date(Date.now() + 60_000),
+      },
+    ],
+    oddLines: [
+      {
+        fixtureId: "fx1",
+        marketName: "Total Goals/Both Teams To Score",
+        value: "Over 2.5/Yes",
+        odd: 2.1,
+        bookmaker: { api_bookmaker_id: 8 },
+      },
+    ],
+  });
+
+  const out = await validatePlacementSelections({
+    prismaClient: prisma,
+    rawSelections: [
+      {
+        apiFixtureId: 11,
+        marketLabel: "Total Goals/Both Teams To Score",
+        marketCode: "TOTAL_GOALS_BTTS",
+        marketParams: { ouSide: "OVER", line: 2.5, btts: "YES" },
+        label: "OVER 2.5/YES",
+        odds: 2.1,
+      },
+    ],
+    live: false,
+  });
+
+  assert.equal(out.ok, true);
+  assert.equal(out.code, "ok");
+});
