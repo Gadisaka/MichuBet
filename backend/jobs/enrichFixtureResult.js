@@ -28,6 +28,7 @@ function periodFromElapsed(elapsed) {
 function normalizeApiEvent(raw, apiHomeTeamId, apiAwayTeamId) {
   const type = String(raw?.type || "").toLowerCase();
   const detail = String(raw?.detail || "").toLowerCase();
+  const comments = String(raw?.comments || "");
   const elapsedMin = Number(raw?.time?.elapsed) || 0;
   const extra = Number(raw?.time?.extra) || 0;
   const minute = elapsedMin + extra;
@@ -39,11 +40,19 @@ function normalizeApiEvent(raw, apiHomeTeamId, apiAwayTeamId) {
         ? "AWAY"
         : null;
 
+  // A penalty SHOOTOUT goal (post-ET tie-breaker) is reported as a normal Goal
+  // event with comments "Penalty Shootout", but it is NOT part of the fixture's
+  // `goals`/`score.fulltime` (which is the 90'/ET score). API-Sports also leaves
+  // `time.elapsed` null for these, so periodFromElapsed would mis-tag them "1H".
+  // Flag + tag them "PEN" so the score-consistency check excludes them and they
+  // never count as regulation goals.
+  const isShootout = /penalty\s*shootout/i.test(comments) || detail.includes("penalty shootout");
+
   if (type === "goal") {
     return {
       type: "GOAL",
       minute,
-      period: periodFromElapsed(elapsedMin),
+      period: isShootout ? "PEN" : periodFromElapsed(elapsedMin),
       team,
       scorer: {
         id: raw?.player?.id != null ? String(raw.player.id) : null,
@@ -58,8 +67,9 @@ function normalizeApiEvent(raw, apiHomeTeamId, apiAwayTeamId) {
       flags: {
         ownGoal: detail.includes("own"),
         penalty: detail.includes("penalty"),
-        varOverturned: /var/i.test(String(raw?.comments || "")) &&
-          /cancel|overturn/i.test(String(raw?.comments || "")),
+        shootout: isShootout,
+        varOverturned: /var/i.test(comments) &&
+          /cancel|overturn/i.test(comments),
       },
     };
   }

@@ -68,6 +68,7 @@ function normalizeGoalEvent(raw, idx) {
     flags: {
       ownGoal: Boolean(raw?.flags?.ownGoal),
       penalty: Boolean(raw?.flags?.penalty),
+      shootout: Boolean(raw?.flags?.shootout) || String(raw?.period || "").toUpperCase() === "PEN",
       varOverturned: Boolean(raw?.flags?.varOverturned),
     },
   };
@@ -98,6 +99,8 @@ function normalizeEvents(rawEvents) {
     const type = String(e?.type || "").toUpperCase();
     if (type === "GOAL") out.push(normalizeGoalEvent(e, i));
     else if (type === "CARD") out.push(normalizeCardEvent(e, i));
+    // Unknown types dropped — this is a normalization layer, not a
+    // pass-through. Reporting tooling reads the raw payload.
   }
   out.sort((a, b) => {
     if (a.minute !== b.minute) return a.minute - b.minute;

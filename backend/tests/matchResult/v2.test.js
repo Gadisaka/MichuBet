@@ -109,6 +109,76 @@ test("terminal fixture WITHOUT a usable score → downgraded to PENDING", () => 
   assert.equal(mr.finality, "PENDING");
 });
 
+test("penalty shootout (PEN): shootout goals excluded → stays FINAL, score = 1-1", () => {
+  // NYC II 1-1 Chattanooga, won on penalties. The fixture score (API `goals`)
+  // is 1-1; /fixtures/events also carries the shootout penalties as Goal events.
+  // Those must NOT count toward the score tally — otherwise every PEN fixture
+  // trips score_event_mismatch and strands.
+  const mr = buildMatchResultV2FromFixture(
+    { id: "fx-pen", status: "PEN", home_score: 1, away_score: 1 },
+    {
+      events: [
+        // two regulation goals — tally to the 1-1 score
+        { type: "GOAL", minute: 30, team: "HOME", scorer: { id: "h1" }, flags: {} },
+        { type: "GOAL", minute: 75, team: "AWAY", scorer: { id: "a1" }, flags: {} },
+        // shootout penalties (flagged + period PEN) — must be ignored
+        { type: "GOAL", minute: 120, period: "PEN", team: "HOME", scorer: { id: "h2" }, flags: { shootout: true, penalty: true } },
+        { type: "GOAL", minute: 120, period: "PEN", team: "HOME", scorer: { id: "h3" }, flags: { shootout: true, penalty: true } },
+        { type: "GOAL", minute: 120, period: "PEN", team: "AWAY", scorer: { id: "a2" }, flags: { shootout: true, penalty: true } },
+      ],
+    },
+  );
+  // Consistent (2 regulation goals == 1-1 once shootout excluded) → FINAL, events kept.
+  assert.equal(mr.finality, "FINAL");
+  assert.equal(mr.scores.fullTime.home, 1);
+  assert.equal(mr.scores.fullTime.away, 1);
+  assert.ok(Array.isArray(mr.events) && mr.events.length === 5);
+});
+
+test("penalty shootout (PEN) without flags but period PEN is still excluded (legacy payload)", () => {
+  const mr = buildMatchResultV2FromFixture(
+    { id: "fx-pen2", status: "PEN", home_score: 0, away_score: 0 },
+    {
+      events: [
+        // 0-0 after ET, decided on pens; only shootout goals present (legacy:
+        // no shootout flag, but period PEN). Must be excluded → no mismatch.
+        { type: "GOAL", minute: 120, period: "PEN", team: "HOME", scorer: { id: "h1" }, flags: {} },
+        { type: "GOAL", minute: 120, period: "PEN", team: "AWAY", scorer: { id: "a1" }, flags: {} },
+        { type: "GOAL", minute: 120, period: "PEN", team: "HOME", scorer: { id: "h2" }, flags: {} },
+      ],
+    },
+  );
+  assert.equal(mr.finality, "FINAL");
+});
+
+test("PEN fixture: shootout goals excluded from consistency check → stays FINAL", () => {
+  // 1-1 after ET, won on penalties. The `goals`/score is 1-1; the shootout
+  // goals (period PEN / flags.shootout) must NOT count toward the score tally,
+  // otherwise every penalty fixture would mismatch and get stranded.
+  const mr = buildMatchResultV2FromFixture(
+    {
+      id: "fx-pen",
+      status: "PEN",
+      home_score: 1,
+      away_score: 1,
+    },
+    {
+      events: [
+        { type: "GOAL", minute: 30, period: "1H", team: "HOME", scorer: { id: "p1" }, flags: {} },
+        { type: "GOAL", minute: 80, period: "2H", team: "AWAY", scorer: { id: "p2" }, flags: {} },
+        // shootout — must be ignored by detectInconsistency
+        { type: "GOAL", minute: 0, period: "PEN", team: "HOME", scorer: { id: "p3" }, flags: { shootout: true, penalty: true } },
+        { type: "GOAL", minute: 0, period: "PEN", team: "HOME", scorer: { id: "p4" }, flags: { shootout: true, penalty: true } },
+        { type: "GOAL", minute: 0, period: "PEN", team: "AWAY", scorer: { id: "p5" }, flags: { shootout: true, penalty: true } },
+      ],
+    },
+  );
+  assert.equal(mr.finality, "FINAL");        // regulation tally 1-1 == score 1-1
+  assert.notEqual(mr.events, null);          // consistent → events kept
+  // shootout flag inferred from period even if flags omitted
+  assert.equal(_internals.detectInconsistency(mr), null);
+});
+
 test("hash is stable under event reorder (sorted by minute, id)", () => {
   const base = {
     id: "fx-5",

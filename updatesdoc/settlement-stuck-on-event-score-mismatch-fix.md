@@ -12,10 +12,11 @@ The V2 result builder runs a consistency check (`detectInconsistency`) on every 
 
 That is too aggressive. A mismatch between events and score means **the event feed is unreliable** — it does **not** mean the score is wrong. The final score (`goals` / `score.fulltime` on a terminal fixture) is the authoritative field. Downgrading the whole fixture stranded every market on it — including markets that only read the score and never look at events.
 
-Two independent real-world triggers produced the same hang:
+Three independent real-world triggers produced the same hang:
 
 1. **Sparse / incomplete event feed** (lower leagues). Example: API-Football fixture `1524947` (USL League Two, West Chester United 3–1 Lone Star II, status `FT`) returned a **correct 3–1 score** but only **ONE goal event**. Tally `1-0` vs score `3-1` → mismatch → whole fixture PENDING → the `Double Chance: 1X` leg (West Chester won, plainly WON) never settled.
 2. **Own goals** (e.g. World Cup group games with an own goal). The own-goal credited-team flip can leave the event tally off-by-one against the score → same whole-fixture PENDING → Match Winner legs stuck even though the score was correct.
+3. **Penalty-shootout games** (`status = PEN`). Example: API-Football fixture `1513170` (MLS Next Pro, New York City II vs Chattanooga, `PEN`, score `1-1`). The shootout goals appear in the events feed but are **not** part of the `1-1` score, so they inflate the event tally → mismatch → fixture stuck. See the dedicated section below — this needed a second, targeted fix on top of the scoped downgrade.
 
 **The fix:** on an event/score mismatch, keep the fixture `FINAL` (trust the score) and **null only the events**. Score-derived markets settle normally; event-derived markets (goalscorer, correct-score-by-events) fail `canEvaluate()` and VOID/refund — the correct fail-closed outcome. The full PENDING downgrade is now reserved for the one case that genuinely can't be graded: a terminal fixture with **no usable score** (`final_without_scores`).
 
@@ -100,6 +101,45 @@ Note: `events = null` (not `[]`). The presence gate in V2 treats `null` as "even
 
 - Replaced the old `"inconsistent events → PENDING"` test with `"inconsistent events → stays FINAL, events nulled"` (3–1 score, one event): asserts `finality === "FINAL"`, scores preserved, `events === null`.
 - Added `"terminal fixture WITHOUT a usable score → PENDING"` to lock the `final_without_scores` branch.
+- Added `"penalty shootout (PEN): shootout goals excluded → stays FINAL, score = 1-1"` (flagged shootout events) and `"… without flags but period PEN is still excluded (legacy payload)"` (covers fixtures enriched before the shootout flag existed).
+
+---
+
+## Second fix — penalty-shootout (and extra-time) games
+
+A `PEN` fixture stayed stuck even with the scoped downgrade, because the **event/score mismatch was being created by the shootout itself**, not by a bad feed.
+
+### Root cause
+
+- A finished penalty game has `status = PEN` and `goals`/`score.fulltime = 1-1` (the 90'+ET score). The penalty-shootout result lives in `score.penalty` and is **not** added to `goals` (correct — 1X2 / Match Winner settle on regulation+ET, a 1-1 game won on pens is a **draw** for those markets).
+- API-Sports reports each **shootout penalty as a normal `Goal` event** with `comments: "Penalty Shootout"` and `time.elapsed = null`. In `enrichFixtureResult.normalizeApiEvent`, `Number(null) || 0 = 0` → `periodFromElapsed(0)` tagged them **`"1H"`**, so they were counted as regulation goals.
+- Result: a 1-1 game with a 4-3 shootout tallied events like `5-4` vs score `1-1` → `score_event_mismatch` → fixture stuck (pre-fix) or events needlessly nulled (post-scoped-fix). Either way the symptom was a stuck `PEN` game.
+
+### The fix (two files)
+
+**[backend/jobs/enrichFixtureResult.js](../backend/jobs/enrichFixtureResult.js)** — detect shootout goals at ingestion and tag them so they're never mistaken for regulation goals:
+
+```js
+const isShootout = /penalty\s*shootout/i.test(comments) || detail.includes("penalty shootout");
+// in the GOAL branch:
+period: isShootout ? "PEN" : periodFromElapsed(elapsedMin),
+flags: { ownGoal, penalty, shootout: isShootout, varOverturned },
+```
+
+**[backend/services/matchResult/v2.js](../backend/services/matchResult/v2.js)** — carry the flag through `normalizeGoalEvent` (also infer it from `period === "PEN"` for already-stored payloads) and exclude shootout goals from the score reconciliation:
+
+```js
+const liveGoals = payload.events.filter(
+  (e) => e.type === "GOAL"
+      && !e.flags?.varOverturned
+      && !e.flags?.shootout
+      && e.period !== "PEN",
+);
+```
+
+Now a `PEN` fixture's regulation tally (`1-1`) matches its score (`1-1`) → **consistent → stays FINAL, events kept**, and Match Winner / O/U / Double Chance settle on the regulation result (1-1 → draw). Extra-time games (`AET`) were already correct — ET goals *are* part of `goals` and are tagged `1ET`/`2ET`, so they count normally.
+
+> Settlement semantics confirmed: prematch 1X2 / Match Winner / Over-Under settle on the **regulation+ET score** (`goals`), NOT on the penalty-shootout winner. A 1-1 game won on penalties grades the Match Winner leg as a **draw**. Markets that pay the shootout winner ("To Qualify", "Winner incl. penalties") are not offered, so no special penalty-winner grading is needed.
 
 ---
 
@@ -169,6 +209,28 @@ The fixtures are already terminal with valid scores, so once the fix is deployed
      node -e "import('./jobs/settlementRetry.js').then(m=>m.runSettlementRetry()).then(r=>{console.log(r);process.exit(0)})"
    ```
 
+### Penalty-shootout fixtures — re-enrich before re-settle
+
+For a stuck `PEN` fixture whose `events_payload` was written by the **old** normalizer (shootout goals saved as `period:"1H"`, no `shootout` flag), re-settling alone still works via the scoped downgrade (events get nulled, score-only markets settle on the regulation score). But to get the **clean** behavior (consistency check passes, events kept), **re-enrich first** so the shootout goals are re-tagged `PEN`, then re-settle:
+
+```
+docker compose -f docker-compose.prod.yml exec backend node -e '
+Promise.all([
+  import("./jobs/enrichFixtureResult.js"),
+  import("./services/ticketSettlementService.js"),
+  import("./Config/db.js"),
+]).then(async ([e,s,{prisma}])=>{
+  const f=await prisma.fixture.findFirst({where:{api_fixture_id:1513170},select:{id:true}});
+  if(!f){console.log("no row");process.exit(0);}
+  console.log("enrich:",JSON.stringify(await e.enrichFixtureResult(f.id,{force:true})));
+  const r=await s.settleFixture(f.id,{force:true});
+  console.log("settle:",JSON.stringify({graded:r.gradingCompleted,pending:r.pendingLegsRemaining,won:r.ticketsWon}));
+  process.exit(0);
+});'
+```
+
+A 1-1 game won on penalties settles its Match Winner leg as a **draw** (regulation result). Bets on "1"/"2" lose; bets on "X" win.
+
 ### Note on the retry job (no bug)
 
 During the incident an early `runSettlementRetry()` returned `scanned=0`. This was **not** a retry-job bug: it ran *before* the fix was deployed, and by the time it ran the fixtures were not yet in the "terminal + pending" backlog state it scans. After deploy, the worker's normal settlement pass graded the fixtures on its own (the manual `force` re-settle then found nothing left to do — `selectionsUpdated=0`, idempotent no-op). The `start_time` values were valid and recent, so the `start_time: { gte: now-14d }` window was never the problem. The retry net works as designed.
@@ -201,9 +263,11 @@ So after the targeted re-settle (step 2 above), the three legs grade WON, the `P
 
 | File | Change |
 |---|---|
-| `backend/services/matchResult/v2.js` | Scoped the `detectInconsistency` handling: `final_without_scores` → PENDING; any other mismatch → keep `FINAL`, set `events = null`. |
-| `backend/tests/matchResult/v2.test.js` | Updated the inconsistency test to assert FINAL + nulled events; added a `final_without_scores → PENDING` test. |
-| `backend/scripts/diagFixture.mjs` | New one-off diagnostic: dumps score + goal events + raw/credited tallies for a fixture id. |
+| `backend/services/matchResult/v2.js` | Scoped `detectInconsistency` handling: `final_without_scores` → PENDING; any other mismatch → keep `FINAL`, set `events = null`. Excluded penalty-shootout goals (`flags.shootout` / `period === "PEN"`) from the score tally; carry `shootout` through `normalizeGoalEvent`. Accurate `logInconsistency` messages per branch. |
+| `backend/jobs/enrichFixtureResult.js` | Detect penalty-shootout goals (`comments` "Penalty Shootout") at ingestion → tag `period = "PEN"` + `flags.shootout = true` so they never count as regulation goals. |
+| `backend/tests/matchResult/v2.test.js` | Inconsistency test now asserts FINAL + nulled events; added `final_without_scores → PENDING` and `PEN shootout goals excluded → FINAL` tests. |
+| `backend/scripts/diagFixture.mjs` | One-off diagnostic: dumps score + goal events + raw/credited tallies for a fixture id. |
+| `backend/scripts/diagStuckTicket.mjs` | One-off diagnostic: for a coupon (or all pending legs), prints each leg's fixture status/score/settled/graded state. |
 
 No schema change. No env change. Backend + worker deploy only.
 
