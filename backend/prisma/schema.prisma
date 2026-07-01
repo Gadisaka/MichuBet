@@ -660,6 +660,25 @@ model CashierLoginAttempt {
   @@map("cashier_login_attempts")
 }
 
+// InOut Games seamless-wallet session tokens. A token is issued when a player
+// launches a game and maps back to the user for the init/bet/withdraw/rollback
+// webhooks. Rows are kept (not hard-expired) so delayed withdraw/rollback
+// resends — up to 3 days per the provider spec — can still resolve the user.
+// `expires_at` is advisory (for future cleanup); webhook security relies on the
+// HMAC signature, not token expiry.
+model InoutGameSession {
+  id         String    @id @default(uuid()) @map("_id")
+  token      String    @unique
+  user_id    String
+  currency   String    @default("ETB")
+  game_mode  String?
+  created_at DateTime  @default(now())
+  expires_at DateTime?
+
+  @@index([user_id])
+  @@map("inout_game_sessions")
+}
+
 // Key-value platform settings (e.g. ticket cancel window) — updated by admin via API
 model Setting {
   id         String   @id @default(uuid()) @map("_id")

@@ -29,6 +29,8 @@ import bonusesRoutes from "./routes/bonuses.js";
 import notificationsRoutes from "./routes/notifications.js";
 import adminNotificationsRoutes from "./routes/adminNotifications.js";
 import adminCashierDevicesRoutes from "./routes/adminCashierDevices.js";
+import inoutRoutes from "./routes/inout.js";
+import casinoRoutes from "./routes/casino.js";
 import { startCronJobs } from "./jobs/index.js";
 import { runBootstrap } from "./jobs/bootstrap.js";
 import { authenticateToken } from "./middleware/auth.js";
@@ -39,6 +41,11 @@ import { createCorsOptions } from "./lib/corsConfig.js";
 const app = express();
 const server = http.createServer(app);
 const port = Number(process.env.PORT || 3000);
+
+// InOut webhooks need the raw request body for HMAC signature verification,
+// so this router (which uses its own express.raw parser) MUST be mounted
+// before the global express.json() below.
+app.use("/api/integrations/inout", inoutRoutes);
 
 app.use(express.json());
 
@@ -75,6 +82,7 @@ app.use("/api/admin/api-config", authenticateToken, apiConfigRoutes);
 app.use("/api/agent", authenticateToken, agentRoutes);
 app.use("/api/tickets", authenticateToken, ticketsRoutes);
 app.use("/api/player", authenticateToken, playerRoutes);
+app.use("/api/casino", authenticateToken, casinoRoutes);
 app.use("/api/notifications", authenticateToken, notificationsRoutes);
 app.use("/api/admin/notifications", authenticateToken, adminNotificationsRoutes);
 app.use(
