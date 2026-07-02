@@ -15,6 +15,7 @@ import {
   getInoutOperatorId,
   isInoutLaunchConfigured,
   INOUT_DEFAULT_CURRENCY,
+  INOUT_DEFAULT_COUNTRY,
   INOUT_LAUNCH_BASE_URL,
 } from "../Config/inout.js";
 import { normalizeLang } from "../lib/inoutLang.js";
@@ -69,11 +70,12 @@ export async function createInoutLaunch(req, res) {
       authToken: token,
       currency: INOUT_DEFAULT_CURRENCY,
       lang: normalizeLang(lang),
+      userCountryCode: (userCountryCode
+        ? String(userCountryCode)
+        : INOUT_DEFAULT_COUNTRY
+      ).toUpperCase(),
       adaptive: "true",
     });
-    if (userCountryCode) {
-      params.set("userCountryCode", String(userCountryCode).toUpperCase());
-    }
     if (lobbyUrl) {
       params.set("lobbyUrl", String(lobbyUrl));
     }

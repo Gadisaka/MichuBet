@@ -21,6 +21,7 @@ import {
   getInoutOperatorId,
   isInoutLaunchConfigured,
   INOUT_DEMO_OPERATOR_ID,
+  INOUT_DEFAULT_COUNTRY,
   INOUT_LAUNCH_BASE_URL,
 } from "../Config/inout.js";
 
@@ -67,11 +68,18 @@ router.get("/inout/demo-launch", (req, res) => {
     return res.status(400).json({ message: "gameMode is required" });
   }
 
+  const countryCode = (
+    typeof req.query.userCountryCode === "string" && req.query.userCountryCode
+      ? req.query.userCountryCode
+      : INOUT_DEFAULT_COUNTRY
+  ).toUpperCase();
+
   const params = new URLSearchParams({
     gameMode,
     operatorId: INOUT_DEMO_OPERATOR_ID,
     currency: "DEMO",
     lang: normalizeLang(req.query.lang),
+    userCountryCode: countryCode,
     adaptive: "true",
   });
 

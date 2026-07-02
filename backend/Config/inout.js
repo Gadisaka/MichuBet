@@ -15,6 +15,14 @@
 export const INOUT_DEFAULT_CURRENCY =
   process.env.INOUT_DEFAULT_CURRENCY || "ETB";
 
+/**
+ * Default ISO country code sent on launch URLs. InOut requires `userCountryCode`
+ * for both real and demo launches; we default to Ethiopia and allow per-request
+ * overrides.
+ */
+export const INOUT_DEFAULT_COUNTRY =
+  (process.env.INOUT_DEFAULT_COUNTRY || "ET").toUpperCase();
+
 export const INOUT_LAUNCH_BASE_URL =
   process.env.INOUT_LAUNCH_BASE_URL || "https://api.inout.games/api/launch";
 
