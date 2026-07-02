@@ -17,6 +17,7 @@ import {
   INOUT_GAMES_CACHE_TTL,
 } from "../lib/inoutCatalogCache.js";
 import { normalizeLang } from "../lib/inoutLang.js";
+import { resolveCasinoEnabled } from "../lib/casinoSettings.js";
 import {
   getInoutOperatorId,
   isInoutLaunchConfigured,
@@ -26,6 +27,21 @@ import {
 } from "../Config/inout.js";
 
 const router = express.Router();
+
+/**
+ * GET /api/casino/status — public master switch state for the lobby.
+ * When `enabled` is false the frontend renders a blank screen.
+ */
+router.get("/status", async (_req, res) => {
+  try {
+    const enabled = await resolveCasinoEnabled(prisma);
+    return res.json({ enabled });
+  } catch (error) {
+    console.error("[casinoPublic] status error:", error);
+    // Fail open so a settings/db hiccup doesn't black out the lobby.
+    return res.json({ enabled: true });
+  }
+});
 
 /** Shape returned to the frontend (no internal/admin fields). */
 function toPublicGame(g) {

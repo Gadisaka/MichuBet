@@ -13,8 +13,61 @@ import { authorizePermission } from "../middleware/auth.js";
 import syncInoutCatalog from "../jobs/syncInoutCatalog.js";
 import { deleteCache } from "../services/cacheService.js";
 import { INOUT_GAMES_CACHE_KEY } from "../lib/inoutCatalogCache.js";
+import {
+  CASINO_ENABLED_SETTING_KEY,
+  resolveCasinoEnabled,
+} from "../lib/casinoSettings.js";
+import { logAuditEvent } from "../lib/auditLog.js";
 
 const router = express.Router();
+
+// ─── Master switch (turns the whole player /casino page on/off) ────────────
+
+router.get("/status", authorizePermission("casino:read"), async (_req, res) => {
+  try {
+    const enabled = await resolveCasinoEnabled(prisma);
+    return res.json({ enabled });
+  } catch (error) {
+    console.error("[casinoAdmin] status error:", error);
+    return res.status(500).json({ message: "Failed to load casino status" });
+  }
+});
+
+router.patch(
+  "/status",
+  authorizePermission("casino:manage"),
+  async (req, res) => {
+    try {
+      const { enabled } = req.body ?? {};
+      if (typeof enabled !== "boolean") {
+        return res.status(400).json({ message: "enabled must be a boolean" });
+      }
+
+      const before = await resolveCasinoEnabled(prisma);
+      const value = enabled ? "true" : "false";
+      await prisma.setting.upsert({
+        where: { key: CASINO_ENABLED_SETTING_KEY },
+        create: { key: CASINO_ENABLED_SETTING_KEY, value },
+        update: { value },
+      });
+
+      await logAuditEvent({
+        req,
+        action: "SETTINGS_CASINO_ENABLED_UPDATED",
+        module: "SETTINGS",
+        entityType: "SETTING",
+        entityId: CASINO_ENABLED_SETTING_KEY,
+        before: { enabled: before },
+        after: { enabled },
+      });
+
+      return res.json({ enabled });
+    } catch (error) {
+      console.error("[casinoAdmin] update status error:", error);
+      return res.status(500).json({ message: "Failed to update casino status" });
+    }
+  },
+);
 
 router.get("/games", authorizePermission("casino:read"), async (_req, res) => {
   try {

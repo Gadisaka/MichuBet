@@ -12,6 +12,7 @@ import { topHeaderData, topNavItems } from "../data/homepageData";
 import { useTranslation } from "../i18n/LanguageContext.jsx";
 import {
   fetchCasinoGames,
+  fetchCasinoStatus,
   fetchInoutDemoLaunchUrl,
   fetchInoutLaunchUrl,
   hasAuthToken,
@@ -74,10 +75,25 @@ function Casino() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  // null = still checking the master switch; false = casino off (black screen).
+  const [casinoEnabled, setCasinoEnabled] = useState(null);
+
   const [frame, setFrame] = useState(null);
   const [launching, setLaunching] = useState(false);
 
   useEffect(() => {
+    const ac = new AbortController();
+    fetchCasinoStatus({ signal: ac.signal })
+      .then((s) => setCasinoEnabled(s.enabled))
+      .catch((err) => {
+        if (err?.name === "AbortError") return;
+        setCasinoEnabled(true);
+      });
+    return () => ac.abort();
+  }, []);
+
+  useEffect(() => {
+    if (casinoEnabled !== true) return;
     const ac = new AbortController();
     setLoading(true);
     fetchCasinoGames({ signal: ac.signal })
@@ -91,7 +107,7 @@ function Casino() {
       })
       .finally(() => setLoading(false));
     return () => ac.abort();
-  }, []);
+  }, [casinoEnabled]);
 
   const handlePlay = useCallback(
     async (game) => {
@@ -128,6 +144,11 @@ function Casino() {
     },
     [launching, language],
   );
+
+  // Master switch off (or still resolving) → blank black screen only.
+  if (casinoEnabled !== true) {
+    return <div className="fixed inset-0 bg-black" />;
+  }
 
   return (
     <PageContainer>

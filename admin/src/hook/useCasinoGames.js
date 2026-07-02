@@ -26,6 +26,29 @@ export function useUpdateCasinoGameMutation() {
   });
 }
 
+/** Master switch state — whether the player /casino page is on (casino:read). */
+export function useCasinoStatusQuery() {
+  return useQuery({
+    queryKey: ["admin", "casino", "status"],
+    queryFn: () => apiRequest(`${BASE}/status`),
+  });
+}
+
+/** Turn the whole player /casino page on/off (casino:manage). */
+export function useUpdateCasinoStatusMutation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (enabled) =>
+      apiRequest(`${BASE}/status`, {
+        method: "PATCH",
+        body: JSON.stringify({ enabled }),
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["admin", "casino", "status"] });
+    },
+  });
+}
+
 /** Re-sync the catalog from InOut (casino:manage). */
 export function useSyncCasinoCatalogMutation() {
   const qc = useQueryClient();

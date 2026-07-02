@@ -742,6 +742,23 @@ export async function markAllNotificationsRead() {
 }
 
 /**
+ * GET /api/casino/status — public master switch for the casino lobby.
+ * Returns { enabled }. Fails open (enabled: true) on network error.
+ */
+export async function fetchCasinoStatus(options = {}) {
+  const { signal } = options;
+  try {
+    const res = await fetch(`${API_URL}/api/casino/status`, { signal });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) return { enabled: true };
+    return { enabled: data.enabled !== false };
+  } catch (err) {
+    if (err?.name === "AbortError") throw err;
+    return { enabled: true };
+  }
+}
+
+/**
  * GET /api/casino/games — public list of enabled InOut games (ordered).
  * Returns an array of { gameMode, title, description, iconUrl, multiplayer, rtp }.
  */

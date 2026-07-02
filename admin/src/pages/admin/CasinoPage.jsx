@@ -5,8 +5,10 @@ import PanelCard from "../../components/ui/PanelCard";
 import PrimaryButton from "../../components/ui/PrimaryButton";
 import {
   useCasinoGamesQuery,
+  useCasinoStatusQuery,
   useSyncCasinoCatalogMutation,
   useUpdateCasinoGameMutation,
+  useUpdateCasinoStatusMutation,
 } from "../../hook/useCasinoGames";
 
 export default function CasinoPage() {
@@ -87,6 +89,8 @@ export default function CasinoPage() {
         </div>
       )}
 
+      <MasterSwitchPanel />
+
       <div className="mb-4 grid grid-cols-3 gap-3">
         <StatCard label="Total games" value={stats.total} />
         <StatCard label="Enabled" value={stats.enabled} accent="green" />
@@ -157,6 +161,77 @@ export default function CasinoPage() {
         )}
       </PanelCard>
     </AdminShell>
+  );
+}
+
+function MasterSwitchPanel() {
+  const status = useCasinoStatusQuery();
+  const mutation = useUpdateCasinoStatusMutation();
+  const [error, setError] = useState("");
+
+  const enabled = status.data?.enabled;
+
+  async function toggle() {
+    setError("");
+    try {
+      await mutation.mutateAsync(!enabled);
+    } catch (err) {
+      setError(err?.message || "Failed to update casino status");
+    }
+  }
+
+  return (
+    <PanelCard className="mb-4 p-4">
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <h3 className="text-sm font-semibold uppercase tracking-wide">
+            Casino availability
+          </h3>
+          <p className="mt-1 text-xs text-[var(--muted)]">
+            Master switch for the player <code>/casino</code> page. When turned
+            off, players see a blank screen — this is independent of InOut and
+            does not change the catalog below.
+          </p>
+          {error && (
+            <p className="mt-1 text-xs font-medium text-[var(--danger)]">
+              {error}
+            </p>
+          )}
+        </div>
+
+        <div className="flex items-center gap-3">
+          {status.isLoading ? (
+            <span className="text-xs text-[var(--muted)]">Loading…</span>
+          ) : (
+            <>
+              <span
+                className={`text-xs font-semibold ${
+                  enabled ? "text-green-600" : "text-[var(--danger)]"
+                }`}
+              >
+                {enabled ? "Casino is ON" : "Casino is OFF"}
+              </span>
+              <button
+                type="button"
+                onClick={toggle}
+                disabled={mutation.isPending || status.isError}
+                className={`relative inline-flex h-7 w-13 shrink-0 items-center rounded-full transition-colors disabled:opacity-50 ${
+                  enabled ? "bg-[var(--accent)]" : "bg-[var(--border)]"
+                }`}
+                style={{ width: "3.25rem" }}
+                aria-label={enabled ? "Turn casino off" : "Turn casino on"}
+              >
+                <span
+                  className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform ${
+                    enabled ? "translate-x-7" : "translate-x-1"
+                  }`}
+                />
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+    </PanelCard>
   );
 }
 
