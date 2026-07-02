@@ -3,6 +3,7 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 import { enforcePlayerSession } from './utils/authSession'
 import Home from './pages/Home'
 import Live from './pages/Live'
+import Casino from './pages/Casino'
 import Login from './pages/Login'
 import Register from './pages/Register'
 import BetHistory from './pages/BetHistory'
@@ -24,6 +25,7 @@ function App() {
     <Routes>
       <Route path="/" element={<Home />} />
       <Route path="/live" element={<Live />} />
+      <Route path="/casino" element={<Casino />} />
       <Route path="/matchdetail/:id" element={<Home />} />
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />

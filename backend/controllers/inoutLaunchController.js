@@ -17,20 +17,7 @@ import {
   INOUT_DEFAULT_CURRENCY,
   INOUT_LAUNCH_BASE_URL,
 } from "../Config/inout.js";
-
-/**
- * InOut supports a fixed set of language codes; anything else falls back to
- * English on their side. Amharic (our `am`) is unsupported, so we send `en`.
- */
-function normalizeLang(lang) {
-  const supported = new Set([
-    "az", "bn", "bd", "en", "es", "hi", "id", "kk", "kz",
-    "mx", "ch", "pe", "ec", "co", "pt", "br", "ru", "tr",
-    "uk", "ua", "uz", "zh",
-  ]);
-  const l = String(lang || "").toLowerCase();
-  return supported.has(l) ? l : "en";
-}
+import { normalizeLang } from "../lib/inoutLang.js";
 
 /** Session token validity window (advisory; see schema note). */
 const SESSION_TTL_MS = 24 * 60 * 60 * 1000;

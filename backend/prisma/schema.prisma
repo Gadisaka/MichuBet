@@ -679,6 +679,28 @@ model InoutGameSession {
   @@map("inout_game_sessions")
 }
 
+// InOut Games catalog. Synced from the provider's gameModesList endpoint.
+// Provider fields (title/description/icon/rtp/multiplayer) are refreshed on
+// every sync; the admin-controlled `enabled` and `sort_order` are set only on
+// create and preserved across re-syncs so curation is not clobbered.
+model InoutGame {
+  id          String   @id @default(uuid()) @map("_id")
+  game_mode   String   @unique
+  title       String
+  description String?
+  icon_url    String?
+  multiplayer Boolean  @default(false)
+  rtp         String?
+  enabled     Boolean  @default(true)
+  sort_order  Int      @default(0)
+  raw         Json?
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+
+  @@index([enabled])
+  @@map("inout_games")
+}
+
 // Key-value platform settings (e.g. ticket cancel window) — updated by admin via API
 model Setting {
   id         String   @id @default(uuid()) @map("_id")

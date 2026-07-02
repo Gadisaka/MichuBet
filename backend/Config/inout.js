@@ -18,6 +18,18 @@ export const INOUT_DEFAULT_CURRENCY =
 export const INOUT_LAUNCH_BASE_URL =
   process.env.INOUT_LAUNCH_BASE_URL || "https://api.inout.games/api/launch";
 
+/** Base URL for InOut REST endpoints (e.g. gameModesList). */
+export const INOUT_API_BASE_URL =
+  process.env.INOUT_API_BASE_URL || "https://api.inout.games/api";
+
+/**
+ * Fixed demo operator id published in InOut's frontend docs. Demo/spectator
+ * launches use this operator with `currency=DEMO`; our own operator id is
+ * passed as `themeId` for branded loading screens.
+ */
+export const INOUT_DEMO_OPERATOR_ID =
+  process.env.INOUT_DEMO_OPERATOR_ID || "ee2013ed-e1f0-4d6e-97d2-f36619e2eb52";
+
 export const INOUT_ALIAS = process.env.INOUT_ALIAS || "";
 
 /** @returns {string} Operator ID (UUID) issued by InOut. */

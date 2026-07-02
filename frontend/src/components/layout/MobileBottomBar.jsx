@@ -101,6 +101,7 @@ function MobileBottomBar({
           onClick={() => {
             if (item.id === "menu") setMenuOpen(true);
             if (item.id === "live") navigate("/live");
+            if (item.id === "games") navigate("/casino");
             if (item.id === "slip") setSlipOpen(true);
             if (item.id === "leagues") {
               if (leaguesSidebarProps) setLeaguesOpen(true);

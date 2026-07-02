@@ -23,6 +23,15 @@ export const translations = Object.freeze({
       live: "LIVE",
       games: "GAMES",
     }),
+    casino: Object.freeze({
+      eyebrow: "Casino",
+      title: "Play instant games",
+      play: "Play",
+      demo: "Demo",
+      loading: "Loading games…",
+      empty: "No games available right now.",
+      loginRequired: "Please log in to play for real.",
+    }),
     header: Object.freeze({
       searchPlaceholder: "Search events",
       searchAria: "Search",
@@ -138,6 +147,15 @@ export const translations = Object.freeze({
       home: "መነሻ",
       live: "ቀጥታ",
       games: "ጨዋታዎች",
+    }),
+    casino: Object.freeze({
+      eyebrow: "ካዚኖ",
+      title: "ፈጣን ጨዋታዎችን ይጫወቱ",
+      play: "ተጫወት",
+      demo: "ሙከራ",
+      loading: "ጨዋታዎችን በመጫን ላይ…",
+      empty: "አሁን ምንም ጨዋታ የለም።",
+      loginRequired: "በእውነተኛ ገንዘብ ለመጫወት እባክዎ ይግቡ።",
     }),
     header: Object.freeze({
       searchPlaceholder: "ክስተቶችን ፈልግ",

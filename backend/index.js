@@ -31,6 +31,8 @@ import adminNotificationsRoutes from "./routes/adminNotifications.js";
 import adminCashierDevicesRoutes from "./routes/adminCashierDevices.js";
 import inoutRoutes from "./routes/inout.js";
 import casinoRoutes from "./routes/casino.js";
+import casinoPublicRoutes from "./routes/casinoPublic.js";
+import casinoAdminRoutes from "./routes/casinoAdmin.js";
 import { startCronJobs } from "./jobs/index.js";
 import { runBootstrap } from "./jobs/bootstrap.js";
 import { authenticateToken } from "./middleware/auth.js";
@@ -62,6 +64,7 @@ app.use("/api/dummy", dummyMatchesRoutes);
 app.use("/api/football", footballPublicRoutes);
 app.use("/api/bets", betsRoutes);
 app.use("/api/cms", cmsPublicRoutes);
+app.use("/api/casino", casinoPublicRoutes);
 
 // --- Authenticated ---
 app.use("/api/admin/users", authenticateToken, usersRoutes);
@@ -83,6 +86,7 @@ app.use("/api/agent", authenticateToken, agentRoutes);
 app.use("/api/tickets", authenticateToken, ticketsRoutes);
 app.use("/api/player", authenticateToken, playerRoutes);
 app.use("/api/casino", authenticateToken, casinoRoutes);
+app.use("/api/admin/casino", authenticateToken, casinoAdminRoutes);
 app.use("/api/notifications", authenticateToken, notificationsRoutes);
 app.use("/api/admin/notifications", authenticateToken, adminNotificationsRoutes);
 app.use(
