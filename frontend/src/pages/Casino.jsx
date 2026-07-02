@@ -6,7 +6,6 @@ import SiteFooter from "../components/layout/SiteFooter";
 import TopHeader from "../components/layout/TopHeader";
 import MobileBottomBar from "../components/layout/MobileBottomBar";
 import AppIcon from "../components/common/AppIcon";
-import LogoImg from "../components/common/LogoImg";
 import GameFrame from "../components/casino/GameFrame";
 import { topHeaderData, topNavItems } from "../data/homepageData";
 import { useTranslation } from "../i18n/LanguageContext.jsx";
@@ -21,14 +20,13 @@ import {
 function GameCard({ game, onPlay, onDemo, t }) {
   return (
     <div className="group flex flex-col overflow-hidden rounded-2xl border border-white/8 bg-gradient-to-br from-[#111111]/92 to-[#000000]/92 transition-all hover:ring-1 hover:ring-(--sb-accent-fill)/40">
-      <div className="relative aspect-square w-full overflow-hidden bg-[#0a0a0a]">
+      <div className="relative aspect-[3/4] w-full overflow-hidden bg-[#0a0a0a]">
         {game.iconUrl ? (
-          <LogoImg
+          <img
             src={game.iconUrl}
             alt={game.title}
-            size={256}
-            className="h-full w-full"
-            rounded="rounded-none"
+            loading="lazy"
+            className="h-full w-full object-contain p-1"
           />
         ) : (
           <div className="flex h-full w-full items-center justify-center text-[#3a3a3a]">
@@ -40,28 +38,32 @@ function GameCard({ game, onPlay, onDemo, t }) {
             RTP {game.rtp}
           </span>
         ) : null}
+
+        {/* Bottom button bar over the banner (glass effect). */}
+        <div className="pointer-events-none absolute inset-x-2 bottom-2">
+          <div className="pointer-events-auto grid grid-cols-2 gap-1.5 rounded-xl border border-white/25 bg-white/12 p-1.5 backdrop-blur-md">
+            <button
+              type="button"
+              onClick={() => onPlay(game)}
+              className="cursor-pointer rounded-lg border-0 bg-(--sb-accent-fill) px-2 py-1.5 text-[12px] font-bold text-[#000000] transition-all hover:brightness-110"
+            >
+              {t("casino.play")}
+            </button>
+            <button
+              type="button"
+              onClick={() => onDemo(game)}
+              className="cursor-pointer rounded-lg border border-white/20 bg-black/20 px-2 py-1.5 text-[12px] font-semibold text-[#ffffff] transition-all hover:bg-black/35"
+            >
+              {t("casino.demo")}
+            </button>
+          </div>
+        </div>
       </div>
 
       <div className="flex flex-1 flex-col gap-2 p-2.5">
         <h3 className="truncate text-[13px] font-semibold text-[#f6f9ff]">
           {game.title}
         </h3>
-        <div className="mt-auto grid grid-cols-2 gap-1.5">
-          <button
-            type="button"
-            onClick={() => onPlay(game)}
-            className="cursor-pointer rounded-xl border-0 bg-(--sb-accent-fill) px-2 py-1.5 text-[12px] font-bold text-[#000000] transition-all hover:brightness-110"
-          >
-            {t("casino.play")}
-          </button>
-          <button
-            type="button"
-            onClick={() => onDemo(game)}
-            className="cursor-pointer rounded-xl border border-white/12 bg-transparent px-2 py-1.5 text-[12px] font-semibold text-[#ffffff] transition-all hover:bg-[#111111]"
-          >
-            {t("casino.demo")}
-          </button>
-        </div>
       </div>
     </div>
   );
