@@ -21,6 +21,8 @@
  *   INOUT_TEST_PASSWORD  (default "test1234")
  *   INOUT_TEST_BALANCE   (default 1000)
  *   INOUT_DEFAULT_CURRENCY (default ETB)
+ *   INOUT_TEST_GAME_MODE (default "plinko" — InOut's integration test guide
+ *                         expects the token to come from a Plinko1000 launch)
  */
 import crypto from "node:crypto";
 import bcrypt from "bcrypt";
@@ -31,6 +33,7 @@ const NAME = process.env.INOUT_TEST_NAME || "InOut Test Player";
 const PASSWORD = process.env.INOUT_TEST_PASSWORD || "test1234";
 const BALANCE = Number(process.env.INOUT_TEST_BALANCE || 1000);
 const CURRENCY = process.env.INOUT_DEFAULT_CURRENCY || "ETB";
+const GAME_MODE = process.env.INOUT_TEST_GAME_MODE || "plinko";
 const EMAIL = `${PHONE}@player.local`;
 
 async function run() {
@@ -79,7 +82,7 @@ async function run() {
       token,
       user_id: user.id,
       currency: CURRENCY,
-      game_mode: "lucky-mines",
+      game_mode: GAME_MODE,
       expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000),
     },
   });
@@ -87,6 +90,7 @@ async function run() {
   console.log("\n=== InOut test session ===");
   console.log(`userId   : ${user.id}`);
   console.log(`currency : ${CURRENCY}`);
+  console.log(`gameMode : ${GAME_MODE}`);
   console.log(`balance  : ${BALANCE}`);
   console.log(`token    : ${token}`);
   console.log("==========================\n");
