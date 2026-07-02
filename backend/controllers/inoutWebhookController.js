@@ -120,7 +120,7 @@ async function handleBet(body, res) {
 async function handleWithdraw(body, res) {
   const token = body?.token;
   const data = body?.data ?? {};
-  const { transactionId, result: resultAmount, currency } = data;
+  const { transactionId, result: resultAmount, currency, debitId } = data;
 
   if (!transactionId) return sendError(res, "UNKNOWN_ERROR", "Missing transactionId");
   if (!currencyAllowed(currency)) return sendError(res, "CHECKS_FAIL", "Unsupported currency");
@@ -128,8 +128,9 @@ async function handleWithdraw(body, res) {
   const resolved = await resolveSession(token);
   if (resolved.error) return sendError(res, resolved.error);
 
-  const out = await creditForWithdraw(resolved.user.id, resultAmount ?? 0, transactionId);
+  const out = await creditForWithdraw(resolved.user.id, resultAmount ?? 0, transactionId, debitId);
   if (out.status === "no_wallet") return sendError(res, "ACCOUNT_INVALID");
+  if (out.status === "debit_not_found") return sendError(res, "DEBIT_TRANSACTION_NOT_FOUND");
   if (out.status !== "ok" && out.status !== "duplicate") {
     return sendError(res, "UNKNOWN_ERROR");
   }
@@ -139,7 +140,7 @@ async function handleWithdraw(body, res) {
 async function handleRollback(body, res) {
   const token = body?.token;
   const data = body?.data ?? {};
-  const { transactionId, amount, currency } = data;
+  const { transactionId, amount, currency, debitId } = data;
 
   if (!transactionId) return sendError(res, "UNKNOWN_ERROR", "Missing transactionId");
   if (!currencyAllowed(currency)) return sendError(res, "CHECKS_FAIL", "Unsupported currency");
@@ -147,8 +148,9 @@ async function handleRollback(body, res) {
   const resolved = await resolveSession(token);
   if (resolved.error) return sendError(res, resolved.error);
 
-  const out = await refundForRollback(resolved.user.id, amount ?? 0, transactionId);
+  const out = await refundForRollback(resolved.user.id, amount ?? 0, transactionId, debitId);
   if (out.status === "no_wallet") return sendError(res, "ACCOUNT_INVALID");
+  if (out.status === "debit_not_found") return sendError(res, "DEBIT_TRANSACTION_NOT_FOUND");
   if (out.status !== "ok" && out.status !== "duplicate") {
     return sendError(res, "UNKNOWN_ERROR");
   }

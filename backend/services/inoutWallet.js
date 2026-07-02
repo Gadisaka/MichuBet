@@ -127,12 +127,20 @@ export async function debitForBet(userId, amount, transactionId) {
  * Shared by `withdraw` (win/loss result, stake already included) and
  * `rollback` (stake refund). The caller supplies the reference + amount.
  *
+ * When `debitId` is provided we require the referenced bet
+ * (`inout:bet:{debitId}`) to exist before crediting. This satisfies the
+ * provider's `DEBIT_TRANSACTION_NOT_FOUND` contract (a credit/refund for a
+ * debit we never recorded must error and leave the balance untouched) while
+ * still honouring the money-safety case: if a bet response was lost on the
+ * network but we DID debit, the debit row exists and the refund proceeds.
+ *
  * @param {string} userId
  * @param {number} amount Positive credit amount.
  * @param {string} reference Unique idempotency reference.
+ * @param {string} [debitId] Original bet transaction id to verify.
  * @returns {Promise<WalletOpResult>}
  */
-async function creditPayout(userId, amount, reference) {
+async function creditPayout(userId, amount, reference, debitId) {
   const credit = toMoney(amount);
 
   return prisma.$transaction(async (tx) => {
@@ -142,6 +150,14 @@ async function creditPayout(userId, amount, reference) {
     });
     if (existing) {
       return { status: "duplicate", balance: Number(existing.balance_after) };
+    }
+
+    if (debitId) {
+      const debit = await tx.transaction.findFirst({
+        where: { reference: betRef(debitId) },
+        select: { id: true },
+      });
+      if (!debit) return { status: "debit_not_found" };
     }
 
     const wallet = await findPlayerWallet(tx, userId);
@@ -199,10 +215,11 @@ async function creditPayout(userId, amount, reference) {
  * @param {string} userId
  * @param {number} result Total to credit (stake already included).
  * @param {string} transactionId InOut transaction id (idempotency key).
+ * @param {string} [debitId] Original bet transaction id to verify.
  * @returns {Promise<WalletOpResult>}
  */
-export async function creditForWithdraw(userId, result, transactionId) {
-  return creditPayout(userId, result, withdrawRef(transactionId));
+export async function creditForWithdraw(userId, result, transactionId, debitId) {
+  return creditPayout(userId, result, withdrawRef(transactionId), debitId);
 }
 
 /**
@@ -210,8 +227,9 @@ export async function creditForWithdraw(userId, result, transactionId) {
  * @param {string} userId
  * @param {number} amount Stake to refund.
  * @param {string} transactionId InOut transaction id (idempotency key).
+ * @param {string} [debitId] Original bet transaction id to verify.
  * @returns {Promise<WalletOpResult>}
  */
-export async function refundForRollback(userId, amount, transactionId) {
-  return creditPayout(userId, amount, rollbackRef(transactionId));
+export async function refundForRollback(userId, amount, transactionId, debitId) {
+  return creditPayout(userId, amount, rollbackRef(transactionId), debitId);
 }

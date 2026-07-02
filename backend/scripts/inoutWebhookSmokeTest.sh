@@ -35,6 +35,9 @@ BET_TX="$(uuidgen 2>/dev/null || echo "bet-$(date +%s)")"
 WD_TX="$(uuidgen 2>/dev/null || echo "wd-$(date +%s)")"
 RB_TX="$(uuidgen 2>/dev/null || echo "rb-$(date +%s)")"
 GAME_ID="$(uuidgen 2>/dev/null || echo "game-$(date +%s)")"
+# A rollback/withdraw pointing at a debit that never happened.
+NX_RB_TX="$(uuidgen 2>/dev/null || echo "nxrb-$(date +%s)")"
+NX_DEBIT="$(uuidgen 2>/dev/null || echo "nxdebit-$(date +%s)")"
 
 # HMAC-SHA256 hex of the exact bytes passed in $1.
 sign() {
@@ -63,6 +66,7 @@ INIT_BODY="{\"action\":\"init\",\"token\":\"${TOKEN}\",\"data\":{\"currency\":\"
 BET_BODY="{\"action\":\"bet\",\"token\":\"${TOKEN}\",\"gameMode\":\"lucky-mines\",\"data\":{\"amount\":\"${AMOUNT}\",\"currency\":\"${CURRENCY}\",\"operator\":\"${OPERATOR}\",\"user_id\":\"1\",\"transactionId\":\"${BET_TX}\",\"gameId\":\"${GAME_ID}\"}}"
 WD_BODY="{\"action\":\"withdraw\",\"token\":\"${TOKEN}\",\"gameMode\":\"lucky-mines\",\"data\":{\"amount\":\"${AMOUNT}\",\"result\":\"${RESULT}\",\"currency\":\"${CURRENCY}\",\"operator\":\"${OPERATOR}\",\"user_id\":\"1\",\"transactionId\":\"${WD_TX}\",\"debitId\":\"${BET_TX}\",\"gameId\":\"${GAME_ID}\",\"isFinished\":true}}"
 RB_BODY="{\"action\":\"rollback\",\"token\":\"${TOKEN}\",\"gameMode\":\"lucky-mines\",\"data\":{\"amount\":\"${AMOUNT}\",\"currency\":\"${CURRENCY}\",\"operator\":\"${OPERATOR}\",\"user_id\":\"1\",\"transactionId\":\"${RB_TX}\",\"debitId\":\"${BET_TX}\",\"gameId\":\"${GAME_ID}\",\"isFinished\":true}}"
+NX_RB_BODY="{\"action\":\"rollback\",\"token\":\"${TOKEN}\",\"gameMode\":\"lucky-mines\",\"data\":{\"amount\":\"${AMOUNT}\",\"currency\":\"${CURRENCY}\",\"operator\":\"${OPERATOR}\",\"user_id\":\"1\",\"transactionId\":\"${NX_RB_TX}\",\"debitId\":\"${NX_DEBIT}\",\"gameId\":\"${GAME_ID}\",\"isFinished\":true}}"
 
 echo "Target: ${URL}"
 echo "Bet tx: ${BET_TX} | Withdraw tx: ${WD_TX} | Rollback tx: ${RB_TX}"
@@ -74,6 +78,8 @@ send "bet (expect 200 OK, balance drops by ${AMOUNT})" "$BET_BODY"
 send "withdraw (expect 200 OK, balance credited ${RESULT})" "$WD_BODY"
 send "withdraw REPLAY (idempotent: same balance, no double credit)" "$WD_BODY"
 send "rollback (expect 200 OK, refunds ${AMOUNT})" "$RB_BODY"
+send "rollback of NON-EXISTENT debit (expect 404 DEBIT_TRANSACTION_NOT_FOUND, balance unchanged)" "$NX_RB_BODY"
 
 echo "Done. Review balances above: bet debits ${AMOUNT}, withdraw credits ${RESULT},"
-echo "withdraw replay must NOT change balance, rollback credits ${AMOUNT}."
+echo "withdraw replay must NOT change balance, rollback credits ${AMOUNT},"
+echo "and the non-existent-debit rollback must ERROR without changing the balance."
