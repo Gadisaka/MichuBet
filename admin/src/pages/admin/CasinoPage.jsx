@@ -201,7 +201,7 @@ function GamesTab() {
         ) : filtered.length === 0 ? (
           <p className="py-10 text-center text-sm text-[var(--muted)]">
             {list.length === 0
-              ? "No games yet. Click "Sync from InOut" to populate the catalog."
+              ? 'No games yet. Click "Sync from InOut" to populate the catalog.'
               : "No games match your filters."}
           </p>
         ) : (
