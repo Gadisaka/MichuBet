@@ -33,11 +33,6 @@ function GameCard({ game, onPlay, onDemo, t }) {
             <AppIcon name="gamepad" size={40} />
           </div>
         )}
-        {game.rtp ? (
-          <span className="absolute right-1.5 top-1.5 rounded-full bg-black/70 px-2 py-0.5 text-[10px] font-bold text-(--sb-accent-fill)">
-            RTP {game.rtp}
-          </span>
-        ) : null}
 
         {/* Bottom button bar over the banner (glass effect). */}
         <div className="pointer-events-none absolute inset-x-2 bottom-2">
