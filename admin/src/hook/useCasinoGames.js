@@ -59,3 +59,15 @@ export function useSyncCasinoCatalogMutation() {
     },
   });
 }
+
+/** Casino reports (GGR, transactions, top players) for a date range. */
+export function useCasinoReportsQuery({ from, to, enabled = true }) {
+  const params = new URLSearchParams();
+  if (from) params.set("from", from);
+  if (to) params.set("to", to);
+  return useQuery({
+    queryKey: ["admin", "casino", "reports", from, to],
+    queryFn: () => apiRequest(`${BASE}/reports?${params.toString()}`),
+    enabled,
+  });
+}

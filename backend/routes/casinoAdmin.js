@@ -13,6 +13,7 @@ import { authorizePermission } from "../middleware/auth.js";
 import syncInoutCatalog from "../jobs/syncInoutCatalog.js";
 import { deleteCache } from "../services/cacheService.js";
 import { INOUT_GAMES_CACHE_KEY } from "../lib/inoutCatalogCache.js";
+import { getCasinoReports } from "../controllers/casinoReportsController.js";
 import {
   CASINO_ENABLED_SETTING_KEY,
   resolveCasinoEnabled,
@@ -123,5 +124,9 @@ router.post("/sync", authorizePermission("casino:manage"), async (_req, res) => 
     return res.status(502).json({ message: "Failed to sync catalog from InOut" });
   }
 });
+
+// ─── Reports ─────────────────────────────────────────────────────────────────
+
+router.get("/reports", authorizePermission("casino:read"), getCasinoReports);
 
 export default router;

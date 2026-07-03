@@ -5,14 +5,90 @@ import PanelCard from "../../components/ui/PanelCard";
 import PrimaryButton from "../../components/ui/PrimaryButton";
 import {
   useCasinoGamesQuery,
+  useCasinoReportsQuery,
   useCasinoStatusQuery,
   useSyncCasinoCatalogMutation,
   useUpdateCasinoGameMutation,
   useUpdateCasinoStatusMutation,
 } from "../../hook/useCasinoGames";
 
+const TABS = [
+  { key: "games", label: "Games" },
+  { key: "reports", label: "Reports" },
+];
+
+const DATE_PRESETS = [
+  { key: "today", label: "Today" },
+  { key: "last7", label: "Last 7 days" },
+  { key: "last30", label: "Last 30 days" },
+];
+
+function formatYmd(date) {
+  return date.toISOString().slice(0, 10);
+}
+
+function getPresetDates(key) {
+  const now = new Date();
+  const today = formatYmd(now);
+  if (key === "today") return { from: today, to: today };
+  if (key === "last7") {
+    const d = new Date(now);
+    d.setDate(d.getDate() - 6);
+    return { from: formatYmd(d), to: today };
+  }
+  if (key === "last30") {
+    const d = new Date(now);
+    d.setDate(d.getDate() - 29);
+    return { from: formatYmd(d), to: today };
+  }
+  return { from: today, to: today };
+}
+
+function money(value) {
+  return Number(value || 0).toLocaleString(undefined, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+}
+
 export default function CasinoPage() {
   const { user, logout } = useAuth();
+  const [activeTab, setActiveTab] = useState("games");
+
+  return (
+    <AdminShell user={user} onLogout={logout}>
+      <div className="mb-6">
+        <h2 className="text-xl font-semibold">Casino Management</h2>
+        <p className="mt-1 text-sm text-[var(--muted)]">
+          Manage the InOut game catalog, view reports, and control casino availability.
+        </p>
+      </div>
+
+      <MasterSwitchPanel />
+
+      <div className="mb-4 flex flex-wrap gap-2 border-b border-[var(--border)] pb-3">
+        {TABS.map((tab) => (
+          <button
+            key={tab.key}
+            type="button"
+            onClick={() => setActiveTab(tab.key)}
+            className={`rounded-sm border px-4 py-2 text-sm font-semibold transition-colors ${
+              activeTab === tab.key
+                ? "border-[var(--accent)] bg-[var(--accent)] text-white"
+                : "border-[var(--border)] text-[var(--text)] hover:bg-[var(--surfaceMuted)]"
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {activeTab === "games" ? <GamesTab /> : <ReportsTab />}
+    </AdminShell>
+  );
+}
+
+function GamesTab() {
   const games = useCasinoGamesQuery();
   const syncMutation = useSyncCasinoCatalogMutation();
 
@@ -57,14 +133,12 @@ export default function CasinoPage() {
   }
 
   return (
-    <AdminShell user={user} onLogout={logout}>
-      <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h2 className="text-xl font-semibold">Casino Games</h2>
-          <p className="mt-1 text-sm text-[var(--muted)]">
-            Curate the InOut game catalog shown in the player lobby. Toggle
-            availability, set display order, and re-sync from the provider.
-          </p>
+    <>
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
+        <div className="grid grid-cols-3 gap-3">
+          <StatCard label="Total games" value={stats.total} />
+          <StatCard label="Enabled" value={stats.enabled} accent="green" />
+          <StatCard label="Disabled" value={stats.disabled} accent="muted" />
         </div>
         <PrimaryButton
           type="button"
@@ -88,14 +162,6 @@ export default function CasinoPage() {
           )}
         </div>
       )}
-
-      <MasterSwitchPanel />
-
-      <div className="mb-4 grid grid-cols-3 gap-3">
-        <StatCard label="Total games" value={stats.total} />
-        <StatCard label="Enabled" value={stats.enabled} accent="green" />
-        <StatCard label="Disabled" value={stats.disabled} accent="muted" />
-      </div>
 
       <PanelCard className="p-4">
         <div className="mb-4 flex flex-wrap items-center gap-2">
@@ -135,7 +201,7 @@ export default function CasinoPage() {
         ) : filtered.length === 0 ? (
           <p className="py-10 text-center text-sm text-[var(--muted)]">
             {list.length === 0
-              ? "No games yet. Click “Sync from InOut” to populate the catalog."
+              ? "No games yet. Click "Sync from InOut" to populate the catalog."
               : "No games match your filters."}
           </p>
         ) : (
@@ -160,7 +226,256 @@ export default function CasinoPage() {
           </div>
         )}
       </PanelCard>
-    </AdminShell>
+    </>
+  );
+}
+
+function ReportsTab() {
+  const today = useMemo(() => formatYmd(new Date()), []);
+  const [datePreset, setDatePreset] = useState("today");
+  const [fromDate, setFromDate] = useState(today);
+  const [toDate, setToDate] = useState(today);
+  const [appliedRange, setAppliedRange] = useState({ from: today, to: today });
+
+  const reports = useCasinoReportsQuery({
+    from: appliedRange.from,
+    to: appliedRange.to,
+  });
+
+  function applyPreset(key) {
+    setDatePreset(key);
+    const { from, to } = getPresetDates(key);
+    setFromDate(from);
+    setToDate(to);
+    setAppliedRange({ from, to });
+  }
+
+  function applyCustomRange() {
+    setDatePreset("");
+    setAppliedRange({ from: fromDate, to: toDate });
+  }
+
+  const summary = reports.data?.summary || {};
+  const byDay = reports.data?.byDay || [];
+  const topPlayers = reports.data?.topPlayers || [];
+
+  return (
+    <>
+      <PanelCard className="mb-4 p-4">
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="flex gap-1">
+            {DATE_PRESETS.map((p) => (
+              <button
+                key={p.key}
+                type="button"
+                onClick={() => applyPreset(p.key)}
+                className={`rounded-sm border px-3 py-2 text-xs font-semibold transition-colors ${
+                  datePreset === p.key
+                    ? "border-[var(--accent)] bg-[var(--accent)] text-white"
+                    : "border-[var(--border)] text-[var(--text)] hover:bg-[var(--surfaceMuted)]"
+                }`}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
+          <div className="flex items-center gap-2">
+            <input
+              type="date"
+              value={fromDate}
+              onChange={(e) => {
+                setFromDate(e.target.value);
+                setDatePreset("");
+              }}
+              className="rounded-sm border border-[var(--border)] bg-[var(--bgApp)] px-2 py-1.5 text-sm"
+            />
+            <span className="text-xs text-[var(--muted)]">to</span>
+            <input
+              type="date"
+              value={toDate}
+              onChange={(e) => {
+                setToDate(e.target.value);
+                setDatePreset("");
+              }}
+              className="rounded-sm border border-[var(--border)] bg-[var(--bgApp)] px-2 py-1.5 text-sm"
+            />
+            <PrimaryButton
+              type="button"
+              onClick={applyCustomRange}
+              className="w-auto px-3 py-1.5 text-xs"
+            >
+              Apply
+            </PrimaryButton>
+          </div>
+        </div>
+      </PanelCard>
+
+      {reports.isLoading ? (
+        <p className="py-10 text-center text-sm text-[var(--muted)]">
+          Loading reports…
+        </p>
+      ) : reports.isError ? (
+        <p className="py-10 text-center text-sm text-[var(--danger)]">
+          {reports.error?.message || "Failed to load reports"}
+        </p>
+      ) : (
+        <>
+          <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4">
+            <StatCard label="Total bets" value={summary.totalBets || 0} />
+            <StatCard
+              label="Bet volume"
+              value={`ETB ${money(summary.totalBetAmount)}`}
+            />
+            <StatCard
+              label="Payouts"
+              value={`ETB ${money(summary.totalWinAmount)}`}
+            />
+            <StatCard
+              label="GGR"
+              value={`ETB ${money(summary.ggr)}`}
+              accent={summary.ggr >= 0 ? "green" : "danger"}
+            />
+          </div>
+
+          <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4">
+            <StatCard label="Unique players" value={summary.uniquePlayers || 0} />
+            <StatCard label="Wins paid" value={summary.totalWins || 0} />
+            <StatCard label="Rollbacks" value={summary.totalRollbacks || 0} />
+            <StatCard
+              label="Rollback amount"
+              value={`ETB ${money(summary.totalRollbackAmount)}`}
+              accent="muted"
+            />
+          </div>
+
+          <PanelCard className="mb-4 p-4">
+            <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide">
+              Daily breakdown
+            </h3>
+            {byDay.length === 0 ? (
+              <p className="py-6 text-center text-sm text-[var(--muted)]">
+                No activity in this period.
+              </p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[640px] border-collapse text-sm">
+                  <thead>
+                    <tr className="border-b border-[var(--border)] text-left">
+                      <Th>Date</Th>
+                      <Th className="text-right">Bets</Th>
+                      <Th className="text-right">Bet amount</Th>
+                      <Th className="text-right">Wins</Th>
+                      <Th className="text-right">Win amount</Th>
+                      <Th className="text-right">Rollbacks</Th>
+                      <Th className="text-right">GGR</Th>
+                      <Th className="text-right">Players</Th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {byDay.map((d) => (
+                      <tr
+                        key={d.date}
+                        className="border-b border-[var(--border)] last:border-b-0"
+                      >
+                        <td className="px-3 py-2">
+                          <span className="font-medium">{d.date}</span>
+                          <span className="ml-1 text-xs text-[var(--muted)]">
+                            {d.dayLabel}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2 text-right tabular-nums">
+                          {d.bets}
+                        </td>
+                        <td className="px-3 py-2 text-right tabular-nums">
+                          {money(d.betAmount)}
+                        </td>
+                        <td className="px-3 py-2 text-right tabular-nums">
+                          {d.wins}
+                        </td>
+                        <td className="px-3 py-2 text-right tabular-nums">
+                          {money(d.winAmount)}
+                        </td>
+                        <td className="px-3 py-2 text-right tabular-nums text-[var(--muted)]">
+                          {d.rollbacks}
+                        </td>
+                        <td
+                          className={`px-3 py-2 text-right tabular-nums font-semibold ${
+                            d.ggr >= 0 ? "text-green-600" : "text-[var(--danger)]"
+                          }`}
+                        >
+                          {money(d.ggr)}
+                        </td>
+                        <td className="px-3 py-2 text-right tabular-nums">
+                          {d.uniquePlayers}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </PanelCard>
+
+          <PanelCard className="p-4">
+            <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide">
+              Top players by bet volume
+            </h3>
+            {topPlayers.length === 0 ? (
+              <p className="py-6 text-center text-sm text-[var(--muted)]">
+                No player activity in this period.
+              </p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[640px] border-collapse text-sm">
+                  <thead>
+                    <tr className="border-b border-[var(--border)] text-left">
+                      <Th>Player</Th>
+                      <Th className="text-right">Bets</Th>
+                      <Th className="text-right">Bet amount</Th>
+                      <Th className="text-right">Wins</Th>
+                      <Th className="text-right">GGR</Th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {topPlayers.map((p) => (
+                      <tr
+                        key={p.userId}
+                        className="border-b border-[var(--border)] last:border-b-0"
+                      >
+                        <td className="px-3 py-2">
+                          <span className="font-medium">{p.name}</span>
+                          {p.phone && (
+                            <span className="ml-2 text-xs text-[var(--muted)]">
+                              {p.phone}
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-3 py-2 text-right tabular-nums">
+                          {p.bets}
+                        </td>
+                        <td className="px-3 py-2 text-right tabular-nums">
+                          {money(p.betAmount)}
+                        </td>
+                        <td className="px-3 py-2 text-right tabular-nums">
+                          {money(p.winAmount)}
+                        </td>
+                        <td
+                          className={`px-3 py-2 text-right tabular-nums font-semibold ${
+                            p.ggr >= 0 ? "text-green-600" : "text-[var(--danger)]"
+                          }`}
+                        >
+                          {money(p.ggr)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </PanelCard>
+        </>
+      )}
+    </>
   );
 }
 
@@ -342,9 +657,11 @@ function StatCard({ label, value, accent }) {
   const valueColor =
     accent === "green"
       ? "text-green-600"
-      : accent === "muted"
-        ? "text-[var(--muted)]"
-        : "text-[var(--text)]";
+      : accent === "danger"
+        ? "text-[var(--danger)]"
+        : accent === "muted"
+          ? "text-[var(--muted)]"
+          : "text-[var(--text)]";
   return (
     <PanelCard className="p-4">
       <p className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
