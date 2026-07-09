@@ -63,7 +63,7 @@ import { isTicketSettleable } from "../lib/ticketExpiry.js";
 const FINAL_FIXTURE_STATUSES = new Set(["FT", "AET", "PEN", "AWD", "WO"]);
 const VOID_FIXTURE_STATUSES = new Set(["CANC", "ABD", "PST"]);
 
-const SETTLEABLE_TICKET_STATUSES = new Set(["OPEN", "PRINTED"]);
+const SETTLEABLE_TICKET_STATUSES = new Set(["OPEN", "PRINTED", "HELD"]);
 const TERMINAL_TICKET_STATUSES = new Set([
   "WON",
   "LOST",

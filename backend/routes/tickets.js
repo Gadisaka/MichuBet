@@ -6,13 +6,13 @@ import {
   createTicket,
   getTicketById,
   getTicketByReceipt,
+  getTicketByCoupon,
   listTickets,
   payoutTicket,
   preparePrintTicket,
   removeTicketSelection,
   repeatTicket,
   updateTicketStake,
-  validatePrintTicket,
   voidTicket,
 } from "../controllers/ticketsController.js";
 import {
@@ -29,6 +29,11 @@ router.get(
   "/by-receipt",
   authorizePermission("tickets:read"),
   getTicketByReceipt,
+);
+router.get(
+  "/by-coupon",
+  authorizePermission("tickets:read"),
+  getTicketByCoupon,
 );
 router.get("/:id", authorizePermission("tickets:read"), getTicketById);
 
@@ -52,11 +57,6 @@ router.delete(
   "/:id/selections/:selectionId",
   authorizePermission("tickets:create"),
   removeTicketSelection,
-);
-router.post(
-  "/:id/validate-print",
-  authorizePermission("tickets:create"),
-  validatePrintTicket,
 );
 router.post(
   "/:id/prepare-print",

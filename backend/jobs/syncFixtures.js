@@ -18,6 +18,7 @@ import {
   buildFixtureSyncData,
   fixtureSyncUnchanged,
 } from "../lib/fixtureResultLock.js";
+import { resolveFixtureScores } from "./lib/fixtureScores.js";
 
 /**
  * Bulk-by-date fixture ingestion.
@@ -192,11 +193,15 @@ async function upsertFixtureRow(entry, leagueId, homeTeamId, awayTeamId) {
   if (!f?.id)
     return { upserted: false, fixtureId: null, becameTerminal: false };
 
-  const goals = entry.goals ?? entry.scores ?? {};
   const status = STATUS_MAP[f.status?.short] ?? "NS";
   const startTime = new Date(f.date);
-  const homeScore = goals?.home ?? null;
-  const awayScore = goals?.away ?? null;
+  // For terminal fixtures, home/away score is the 90' regulation score
+  // (`score.fulltime`), NOT the ET-inclusive `goals` — so Match Winner and all
+  // other full-time markets settle on regulation. Live fixtures keep `goals`.
+  const { homeScore, awayScore, etHome, etAway, penHome, penAway } =
+    resolveFixtureScores(entry, {
+      preferFullTime: isTerminalFixtureStatus(status),
+    });
   // Half-time scores live under `score.halftime` in the API-Sports /fixtures
   // payload (separate from `goals`, which is the current/full-time score).
   // Required by HT markets (HALF_TIME_RESULT, HT_OVER_UNDER, HT_FT).
@@ -230,6 +235,10 @@ async function upsertFixtureRow(entry, leagueId, homeTeamId, awayTeamId) {
       away_score: awayScore,
       ht_home_score: htHomeScore,
       ht_away_score: htAwayScore,
+      et_home_score: etHome,
+      et_away_score: etAway,
+      pen_home_score: penHome,
+      pen_away_score: penAway,
       league_id: leagueId,
       home_team_id: homeTeamId,
       away_team_id: awayTeamId,
@@ -263,6 +272,10 @@ async function upsertFixtureRow(entry, leagueId, homeTeamId, awayTeamId) {
         away_score: awayScore,
         ht_home_score: htHomeScore,
         ht_away_score: htAwayScore,
+        et_home_score: etHome,
+        et_away_score: etAway,
+        pen_home_score: penHome,
+        pen_away_score: penAway,
         league_id: leagueId,
         home_team_id: homeTeamId,
         away_team_id: awayTeamId,
@@ -289,6 +302,10 @@ async function upsertFixtureRow(entry, leagueId, homeTeamId, awayTeamId) {
       away_score: awayScore,
       ht_home_score: htHomeScore,
       ht_away_score: htAwayScore,
+      et_home_score: etHome,
+      et_away_score: etAway,
+      pen_home_score: penHome,
+      pen_away_score: penAway,
       league_id: leagueId,
       home_team_id: homeTeamId,
       away_team_id: awayTeamId,

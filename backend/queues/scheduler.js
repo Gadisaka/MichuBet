@@ -161,6 +161,15 @@ function buildRepeatables() {
         jobId: toJobId(REPEATABLE_JOB_NAMES.EXPIRE_UNPAID_TICKETS),
       },
     },
+    {
+      queue: QUEUE_NAMES.HOLD_REAPER,
+      name: REPEATABLE_JOB_NAMES.HOLD_REAPER_TICK,
+      data: {},
+      opts: {
+        repeat: { every: envSeconds("HOLD_REAPER_SECONDS", 20 * SECONDS) },
+        jobId: toJobId(REPEATABLE_JOB_NAMES.HOLD_REAPER_TICK),
+      },
+    },
   ];
 }
 

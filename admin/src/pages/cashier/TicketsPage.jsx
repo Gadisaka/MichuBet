@@ -27,7 +27,6 @@ import {
   useTicketByIdLookupMutation,
   useTodayTicketsQuery,
   useUpdateTicketStakeMutation,
-  useValidatePrintTicketMutation,
 } from "../../hook/useCashierTickets";
 import { useCashierHistoryQuery } from "../../hook/useCashierWallet";
 import { useNotificationUnreadCountQuery } from "../../hook/useNotifications";
@@ -499,7 +498,6 @@ export default function CashierTicketsPage() {
   const cashoutQuoteMutation = useCashoutQuoteMutation();
   const executeCashoutMutation = useExecuteCashoutMutation();
   const confirmPrint = useConfirmPrintedTicketMutation();
-  const validatePrint = useValidatePrintTicketMutation();
   const preparePrint = usePreparePrintTicketMutation();
   const updateStake = useUpdateTicketStakeMutation();
   const repeatTicket = useRepeatTicketMutation();
@@ -602,7 +600,6 @@ export default function CashierTicketsPage() {
     cashoutQuoteMutation.isPending ||
     executeCashoutMutation.isPending ||
     confirmPrint.isPending ||
-    validatePrint.isPending ||
     preparePrint.isPending ||
     updateStake.isPending ||
     repeatTicket.isPending ||
@@ -751,7 +748,6 @@ export default function CashierTicketsPage() {
     printInFlightRef.current = true;
     setSellError("");
     const ticketForWalletAndPrint = sellTicket;
-    setActionSuccess("Validating ticket before print...");
 
     const runWithDriftRetry = async (mutateAsync, basePayload) => {
       try {
@@ -782,26 +778,24 @@ export default function CashierTicketsPage() {
     };
 
     try {
-      await runWithDriftRetry(validatePrint.mutateAsync, {
-        ticketId: ticketForWalletAndPrint.id,
-      });
-
-      setActionSuccess("Preparing receipt...");
-      const prepareResult = await preparePrint.mutateAsync({
-        ticketId: ticketForWalletAndPrint.id,
-      });
-      const ticketToPrint = prepareResult?.ticket
-        ? mapTicketDetail(prepareResult.ticket)
-        : ticketForWalletAndPrint;
-
+      // Fail fast when the printer is offline — before any network call.
       if (!printerConnected) {
-        setActionSuccess("");
         setSellError(
           "Printer offline. Ensure local print service is running and POS80 printer is connected.",
         );
         setTicketPreviewOpen(false);
         return;
       }
+
+      // Single pre-print round trip: prepare-print now validates odds/markets
+      // AND reserves the receipt number (drift/lock prompts still fire here).
+      setActionSuccess("Validating ticket before print...");
+      const prepareResult = await runWithDriftRetry(preparePrint.mutateAsync, {
+        ticketId: ticketForWalletAndPrint.id,
+      });
+      const ticketToPrint = prepareResult?.ticket
+        ? mapTicketDetail(prepareResult.ticket)
+        : ticketForWalletAndPrint;
 
       setActionSuccess("Sending ticket to printer...");
       const escposData = await encodeTicketAsync(ticketToPrint, {
@@ -867,7 +861,8 @@ export default function CashierTicketsPage() {
       }
       setSellTicket(updatedTicket);
 
-      await Promise.all([slipsQuery.refetch(), walletQuery.refetch()]);
+      // Fire-and-forget: don't block the cashier on post-sale refetches.
+      Promise.all([slipsQuery.refetch(), walletQuery.refetch()]).catch(() => {});
 
       const walletMessage = confirmResult.alreadyPrinted
         ? "Ticket already confirmed; wallet was not deducted again."

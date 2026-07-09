@@ -39,6 +39,7 @@ import { authenticateToken } from "./middleware/auth.js";
 import { pingRedis } from "./services/cacheService.js";
 import { initSocketHub } from "./lib/socketHub.js";
 import { createCorsOptions } from "./lib/corsConfig.js";
+import { perfTimingMiddleware } from "./middleware/perfTiming.js";
 
 const app = express();
 const server = http.createServer(app);
@@ -50,6 +51,7 @@ const port = Number(process.env.PORT || 3000);
 app.use("/api/integrations/inout", inoutRoutes);
 
 app.use(express.json());
+app.use(perfTimingMiddleware);
 
 app.get("/health", async (_req, res) => {
   const redis = await pingRedis();

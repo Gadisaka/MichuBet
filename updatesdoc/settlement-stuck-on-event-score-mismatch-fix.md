@@ -137,9 +137,23 @@ const liveGoals = payload.events.filter(
 );
 ```
 
-Now a `PEN` fixture's regulation tally (`1-1`) matches its score (`1-1`) → **consistent → stays FINAL, events kept**, and Match Winner / O/U / Double Chance settle on the regulation result (1-1 → draw). Extra-time games (`AET`) were already correct — ET goals *are* part of `goals` and are tagged `1ET`/`2ET`, so they count normally.
+Now a `PEN` fixture's regulation tally (`1-1`) matches its score (`1-1`) → **consistent → stays FINAL, events kept**, and Match Winner / O/U / Double Chance settle on the regulation result (1-1 → draw).
 
-> Settlement semantics confirmed: prematch 1X2 / Match Winner / Over-Under settle on the **regulation+ET score** (`goals`), NOT on the penalty-shootout winner. A 1-1 game won on penalties grades the Match Winner leg as a **draw**. Markets that pay the shootout winner ("To Qualify", "Winner incl. penalties") are not offered, so no special penalty-winner grading is needed.
+> **Superseded note:** An earlier version of this document stated that "Match Winner settles on the regulation+ET score". That is incorrect — see the 90' regulation score section below. Match Winner and all full-time markets settle on the **90' regulation score only**.
+
+---
+
+## 90' regulation score (Match Winner FT settlement fix)
+
+Match Winner — and every other full-time market (Double Chance, Over/Under, BTTS, Correct Score, Handicaps, Odd/Even, Team Total, …) — settles on the **90' regulation score**, NOT the extra-time-inclusive `goals`.
+
+API-Sports returns two full-match scores: `goals` (running/final total, which **includes ET** on an `AET` game) and `score.fulltime` (the score at the 90' whistle). Previously every sync path stored `goals` into `Fixture.home_score`/`away_score`, so a game that was 1-1 at 90' and 2-1 after ET wrongly settled Match Winner as a home win instead of a draw.
+
+The fix stores the 90' regulation score for **terminal** fixtures (live/in-play fixtures keep the running `goals` so the displayed score stays correct):
+
+- `[backend/jobs/lib/fixtureScores.js](../backend/jobs/lib/fixtureScores.js)` — `resolveFixtureScores(entry, { preferFullTime })` prefers `score.fulltime` for terminal fixtures, falling back to `goals`. Also extracts `score.extratime` / `score.penalty` into the `et_*` / `pen_*` columns.
+- Used by `syncFixtures.js`, `settlementRetry.js` (zombie rescue), and `syncLiveFixtures.js`; persisted via `buildFixtureSyncData`.
+- `detectInconsistency` in `matchResult/v2.js` now excludes `1ET`/`2ET` goals from the score reconciliation (alongside the existing `PEN`/shootout exclusion), so an `AET` fixture's regulation tally matches its 90' score and stays `FINAL`.
 
 ---
 
