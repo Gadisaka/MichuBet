@@ -18,8 +18,8 @@ const UPCOMING_FIXTURES_LIMIT = Number(
 const UPCOMING_MIN_START_BUFFER_MINUTES = 5;
 const UPCOMING_ALLOWED_STATUSES = new Set(["NS", "TBD"]);
 
-/** Bumped when list payload / query semantics change (relaxed single-query). */
-export const FIXTURES_BY_DATE_CACHE_VERSION = "v4";
+/** Bumped when list payload / query semantics change (slim select, no bookmaker join). */
+export const FIXTURES_BY_DATE_CACHE_VERSION = "v5";
 
 const MAIN_MARKET_NAMES = [
   "Match Winner",
@@ -31,28 +31,37 @@ const MAIN_MARKET_NAMES = [
 /** In-process single-flight for list rebuilds (keyed by cache key). */
 const fixturesByDateInflight = new Map();
 
+/** Process-local warm cache so API hits avoid Redis/Mongo under worker load. */
+const MEMORY_TTL_MS = Number(process.env.FIXTURES_MEMORY_TTL_MS || 30_000);
+const fixturesByDateMemory = new Map();
+
+/** Coalesce concurrent worker refreshes. */
+let refreshInflight = null;
+
 /**
  * Build a Prisma `include` clause for fixture.markets that optionally
  * filters odd_lines down to a single bookmaker.
  */
 export function buildMarketsInclude(
   preferredBookmakerId,
-  { marketLimit, oddLineLimit, mainMarketsOnly, marketNamesIn } = {},
+  { marketLimit, oddLineLimit, mainMarketsOnly, marketNamesIn, includeBookmaker = true } = {},
 ) {
   const oddLines = {
     where: preferredBookmakerId
       ? { bookmaker_id: preferredBookmakerId }
       : undefined,
-    include: { bookmaker: true },
+    ...(includeBookmaker
+      ? { include: { bookmaker: true } }
+      : { select: { id: true, value: true, odd: true, bookmaker_id: true } }),
   };
   if (Number.isFinite(oddLineLimit) && oddLineLimit > 0) {
     oddLines.take = oddLineLimit;
     oddLines.orderBy = { value: "asc" };
   }
 
-  const include = {
-    include: { odd_lines: oddLines },
-  };
+  const include = includeBookmaker
+    ? { include: { odd_lines: oddLines } }
+    : { select: { id: true, name: true, odd_lines: oddLines } };
 
   if (Array.isArray(marketNamesIn) && marketNamesIn.length > 0) {
     include.where = { name: { in: marketNamesIn } };
@@ -140,7 +149,7 @@ export async function mergeMarketsFallbackForList(rows, preferred, caps) {
   const extras = await prisma.fixture.findMany({
     where: { id: { in: ids } },
     include: {
-      markets: buildMarketsInclude(null, caps),
+      markets: buildMarketsInclude(null, { ...caps, includeBookmaker: false }),
     },
   });
 
@@ -218,8 +227,24 @@ function listQueryBookmakerId(preferred) {
   return null;
 }
 
+function rememberFixtures(cacheKey, data) {
+  fixturesByDateMemory.set(cacheKey, { at: Date.now(), data });
+}
+
+function memoryFixtures(cacheKey) {
+  const hit = fixturesByDateMemory.get(cacheKey);
+  if (!hit) return null;
+  if (Date.now() - hit.at > MEMORY_TTL_MS) {
+    fixturesByDateMemory.delete(cacheKey);
+    return null;
+  }
+  return hit.data;
+}
+
 /**
  * Rebuild fixtures for one UTC day and write Redis (overwrite, no delete).
+ * Uses a slim select + "has priced summary markets" filter so the day query
+ * does not pull full team/league docs or bookmaker joins for every fixture.
  */
 export async function buildFixturesByDate(ymd, { preferred } = {}) {
   const parsed = parseUtcYmd(ymd);
@@ -237,37 +262,94 @@ export async function buildFixturesByDate(ymd, { preferred } = {}) {
     rangeStart = upcomingCutoffStart(parsed.start);
   }
 
-  const caps = {
-    marketLimit: FIXTURES_SUMMARY_MARKET_LIMIT,
-    oddLineLimit: FIXTURES_SUMMARY_ODD_LINES_PER_MARKET,
-    marketNamesIn: SUMMARY_MARKET_NAMES,
+  const bookmakerId = listQueryBookmakerId(preferredRecord);
+  const t0 = Date.now();
+
+  const oddLinesQuery = {
+    where: bookmakerId ? { bookmaker_id: bookmakerId } : undefined,
+    take: FIXTURES_SUMMARY_ODD_LINES_PER_MARKET,
+    orderBy: { value: "asc" },
+    select: { id: true, value: true, odd: true },
   };
 
   const rows = await prisma.fixture.findMany({
     where: {
       start_time: { gte: rangeStart, lte: rangeEnd },
       status: { in: [...UPCOMING_ALLOWED_STATUSES] },
+      // Skip unpriced fixtures in Mongo instead of loading them then filtering.
+      markets: {
+        some: {
+          name: { in: SUMMARY_MARKET_NAMES },
+          odd_lines: bookmakerId
+            ? { some: { bookmaker_id: bookmakerId } }
+            : { some: {} },
+        },
+      },
     },
-    include: {
-      home_team: true,
-      away_team: true,
-      league: true,
-      markets: buildMarketsInclude(listQueryBookmakerId(preferredRecord), caps),
+    select: {
+      id: true,
+      api_fixture_id: true,
+      start_time: true,
+      status: true,
+      home_score: true,
+      away_score: true,
+      extra_markets_count: true,
+      available_odd_cells_count: true,
+      home_team: {
+        select: { id: true, name: true, logo: true, api_team_id: true },
+      },
+      away_team: {
+        select: { id: true, name: true, logo: true, api_team_id: true },
+      },
+      league: {
+        select: {
+          id: true,
+          name: true,
+          country: true,
+          logo: true,
+          country_flag: true,
+          api_league_id: true,
+        },
+      },
+      markets: {
+        where: { name: { in: SUMMARY_MARKET_NAMES } },
+        take: FIXTURES_SUMMARY_MARKET_LIMIT,
+        orderBy: { name: "asc" },
+        select: {
+          id: true,
+          name: true,
+          odd_lines: oddLinesQuery,
+        },
+      },
     },
     orderBy: { start_time: "asc" },
   });
 
-  let merged = await mergeMarketsFallbackForList(rows, preferredRecord, caps);
+  let merged = rows.map(stripEmptyMarkets);
+  // Strict mode may still need a fallback pass when preferred filter was used.
+  if (bookmakerId) {
+    merged = await mergeMarketsFallbackForList(merged, preferredRecord, {
+      marketLimit: FIXTURES_SUMMARY_MARKET_LIMIT,
+      oddLineLimit: FIXTURES_SUMMARY_ODD_LINES_PER_MARKET,
+      marketNamesIn: SUMMARY_MARKET_NAMES,
+      includeBookmaker: false,
+    });
+  }
+
   merged = merged.filter(fixtureHasPricedOdds);
   merged = sortFixturesByLeagueRank(merged, UPCOMING_FIXTURES_LIMIT);
 
   const data = attachLeagueRanksToList(merged);
   await setCache(cacheKey, data, TTL.FIXTURES);
+  rememberFixtures(cacheKey, data);
+  console.log(
+    `[fixturesList] build ${parsed.ymd} count=${data.length} ms=${Date.now() - t0}`,
+  );
   return data;
 }
 
 /**
- * Cache-aside with single-flight coalescing for concurrent misses.
+ * Cache-aside with memory → Redis → single-flight DB rebuild.
  */
 export async function getOrBuildFixturesByDate(ymd) {
   const preferred = await getPreferredBookmakerRecord();
@@ -277,8 +359,15 @@ export async function getOrBuildFixturesByDate(ymd) {
   }
 
   const cacheKey = fixturesByDateCacheKey(parsed.ymd, preferred);
+
+  const mem = memoryFixtures(cacheKey);
+  if (mem) return mem;
+
   const cached = await getCache(cacheKey);
-  if (cached) return cached;
+  if (cached) {
+    rememberFixtures(cacheKey, cached);
+    return cached;
+  }
 
   let inflight = fixturesByDateInflight.get(cacheKey);
   if (!inflight) {
@@ -301,25 +390,34 @@ function addUtcDaysYmd(ymd, days) {
 /**
  * Rebuild-then-swap for today + tomorrow so public list caches stay warm
  * after sync jobs instead of being deleted (cold miss for visitors).
+ * Concurrent callers share one in-flight refresh.
  */
 export async function refreshFixturesByDateCaches() {
-  const today = utcTodayYmd();
-  const tomorrow = addUtcDaysYmd(today, 1);
-  const dates = [today, tomorrow].filter(Boolean);
+  if (refreshInflight) return refreshInflight;
 
-  const preferred = await getPreferredBookmakerRecord();
-  const results = [];
-  for (const ymd of dates) {
-    try {
-      const data = await buildFixturesByDate(ymd, { preferred });
-      results.push({ ymd, count: Array.isArray(data) ? data.length : 0 });
-    } catch (err) {
-      console.error(
-        `[fixturesList] refresh ${ymd} failed:`,
-        err?.message || err,
-      );
-      results.push({ ymd, error: String(err?.message || err) });
+  refreshInflight = (async () => {
+    const today = utcTodayYmd();
+    const tomorrow = addUtcDaysYmd(today, 1);
+    const dates = [today, tomorrow].filter(Boolean);
+
+    const preferred = await getPreferredBookmakerRecord();
+    const results = [];
+    for (const ymd of dates) {
+      try {
+        const data = await buildFixturesByDate(ymd, { preferred });
+        results.push({ ymd, count: Array.isArray(data) ? data.length : 0 });
+      } catch (err) {
+        console.error(
+          `[fixturesList] refresh ${ymd} failed:`,
+          err?.message || err,
+        );
+        results.push({ ymd, error: String(err?.message || err) });
+      }
     }
-  }
-  return results;
+    return results;
+  })().finally(() => {
+    refreshInflight = null;
+  });
+
+  return refreshInflight;
 }
