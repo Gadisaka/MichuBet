@@ -2,6 +2,7 @@ import prisma from "../Config/db.js";
 import { upsertNoTx } from "../utils/upsertNoTx.js";
 import { api } from "../services/apiSportsService.js";
 import { deleteByPattern, getRedisClient } from "../services/cacheService.js";
+import { refreshFixturesByDateCaches } from "../services/fixturesListService.js";
 import { parseMarkets } from "../utils/oddsParser.js";
 import { getEnabledSports } from "../services/sportsRegistry.js";
 import { getPreferredBookmakerApiId } from "../services/settingsService.js";
@@ -286,11 +287,18 @@ export default async function syncLiveFixtures() {
     }
 
     if (updated > 0) {
-      // Blow away the bookmaker-namespaced public caches so the next request
-      // rebuilds with the new scores / odds.
+      // Blow away live/today caches; rebuild by-date so home stays warm.
       await deleteByPattern("live:fixtures:*");
       await deleteByPattern("fixtures:today:*");
-      await deleteByPattern("fixtures:by-date:*");
+      try {
+        await refreshFixturesByDateCaches();
+      } catch (err) {
+        console.error(
+          "[syncLive] fixtures by-date refresh failed:",
+          err?.message || err,
+        );
+        await deleteByPattern("fixtures:by-date:*");
+      }
     }
   } catch (err) {
     console.error("[syncLive] error:", err);

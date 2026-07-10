@@ -50,6 +50,12 @@ const PREMATCH_POLL_MS = Number.isFinite(PREMATCH_POLL_MS_RAW)
   ? PREMATCH_POLL_MS_RAW
   : 90_000;
 
+/** Initial home-page fixtures fetch — never spin forever. */
+const INITIAL_FIXTURES_TIMEOUT_MS = Number.parseInt(
+  import.meta.env.VITE_FIXTURES_FETCH_TIMEOUT_MS || "15000",
+  10,
+) || 15_000;
+
 const UPCOMING_FRONTEND_BUFFER_MS = 5 * 60 * 1000;
 const UPCOMING_FIXTURES_DAYS = 14;
 /** Include prior UTC day when prefetching fixtures for betting-day spillover. */
@@ -170,12 +176,12 @@ export function useMatches({ includeLive = true, filters = {} } = {}) {
     setError(null);
   }, []);
 
-  const loadDateImpl = useCallback(async (dateStr, { signal } = {}) => {
+  const loadDateImpl = useCallback(async (dateStr, { signal, timeoutMs } = {}) => {
     if (!USE_FIXTURES_BY_DATE) return;
     if (loadedDatesRef.current.has(dateStr)) return;
 
     try {
-      const rows = await fetchFixturesByDate(dateStr, { signal });
+      const rows = await fetchFixturesByDate(dateStr, { signal, timeoutMs });
       if (signal?.aborted) return;
       loadedDatesRef.current.add(dateStr);
       setFixturesMap((prev) => {
@@ -185,15 +191,24 @@ export function useMatches({ includeLive = true, filters = {} } = {}) {
       });
       setError(null);
     } catch (e) {
-      if (e?.name !== "AbortError") {
-        setError(e);
-        loadedDatesRef.current.add(dateStr);
-        setFixturesMap((prev) => {
-          const next = new Map(prev);
-          if (!next.has(dateStr)) next.set(dateStr, []);
-          return next;
-        });
-      }
+      // External abort (unmount / refresh) — ignore. Timeout / network — surface.
+      if (signal?.aborted && e?.name === "AbortError") return;
+      const timedOut =
+        e?.name === "TimeoutError" ||
+        String(e?.message || "").toLowerCase().includes("timed out");
+      if (e?.name === "AbortError" && !timedOut) return;
+
+      setError(
+        timedOut
+          ? new Error("Matches took too long to load. Please try again.")
+          : e,
+      );
+      loadedDatesRef.current.add(dateStr);
+      setFixturesMap((prev) => {
+        const next = new Map(prev);
+        if (!next.has(dateStr)) next.set(dateStr, []);
+        return next;
+      });
     }
   }, []);
 
@@ -222,12 +237,16 @@ export function useMatches({ includeLive = true, filters = {} } = {}) {
           PREMATCH_UTC_DAYS_BACK,
         );
         await Promise.all(
-          initialDates.map((ymd) => loadDateImpl(ymd, { signal: ac.signal })),
+          initialDates.map((ymd) =>
+            loadDateImpl(ymd, {
+              signal: ac.signal,
+              timeoutMs: INITIAL_FIXTURES_TIMEOUT_MS,
+            }),
+          ),
         );
       } else {
         await refreshWindowLegacy(ac.signal);
       }
-      setError(null);
       refreshLive().catch(() => {});
     } catch (e) {
       if (e?.name !== "AbortError") setError(e);

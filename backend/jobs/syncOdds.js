@@ -7,6 +7,7 @@ import {
   setCache,
   TTL,
 } from "../services/cacheService.js";
+import { refreshFixturesByDateCaches } from "../services/fixturesListService.js";
 import { parseMarkets } from "../utils/oddsParser.js";
 import { getEnabledSports } from "../services/sportsRegistry.js";
 import { getPreferredBookmakerApiId } from "../services/settingsService.js";
@@ -369,13 +370,26 @@ export default async function syncOdds(options = {}) {
       await sleep(ODDS_CALL_DELAY_MS);
     }
 
-    // Invalidate public caches so fresh DB state is served
+    // Keep public list caches warm: rebuild today/tomorrow by-date instead of
+    // deleting (home page was cold-missing for minutes after every sync).
     await deleteByPattern("fixtures:today:*");
-    await deleteByPattern("fixtures:by-date:*");
     await deleteByPattern("fixtures:upcoming:*");
     await deleteByPattern("live:fixtures:*");
     if (total > 0) {
       await deleteByPattern("odds:fixture:*:bk-*");
+    }
+    try {
+      const refreshed = await refreshFixturesByDateCaches();
+      console.log(
+        `[syncOdds] fixtures by-date refreshed:`,
+        refreshed.map((r) => `${r.ymd}=${r.count ?? r.error}`).join(", "),
+      );
+    } catch (err) {
+      console.error(
+        "[syncOdds] fixtures by-date refresh failed:",
+        err?.message || err,
+      );
+      await deleteByPattern("fixtures:by-date:*");
     }
 
     console.log(

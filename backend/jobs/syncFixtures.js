@@ -2,6 +2,7 @@ import prisma from "../Config/db.js";
 import { upsertNoTx } from "../utils/upsertNoTx.js";
 import { api, sleep } from "../services/apiSportsService.js";
 import { deleteByPattern } from "../services/cacheService.js";
+import { refreshFixturesByDateCaches } from "../services/fixturesListService.js";
 import { getEnabledSports } from "../services/sportsRegistry.js";
 import {
   getIngestActiveCap,
@@ -556,13 +557,24 @@ export async function runFixturesBulkByDate(opts = {}) {
     }
   }
 
-  // Cache keys for /fixtures/today, /upcoming, and /live are namespaced by the
-  // active preferred bookmaker. Blow them all away so the next public read
-  // rebuilds with fresh data.
+  // Keep by-date list caches warm (home page). Invalidate other list keys
+  // that are not rebuilt here.
   await deleteByPattern("fixtures:today:*");
-  await deleteByPattern("fixtures:by-date:*");
   await deleteByPattern("fixtures:upcoming:*");
   await deleteByPattern("live:fixtures:*");
+  try {
+    const refreshed = await refreshFixturesByDateCaches();
+    console.log(
+      `[syncFixtures] fixtures by-date refreshed:`,
+      refreshed.map((r) => `${r.ymd}=${r.count ?? r.error}`).join(", "),
+    );
+  } catch (err) {
+    console.error(
+      "[syncFixtures] fixtures by-date refresh failed:",
+      err?.message || err,
+    );
+    await deleteByPattern("fixtures:by-date:*");
+  }
 
   console.log(
     `[syncFixtures] bulk-by-date done – upserts=${totalUpserts}, skipped=${totalSkipped}, settled=${totalSettled}, ticketsSettled=${totalTicketsSettled}, payoutsCredited=${totalPayoutsCredited}, days=${dates.length}, leaguesSeen=${caches.leagueCache.size}, teamsSeen=${caches.teamCache.size}`,
