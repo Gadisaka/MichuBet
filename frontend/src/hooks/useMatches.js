@@ -10,9 +10,9 @@ import {
   getCalendarDayOffset,
   matchesClubNameSearch,
   parseUiDateToDate,
+  utcTodayYmd,
 } from "../utils/matchTimeUtils";
 import {
-  utcYmdDatesForPrematchHorizon,
   utcYmdDatesForSportsbookOffset,
 } from "../utils/sportsbookDay.js";
 import {
@@ -58,8 +58,6 @@ const INITIAL_FIXTURES_TIMEOUT_MS = Number.parseInt(
 
 const UPCOMING_FRONTEND_BUFFER_MS = 5 * 60 * 1000;
 const UPCOMING_FIXTURES_DAYS = 14;
-/** Include prior UTC day when prefetching fixtures for betting-day spillover. */
-const PREMATCH_UTC_DAYS_BACK = 1;
 
 function matchesTimeFilter(matchDate, timeId, kickoffAt, now = new Date()) {
   if (!timeId || timeId === "all") return true;
@@ -232,18 +230,14 @@ export function useMatches({ includeLive = true, filters = {} } = {}) {
       if (USE_FIXTURES_BY_DATE) {
         loadedDatesRef.current.clear();
         setFixturesMap(new Map());
-        const initialDates = utcYmdDatesForPrematchHorizon(
-          MAX_PREMATCH_DAYS,
-          PREMATCH_UTC_DAYS_BACK,
-        );
-        await Promise.all(
-          initialDates.map((ymd) =>
-            loadDateImpl(ymd, {
-              signal: ac.signal,
-              timeoutMs: INITIAL_FIXTURES_TIMEOUT_MS,
-            }),
-          ),
-        );
+        // Only block the home spinner on today's list. Other calendar days
+        // load lazily when the user changes the day filter (see effect below).
+        // Prefetching the full horizon here stampeded /fixtures?date= and
+        // kept loading=true for many seconds even after the API was fast.
+        await loadDateImpl(utcTodayYmd(), {
+          signal: ac.signal,
+          timeoutMs: INITIAL_FIXTURES_TIMEOUT_MS,
+        });
       } else {
         await refreshWindowLegacy(ac.signal);
       }
