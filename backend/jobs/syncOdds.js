@@ -389,7 +389,7 @@ export default async function syncOdds(options = {}) {
           "[syncOdds] fixtures by-date refresh failed:",
           err?.message || err,
         );
-        await deleteByPattern("fixtures:by-date:*");
+        // Keep existing by-date keys — stale data beats a cold miss for visitors.
       }
     } else {
       console.log(
