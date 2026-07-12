@@ -605,6 +605,7 @@ test("LOST ticket credits tiered cashback (totalOdds/lostOdds picks tier)", asyn
   seedTieredCashbackBonus();
   // Two home-win legs (4, 10) + one away-win leg (odds 2) that loses.
   // After recompute total_odds = 4*10*2 = 80; result = 80/2 = 40 -> tier x1.
+  // Grade winning fixtures first so cashback sees no PENDING legs.
   seedFixture({ id: "fx-w1", status: "FT", homeScore: 2, awayScore: 0 });
   seedFixture({ id: "fx-w2", status: "FT", homeScore: 1, awayScore: 0 });
   seedFixture({ id: "fx-l", status: "FT", homeScore: 0, awayScore: 2 });
@@ -614,6 +615,8 @@ test("LOST ticket credits tiered cashback (totalOdds/lostOdds picks tier)", asyn
   seedSelection({ id: "s-l", ticketId: "tk-t", fixtureId: "fx-l", selection: "1", marketCode: "MATCH_WINNER", odds: 2 });
   seedWallet({ id: "w-t", userId: "u-t", balance: 0 });
 
+  await settlement.settleFixture("fx-w1");
+  await settlement.settleFixture("fx-w2");
   const summary = await settlement.settleFixture("fx-l");
   assert.equal(summary.ticketsLost, 1);
 
@@ -638,12 +641,83 @@ test("LOST ticket with a postponed leg is NOT eligible for tiered cashback", asy
   seedSelection({ id: "d-l", ticketId: "tk-d", fixtureId: "fx-lb", selection: "1", marketCode: "MATCH_WINNER", odds: 2 });
   seedWallet({ id: "w-d", userId: "u-d", balance: 0 });
 
+  await settlement.settleFixture("fx-w1b");
+  await settlement.settleFixture("fx-pst");
   const summary = await settlement.settleFixture("fx-lb");
   assert.equal(summary.ticketsLost, 1);
 
   const bonusTx = [...store.transaction.values()].find((t) => t.type === "BONUS");
   assert.equal(bonusTx, undefined, "postponed leg must block cashback");
   assert.equal(store.wallet.get("w-d").balance, 0);
+});
+
+test("tiered cashback defers while a leg is PENDING, then credits when all resolve", async () => {
+  resetStore();
+  const store = getStore();
+  seedTieredCashbackBonus();
+  // total_odds 4*10*2 = 80; lost odds 2 -> result 40 -> x1 once all legs graded.
+  seedFixture({ id: "fx-dw1", status: "FT", homeScore: 2, awayScore: 0 });
+  seedFixture({ id: "fx-dw2", status: "FT", homeScore: 1, awayScore: 0 });
+  seedFixture({ id: "fx-dl", status: "FT", homeScore: 0, awayScore: 2 });
+  seedTicket({ id: "tk-def", userId: "u-def", stake: 10, totalOdds: 80 });
+  seedSelection({ id: "def-w1", ticketId: "tk-def", fixtureId: "fx-dw1", selection: "1", marketCode: "MATCH_WINNER", odds: 4 });
+  seedSelection({ id: "def-w2", ticketId: "tk-def", fixtureId: "fx-dw2", selection: "1", marketCode: "MATCH_WINNER", odds: 10 });
+  seedSelection({ id: "def-l", ticketId: "tk-def", fixtureId: "fx-dl", selection: "1", marketCode: "MATCH_WINNER", odds: 2 });
+  seedWallet({ id: "w-def", userId: "u-def", balance: 0 });
+
+  // First losing leg only — other legs still PENDING → no cashback yet.
+  const early = await settlement.settleFixture("fx-dl");
+  assert.equal(early.ticketsLost, 1);
+  assert.equal(store.ticket.get("tk-def").status, "LOST");
+  assert.equal(
+    [...store.transaction.values()].find((t) => t.type === "BONUS"),
+    undefined,
+    "must not credit cashback while legs are still PENDING",
+  );
+  assert.equal(store.wallet.get("w-def").balance, 0);
+
+  // Remaining legs grade WON; already-LOST path retries cashback.
+  await settlement.settleFixture("fx-dw1");
+  await settlement.settleFixture("fx-dw2");
+
+  const bonusTx = [...store.transaction.values()].find((t) => t.type === "BONUS");
+  assert.ok(bonusTx, "expected deferred BONUS cashback after all legs resolve");
+  assert.equal(bonusTx.reference, "bonus:cashback:tk-def");
+  assert.equal(bonusTx.amount, 10);
+  assert.equal(store.wallet.get("w-def").balance, 10);
+});
+
+test("tiered cashback deferred credit uses final largest lost odds (may pay nothing)", async () => {
+  resetStore();
+  const store = getStore();
+  seedTieredCashbackBonus();
+  // Product 4*5*2.5 = 50. Early lost @2.5 alone would be result 20 (eligible x1),
+  // but a later lost @5 makes result 10 < minResult 20 → no cashback.
+  seedFixture({ id: "fx-f1", status: "FT", homeScore: 2, awayScore: 0 });
+  seedFixture({ id: "fx-f2", status: "FT", homeScore: 0, awayScore: 1 });
+  seedFixture({ id: "fx-f3", status: "FT", homeScore: 0, awayScore: 2 });
+  seedTicket({ id: "tk-fin", userId: "u-fin", stake: 10, totalOdds: 50 });
+  seedSelection({ id: "fin-w", ticketId: "tk-fin", fixtureId: "fx-f1", selection: "1", marketCode: "MATCH_WINNER", odds: 4 });
+  seedSelection({ id: "fin-l2", ticketId: "tk-fin", fixtureId: "fx-f2", selection: "1", marketCode: "MATCH_WINNER", odds: 5 });
+  seedSelection({ id: "fin-l1", ticketId: "tk-fin", fixtureId: "fx-f3", selection: "1", marketCode: "MATCH_WINNER", odds: 2.5 });
+  seedWallet({ id: "w-fin", userId: "u-fin", balance: 0 });
+
+  const early = await settlement.settleFixture("fx-f3");
+  assert.equal(early.ticketsLost, 1);
+  assert.equal(
+    [...store.transaction.values()].find((t) => t.type === "BONUS"),
+    undefined,
+  );
+
+  await settlement.settleFixture("fx-f1");
+  await settlement.settleFixture("fx-f2");
+
+  assert.equal(
+    [...store.transaction.values()].find((t) => t.type === "BONUS"),
+    undefined,
+    "final largest lost odds must push result below minResult",
+  );
+  assert.equal(store.wallet.get("w-fin").balance, 0);
 });
 
 test("PENDING legs on terminal tickets (LOST/EXPIRED) are VOIDed so the fixture completes", async () => {

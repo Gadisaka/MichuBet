@@ -9,6 +9,11 @@ import {
   filterCategoriesByChipId,
 } from "../../data/footballMarketsByCategory";
 import { resolveCompactMarketToken } from "../../utils/compactMarketToken";
+import {
+  getMarketDisplayName,
+  sortMarketsByPriority,
+  sortOddsWithinMarket,
+} from "../../utils/marketDisplay";
 
 const TABLE_GRID_COLS =
   "grid-cols-[64px_minmax(220px,1fr)_repeat(6,82px)_58px_22px]";
@@ -371,7 +376,12 @@ function MatchExpansion({ match, onClose, onOddsClick, selectedOdds }) {
   const showFilteredEmpty =
     activeChipId !== MARKET_FILTER_ALL_CHIP_ID &&
     filteredCategories.length === 0;
-  const visibleCategories = filteredCategories;
+  const visibleCategories = sortMarketsByPriority(filteredCategories).map(
+    (category) => ({
+      ...category,
+      odds: sortOddsWithinMarket(category.category, category.odds || []),
+    }),
+  );
   const { home, away } = splitMatchTeams(match.match);
   const { datePart, timePart } = parseDate(match.date);
 
@@ -482,12 +492,15 @@ function MatchExpansion({ match, onClose, onOddsClick, selectedOdds }) {
               <ExpansionMarketSection
                 key={category.category}
                 marketLabel={category.category}
+                displayMarketLabel={getMarketDisplayName(category.category)}
                 odds={category.odds}
                 matchName={match.match}
                 apiFixtureId={match.apiFixtureId}
                 kickoffAt={match.kickoffAt}
                 matchStatus={match.status}
                 fromLive={false}
+                home={home}
+                away={away}
                 onOddsClick={handleOddsInExpansion}
                 selectedOdds={selectedOdds}
               />

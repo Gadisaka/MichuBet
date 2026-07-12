@@ -19,6 +19,11 @@ import { mapFixtureToMatch } from "../services/fixtureMapper";
 import { normalizeApiFixtureId } from "../utils/fixtureId";
 import { resolveCompactMarketToken } from "../utils/compactMarketToken";
 import {
+  getMarketDisplayName,
+  sortMarketsByPriority,
+  sortOddsWithinMarket,
+} from "../utils/marketDisplay";
+import {
   MARKET_FILTER_CHIPS,
   MARKET_FILTER_ALL_CHIP_ID,
   filterCategoriesByChipId,
@@ -184,7 +189,12 @@ function LiveExpansion({ match, onClose, onOddsClick, selectedOdds }) {
   const showFilteredEmpty =
     activeChipId !== MARKET_FILTER_ALL_CHIP_ID &&
     filteredCategories.length === 0;
-  const visibleCategories = filteredCategories;
+  const visibleCategories = sortMarketsByPriority(filteredCategories).map(
+    (category) => ({
+      ...category,
+      odds: sortOddsWithinMarket(category.category, category.odds || []),
+    }),
+  );
   const { home, away } = splitMatchTeams(match.match);
 
   if (!categories.length) {
@@ -302,12 +312,15 @@ function LiveExpansion({ match, onClose, onOddsClick, selectedOdds }) {
               <ExpansionMarketSection
                 key={category.category}
                 marketLabel={category.category}
+                displayMarketLabel={getMarketDisplayName(category.category)}
                 odds={category.odds}
                 matchName={match.match}
                 apiFixtureId={match.apiFixtureId}
                 kickoffAt={match.kickoffAt}
                 matchStatus={match.liveStatus ?? match.status}
                 fromLive
+                home={home}
+                away={away}
                 onOddsClick={handleOddsInExpansion}
                 selectedOdds={selectedOdds}
               />

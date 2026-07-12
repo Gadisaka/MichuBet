@@ -237,6 +237,36 @@ test("evaluateCashback gate: result below minResult", () => {
   assert.equal(ev.reason, "below_min_result");
 });
 
+test("evaluateCashback gate: any PENDING leg defers cashback", () => {
+  const ev = evaluateCashback({
+    ticket: { user_id: "u1", stake: 10, total_odds: 96, created_at: new Date() },
+    selections: [
+      { result: "WON", odds: 1.5 },
+      { result: "LOST", odds: 2.3 },
+      { result: "PENDING", odds: 1.5 },
+    ],
+    bonus: tieredBonus(),
+  });
+  assert.equal(ev.eligible, false);
+  assert.equal(ev.reason, "legs_pending");
+  assert.equal(ev.amount, 0);
+});
+
+test("evaluateCashback pays once all pending legs are resolved", () => {
+  const ev = evaluateCashback({
+    ticket: { user_id: "u1", stake: 10, total_odds: 96, created_at: new Date() },
+    selections: [
+      { result: "WON", odds: 1.5 },
+      { result: "LOST", odds: 2.3 },
+      { result: "WON", odds: 1.5 },
+    ],
+    bonus: tieredBonus(),
+  });
+  assert.equal(ev.eligible, true);
+  assert.equal(ev.reason, "eligible");
+  assert.equal(ev.amount, 10);
+});
+
 test("computeCashbackAmount uses tiered path when rules.tiers present", () => {
   const amount = computeCashbackAmount(
     { user_id: "u1", stake: 10, total_odds: 96, created_at: new Date() },

@@ -28,7 +28,7 @@ export const MARKET_FILTER_TAB_IDS = /** @type {const} */ ([
 /** UI labels (production order; "All" is synthetic in the component). */
 export const MARKET_FILTER_TAB_LABEL = {
   "main-market": "Main Market",
-  goals: "Goals",
+  goals: "Total",
   combination: "Combination",
   "half-time": "Half Time",
   corners: "Corners",
@@ -68,6 +68,8 @@ export function isAllChipId(chipId) {
 const MAIN_MARKET = [
   "Match Winner",
   "Home/Away",
+  "Both Teams Score",
+  "Both Teams to Score",
   "Double Chance",
   "Draw No Bet",
   "Handicap Result",

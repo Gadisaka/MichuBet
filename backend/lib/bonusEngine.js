@@ -271,6 +271,13 @@ export function evaluateCashback({
   );
   if (hasDqFixture || hasDqMatch) return fail("disqualified_selection");
 
+  // Defer until every leg is graded so the ratio uses the final lost set
+  // (paying on the first LOST leg can overpay when a larger lost odd arrives later).
+  const hasPending = selections.some(
+    (s) => String(s?.result ?? "PENDING").toUpperCase() === "PENDING",
+  );
+  if (hasPending) return fail("legs_pending");
+
   let largestLostOdds = 0;
   for (const sel of selections) {
     if (!sel) continue;

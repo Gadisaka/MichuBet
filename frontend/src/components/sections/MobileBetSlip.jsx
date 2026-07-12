@@ -702,7 +702,7 @@ function MobileBetSlip({
                       expired ? "text-[#f87171]/90" : "text-[rgba(255,255,255,0.72)]"
                     }`}
                   >
-                    {sel.marketLabel}: {sel.label}
+                    {sel.marketLabel}: {sel.displayLabel || sel.label}
                   </div>
                 </button>
                 <div className="flex items-center gap-3">
@@ -1019,7 +1019,7 @@ function MobileBetSlip({
                         </td>
                         <td className="px-2 py-2">{sel.matchName}</td>
                         <td className="px-2 py-2">{sel.marketLabel}</td>
-                        <td className="px-2 py-2">{sel.label}</td>
+                        <td className="px-2 py-2">{sel.displayLabel || sel.label}</td>
                         <td className="px-2 py-2 text-right font-bold">
                           {sel.value}
                         </td>
