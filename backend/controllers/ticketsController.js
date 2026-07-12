@@ -26,7 +26,10 @@ import { logAuditEvent } from "../lib/auditLog.js";
 import { perfSpan, slowThresholdMs } from "../lib/perfTiming.js";
 import { notifyUserSafe } from "../lib/createNotification.js";
 import { betPlacedNotification } from "../lib/notificationMessages.js";
-import { resolveAccumulatorForNewTicket } from "../lib/bonusEngine.js";
+import {
+  cashbackBonusRef,
+  resolveAccumulatorForNewTicket,
+} from "../lib/bonusEngine.js";
 import { classifySelectionSupport } from "../services/markets/marketSupport.js";
 import { validatePlacementSelections } from "../services/odds-engine/validateSelections.js";
 import { validateOpenTicketForPrint, normalizeSnapshotForPrintValidation } from "../services/ticketPrintValidation.js";
@@ -850,10 +853,11 @@ export async function getPublicReceiptTicket(req, res) {
 }
 
 /**
- * Minimal payload for coupon check — no stake/financial info.
- * Used by getPublicCouponCheck to return only selections and status.
+ * Minimal payload for coupon check — no stake / potential win.
+ * Includes credited cashbackAmount when a BONUS ledger row exists.
+ * Used by getPublicCouponCheck to return selections, status, and cashback.
  */
-function mapPublicCouponCheckPayload(ticket) {
+function mapPublicCouponCheckPayload(ticket, cashbackAmount = null) {
   const snapshot = Array.isArray(ticket.selection_snapshot)
     ? ticket.selection_snapshot
     : [];
@@ -930,12 +934,18 @@ function mapPublicCouponCheckPayload(ticket) {
           };
         });
 
+  const credited =
+    cashbackAmount != null && Number(cashbackAmount) > 0
+      ? Number(cashbackAmount)
+      : null;
+
   return {
     couponNumber: ticket.coupon_number,
     receiptNumber: ticket.receipt_number ?? null,
     status: ticket.status,
     createdAt: ticket.created_at,
     selections: selectionLegs,
+    cashbackAmount: credited,
   };
 }
 
@@ -943,7 +953,8 @@ function mapPublicCouponCheckPayload(ticket) {
  * GET /api/cms/check-coupon?couponNumber=
  * Public coupon check — returns list of paid tickets (those with receipt_number).
  * Unpaid tickets (no receipt_number) are filtered out.
- * Returns minimal fields: couponNumber, receiptNumber, status, selections.
+ * Returns minimal fields: couponNumber, receiptNumber, status, selections,
+ * and cashbackAmount when a BONUS cashback credit exists for the ticket.
  */
 export async function getPublicCouponCheck(req, res) {
   try {
@@ -976,8 +987,25 @@ export async function getPublicCouponCheck(req, res) {
       });
     }
 
+    const refs = paidTickets.map((t) => cashbackBonusRef(t.id));
+    const cashbackTxns =
+      refs.length > 0
+        ? await prisma.transaction.findMany({
+            where: { type: "BONUS", reference: { in: refs } },
+            select: { reference: true, amount: true },
+          })
+        : [];
+    const cashbackByRef = new Map(
+      cashbackTxns.map((tx) => [tx.reference, Number(tx.amount) || 0]),
+    );
+
     return res.json({
-      tickets: paidTickets.map(mapPublicCouponCheckPayload),
+      tickets: paidTickets.map((ticket) =>
+        mapPublicCouponCheckPayload(
+          ticket,
+          cashbackByRef.get(cashbackBonusRef(ticket.id)) ?? null,
+        ),
+      ),
     });
   } catch (error) {
     console.error("getPublicCouponCheck error:", error);

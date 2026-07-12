@@ -6,11 +6,12 @@ import {
 
 /**
  * Coupon check preview — displays list of paid tickets for a coupon number.
- * Shows coupon, selections, odds, and status — not stake/financial info or receipt number.
+ * Shows coupon, selections, odds, status, and credited cashback when present.
+ * Does not show stake or potential win.
  *
  * Used by the "Check Coupon" feature in betslip and CheckTicket page.
  * `tickets` is the array from `fetchPublicCouponCheck`:
- * `[{ couponNumber, receiptNumber, status, createdAt, selections: [...] }]`
+ * `[{ couponNumber, receiptNumber, status, createdAt, cashbackAmount, selections: [...] }]`
  */
 
 const TICKET_STATUS_CLS = {
@@ -41,6 +42,12 @@ function formatOdds(value) {
   return n.toFixed(2);
 }
 
+function formatCashbackEtb(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n <= 0) return null;
+  return `${n.toFixed(2)} ETB`;
+}
+
 function formatLeagueLine(sel) {
   const league = String(sel?.league ?? "").trim();
   if (league) return league;
@@ -60,6 +67,7 @@ function SingleTicketCard({ ticket, className = "" }) {
   if (!ticket) return null;
   const selections = ticket.selections || [];
   const ticketStatus = mapTicketUiStatus(ticket.status);
+  const cashbackLabel = formatCashbackEtb(ticket.cashbackAmount);
 
   return (
     <div
@@ -80,6 +88,12 @@ function SingleTicketCard({ ticket, className = "" }) {
         >
           {ticketStatus.label}
         </p>
+        {cashbackLabel ? (
+          <p className="mt-2 text-[12px] font-black uppercase tracking-[0.12em] text-[#0a0a0a]">
+            Cashback{" "}
+            <span className="tracking-normal">{cashbackLabel}</span>
+          </p>
+        ) : null}
       </div>
 
       <ReceiptDivider />
