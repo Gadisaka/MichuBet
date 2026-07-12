@@ -87,6 +87,25 @@ describe("formatSelectionDisplayLabel", () => {
     ).toBe("Draw or Chelsea");
   });
 
+  it("maps Home/Draw API values and compact tokens to team labels", () => {
+    expect(
+      formatSelectionDisplayLabel({
+        marketName: "Double Chance",
+        selectionId: "Home/Draw",
+        home: "Tianjin Teda",
+        away: "Shenyang Urban",
+      }),
+    ).toBe("Tianjin Teda or Draw");
+    expect(
+      formatSelectionDisplayLabel({
+        marketName: "Double Chance",
+        selectionId: "1X",
+        home: "Tianjin Teda",
+        away: "Shenyang Urban",
+      }),
+    ).toBe("Tianjin Teda or Draw");
+  });
+
   it("leaves other markets as-is", () => {
     expect(
       formatSelectionDisplayLabel({

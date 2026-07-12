@@ -76,6 +76,25 @@ function isGoalsOverUnderMarket(marketName) {
 }
 
 /**
+ * Normalize selection ids so Home/Draw-style API values map to compact tokens.
+ * @param {string} selectionId
+ * @returns {string}
+ */
+function canonicalSelectionToken(selectionId) {
+  const id = String(selectionId || "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, " ");
+  if (["home", "1"].includes(id)) return "1";
+  if (["draw", "x"].includes(id)) return "x";
+  if (["away", "2"].includes(id)) return "2";
+  if (["1x", "home/draw", "home or draw", "x1"].includes(id)) return "1x";
+  if (["12", "home/away", "home or away", "21"].includes(id)) return "12";
+  if (["x2", "draw/away", "draw or away", "2x"].includes(id)) return "x2";
+  return id;
+}
+
+/**
  * Team-aware display label for OddsCell / bet slip. Placement still uses the
  * canonical selection token via resolveExpansionSelectionMeta.
  *
@@ -93,9 +112,7 @@ export function formatSelectionDisplayLabel({
   home = "Home",
   away = "Away",
 }) {
-  const id = String(selectionId || "")
-    .trim()
-    .toLowerCase();
+  const id = canonicalSelectionToken(selectionId);
   const homeName = String(home || "Home").trim() || "Home";
   const awayName = String(away || "Away").trim() || "Away";
 
@@ -105,7 +122,13 @@ export function formatSelectionDisplayLabel({
     if (id === "2") return awayName;
   }
 
-  if (isDoubleChanceMarket(marketName)) {
+  // Double Chance (and DC compact tokens even if market name is missing)
+  if (
+    isDoubleChanceMarket(marketName) ||
+    id === "1x" ||
+    id === "12" ||
+    id === "x2"
+  ) {
     if (id === "1x") return `${homeName} or Draw`;
     if (id === "12") return `${homeName} or ${awayName}`;
     if (id === "x2") return `Draw or ${awayName}`;
@@ -217,6 +240,7 @@ export function gridColsForMarket(marketName) {
 export function resolveExpansionSelectionMeta(marketName, selectionId, teams = {}) {
   const home = teams.home || "Home";
   const away = teams.away || "Away";
+  const tokenId = canonicalSelectionToken(selectionId);
   const displayLabel = formatSelectionDisplayLabel({
     marketName,
     selectionId,
@@ -224,7 +248,7 @@ export function resolveExpansionSelectionMeta(marketName, selectionId, teams = {
     away,
   });
 
-  const token = resolveCompactMarketToken(selectionId);
+  const token = resolveCompactMarketToken(tokenId);
   if (
     token &&
     ((isMatchWinnerMarket(marketName) && token.marketCode === "MATCH_WINNER") ||

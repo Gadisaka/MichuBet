@@ -195,7 +195,9 @@ function LiveExpansion({ match, onClose, onOddsClick, selectedOdds }) {
       odds: sortOddsWithinMarket(category.category, category.odds || []),
     }),
   );
-  const { home, away } = splitMatchTeams(match.match);
+  const split = splitMatchTeams(match.match);
+  const home = match.homeTeam || split.home;
+  const away = match.awayTeam || split.away;
 
   if (!categories.length) {
     return <LiveExpansionEmpty onClose={onClose} />;

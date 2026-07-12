@@ -183,6 +183,8 @@ export function mapFixtureToMatch(fixture, oddsPayload = null) {
       : 9999,
     league: `${country} - ${leagueName}`,
     match: `${home} V ${away}`,
+    homeTeam: home,
+    awayTeam: away,
     date: formatDateForUi(fixture.start_time),
     kickoffAt,
     sportId,
