@@ -22,6 +22,11 @@ export const translations = Object.freeze({
       home: "HOME",
       live: "LIVE",
       games: "GAMES",
+      fastKeno: "KENO",
+      aviator: "AVIATOR",
+      chickenRoad: "CHICKEN ROAD 2",
+      bingo: "BINGO",
+      megaBlock: "MEGA BLOCK",
     }),
     casino: Object.freeze({
       eyebrow: "Casino",
@@ -154,6 +159,11 @@ export const translations = Object.freeze({
       home: "መነሻ",
       live: "ቀጥታ",
       games: "ጨዋታዎች",
+      fastKeno: "ኬኖ",
+      aviator: "አቪያተር",
+      chickenRoad: "ቺክን ሮድ 2",
+      bingo: "ቢንጎ",
+      megaBlock: "ሜጋ ብሎክ",
     }),
     casino: Object.freeze({
       eyebrow: "ካዚኖ",

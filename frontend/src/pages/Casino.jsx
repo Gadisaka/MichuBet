@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import PageContainer from "../components/layout/PageContainer";
 import PrimaryNav from "../components/layout/PrimaryNav";
 import SiteFooter from "../components/layout/SiteFooter";
@@ -12,7 +12,6 @@ import { useTranslation } from "../i18n/LanguageContext.jsx";
 import {
   fetchCasinoGames,
   fetchCasinoStatus,
-  fetchInoutDemoLaunchUrl,
   fetchInoutLaunchUrl,
   generateMrxSsoToken,
   hasAuthToken,
@@ -33,38 +32,49 @@ const MRX_GAMES = [
     path: "/game/keno",
   },
   {
-    id: "aviator",
-    nameKey: "casino.aviatorName",
-    iconUrl: aviatorThumb,
-    ssoTarget: GAME_BASE_URL,
-    path: "/game/aviator",
-  },
-  {
     id: "bingo",
     nameKey: "casino.bingoName",
     iconUrl: bingoThumb,
     ssoTarget: GAME_BASE_URL,
     path: "/game/bingo",
   },
+  {
+    id: "aviator",
+    nameKey: "casino.aviatorName",
+    iconUrl: aviatorThumb,
+    ssoTarget: GAME_BASE_URL,
+    path: "/game/aviator",
+  },
 ];
 
-function InstantGameCard({ game, launching, onPlay, t }) {
-  const isLaunching = launching === game.id;
-  const title = t(game.nameKey);
+/** InOut gameModes launched from the top nav (session token via backend). */
+const NAV_INOUT_LAUNCHES = {
+  "chicken-road-two-bonus": { title: "Chicken Road 2" },
+  megablock: { title: "Mega Block" },
+};
+
+function GameCard({ game, onPlay, launching = false }) {
   return (
     <button
       type="button"
-      disabled={isLaunching}
+      disabled={launching}
       onClick={() => onPlay(game)}
       className="group relative aspect-square w-full cursor-pointer overflow-hidden rounded-2xl border border-(--sb-accent-border) bg-[#0a0a0a] p-0 text-left transition-all hover:ring-1 hover:ring-(--sb-accent-fill)/60 disabled:cursor-wait disabled:opacity-70"
     >
-      <img
-        src={game.iconUrl}
-        alt={title}
-        loading="lazy"
-        className="absolute inset-0 h-full w-full object-cover"
-      />
-      {isLaunching ? (
+      {game.iconUrl ? (
+        <img
+          src={game.iconUrl}
+          alt={game.title}
+          loading="lazy"
+          className="absolute inset-0 h-full w-full object-cover"
+        />
+      ) : (
+        <div className="absolute inset-0 flex items-center justify-center text-[#3a3a3a]">
+          <AppIcon name="gamepad" size={40} />
+        </div>
+      )}
+
+      {launching ? (
         <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/50">
           <span className="h-5 w-5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
         </div>
@@ -72,63 +82,19 @@ function InstantGameCard({ game, launching, onPlay, t }) {
 
       <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/40 to-transparent px-1.5 pb-1.5 pt-6">
         <h3 className="truncate text-[12px] font-semibold text-[#f6f9ff]">
-          {title}
+          {game.title}
         </h3>
       </div>
     </button>
   );
 }
 
-function GameCard({ game, onPlay, onDemo, t }) {
-  return (
-    <div className="group flex flex-col overflow-hidden rounded-2xl border border-white/8 bg-gradient-to-br from-[#111111]/92 to-[#000000]/92 transition-all hover:ring-1 hover:ring-(--sb-accent-fill)/40">
-      <div className="relative aspect-[3/4] w-full overflow-hidden bg-[#0a0a0a]">
-        {game.iconUrl ? (
-          <img
-            src={game.iconUrl}
-            alt={game.title}
-            loading="lazy"
-            className="h-full w-full object-contain p-1"
-          />
-        ) : (
-          <div className="flex h-full w-full items-center justify-center text-[#3a3a3a]">
-            <AppIcon name="gamepad" size={40} />
-          </div>
-        )}
-
-        {/* Bottom button bar over the banner (glass effect). */}
-        <div className="pointer-events-none absolute inset-x-2 bottom-2">
-          <div className="pointer-events-auto grid grid-cols-2 gap-1.5 rounded-xl border border-white/25 bg-white/12 p-1.5 backdrop-blur-md">
-            <button
-              type="button"
-              onClick={() => onPlay(game)}
-              className="cursor-pointer rounded-lg border-0 bg-(--sb-accent-fill) px-2 py-1.5 text-[12px] font-bold text-[#000000] transition-all hover:brightness-110"
-            >
-              {t("casino.play")}
-            </button>
-            <button
-              type="button"
-              onClick={() => onDemo(game)}
-              className="cursor-pointer rounded-lg border border-white/20 bg-black/20 px-2 py-1.5 text-[12px] font-semibold text-[#ffffff] transition-all hover:bg-black/35"
-            >
-              {t("casino.demo")}
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <div className="flex flex-1 flex-col gap-2 p-2.5">
-        <h3 className="truncate text-[13px] font-semibold text-[#f6f9ff]">
-          {game.title}
-        </h3>
-      </div>
-    </div>
-  );
-}
-
 function Casino() {
   const { t, language } = useTranslation();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const launchId = searchParams.get("launch");
+  const handledLaunchRef = useRef(null);
 
   const [games, setGames] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -172,6 +138,17 @@ function Casino() {
       .finally(() => setLoading(false));
     return () => ac.abort();
   }, [casinoEnabled]);
+
+  const clearLaunchParam = useCallback(() => {
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete("launch");
+        return next;
+      },
+      { replace: true },
+    );
+  }, [setSearchParams]);
 
   const handleMrxPlay = useCallback(
     async (game) => {
@@ -220,21 +197,32 @@ function Casino() {
     [launching, language, navigate],
   );
 
-  const handleDemo = useCallback(
-    async (game) => {
-      if (launching) return;
-      setLaunching(true);
-      try {
-        const url = await fetchInoutDemoLaunchUrl(game.gameMode, language);
-        setFrame({ url, title: game.title });
-      } catch (err) {
-        setError(err.message || "Failed to launch demo");
-      } finally {
-        setLaunching(false);
-      }
-    },
-    [launching, language],
-  );
+  useEffect(() => {
+    if (!launchId) {
+      handledLaunchRef.current = null;
+      return;
+    }
+    if (handledLaunchRef.current === launchId) return;
+
+    const mrxGame = MRX_GAMES.find((g) => g.id === launchId);
+    if (mrxGame) {
+      handledLaunchRef.current = launchId;
+      clearLaunchParam();
+      handleMrxPlay(mrxGame);
+      return;
+    }
+
+    const navInout = NAV_INOUT_LAUNCHES[launchId];
+    if (navInout) {
+      handledLaunchRef.current = launchId;
+      clearLaunchParam();
+      handlePlay({ gameMode: launchId, title: navInout.title });
+      return;
+    }
+
+    handledLaunchRef.current = launchId;
+    clearLaunchParam();
+  }, [launchId, clearLaunchParam, handleMrxPlay, handlePlay]);
 
   return (
     <PageContainer>
@@ -261,12 +249,11 @@ function Casino() {
 
         <div className="mt-3 grid grid-cols-3 gap-2 pb-4 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6">
           {MRX_GAMES.map((game) => (
-            <InstantGameCard
+            <GameCard
               key={game.id}
-              game={game}
-              launching={mrxLaunching}
+              game={{ ...game, title: t(game.nameKey) }}
+              launching={mrxLaunching === game.id}
               onPlay={handleMrxPlay}
-              t={t}
             />
           ))}
         </div>
@@ -296,14 +283,12 @@ function Casino() {
                 </p>
               </div>
             ) : (
-              <div className="mt-3 grid grid-cols-2 gap-3 pb-6 md:grid-cols-3 lg:grid-cols-4">
+              <div className="mt-3 grid grid-cols-3 gap-2 pb-6 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6">
                 {games.map((game) => (
                   <GameCard
                     key={game.gameMode}
                     game={game}
                     onPlay={handlePlay}
-                    onDemo={handleDemo}
-                    t={t}
                   />
                 ))}
               </div>

@@ -6,9 +6,26 @@ export const topHeaderData = {
 
 /** Labels come from i18n `nav.*` via `PrimaryNav`. */
 export const topNavItems = [
-  { id: "home", icon: "home", path: "/" },
-  { id: "live", icon: "radio", path: "/live" },
-  { id: "games", icon: "gamepad", path: "/casino" },
+  { id: "fastKeno", icon: "hash", path: "/casino?launch=keno", launch: "keno" },
+  {
+    id: "aviator",
+    icon: "rocket",
+    path: "/casino?launch=aviator",
+    launch: "aviator",
+  },
+  {
+    id: "chickenRoad",
+    icon: "bird",
+    path: "/casino?launch=chicken-road-two-bonus",
+    launch: "chicken-road-two-bonus",
+  },
+  { id: "bingo", icon: "grid", path: "/casino?launch=bingo", launch: "bingo" },
+  {
+    id: "megaBlock",
+    icon: "boxes",
+    path: "/casino?launch=megablock",
+    launch: "megablock",
+  },
 ];
 
 export const topLeagues = [
