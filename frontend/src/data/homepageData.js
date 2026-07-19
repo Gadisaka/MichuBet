@@ -6,6 +6,9 @@ export const topHeaderData = {
 
 /** Labels come from i18n `nav.*` via `PrimaryNav`. */
 export const topNavItems = [
+  { id: "home", icon: "home", path: "/" },
+  { id: "live", icon: "radio", path: "/live" },
+  { id: "games", icon: "gamepad", path: "/casino" },
   { id: "fastKeno", icon: "hash", path: "/casino?launch=keno", launch: "keno" },
   {
     id: "aviator",

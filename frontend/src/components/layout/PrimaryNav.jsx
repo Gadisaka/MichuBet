@@ -15,6 +15,8 @@ function PrimaryNav({ items }) {
         if (item.launch) {
           isActive =
             location.pathname === "/casino" && launchParam === item.launch;
+        } else if (item.id === "games") {
+          isActive = location.pathname === "/casino" && !launchParam;
         } else {
           isActive = Boolean(item.path) && location.pathname === item.path;
         }

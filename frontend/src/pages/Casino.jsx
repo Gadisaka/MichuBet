@@ -59,7 +59,7 @@ function GameCard({ game, onPlay, launching = false }) {
       type="button"
       disabled={launching}
       onClick={() => onPlay(game)}
-      className="group relative aspect-square w-full cursor-pointer overflow-hidden rounded-2xl border border-(--sb-accent-border) bg-[#0a0a0a] p-0 text-left transition-all hover:ring-1 hover:ring-(--sb-accent-fill)/60 disabled:cursor-wait disabled:opacity-70"
+      className="group relative aspect-[3/4] w-full cursor-pointer overflow-hidden rounded-2xl border border-(--sb-accent-border) bg-[#0a0a0a] p-0 text-left transition-all hover:ring-1 hover:ring-(--sb-accent-fill)/60 disabled:cursor-wait disabled:opacity-70"
     >
       {game.iconUrl ? (
         <img
@@ -247,7 +247,7 @@ function Casino() {
           </div>
         ) : null}
 
-        <div className="mt-3 grid grid-cols-3 gap-2 pb-4 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6">
+        <div className="mt-3 grid grid-cols-2 gap-3 pb-4 md:grid-cols-3 lg:grid-cols-4">
           {MRX_GAMES.map((game) => (
             <GameCard
               key={game.id}
@@ -283,7 +283,7 @@ function Casino() {
                 </p>
               </div>
             ) : (
-              <div className="mt-3 grid grid-cols-3 gap-2 pb-6 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6">
+              <div className="mt-3 grid grid-cols-2 gap-3 pb-6 md:grid-cols-3 lg:grid-cols-4">
                 {games.map((game) => (
                   <GameCard
                     key={game.gameMode}
