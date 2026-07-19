@@ -53,13 +53,14 @@ const NAV_INOUT_LAUNCHES = {
   megablock: { title: "Mega Block" },
 };
 
-function GameCard({ game, onPlay, launching = false }) {
+function GameCard({ game, onPlay, launching = false, size = "lg" }) {
+  const aspect = size === "sm" ? "aspect-square" : "aspect-[3/4]";
   return (
     <button
       type="button"
       disabled={launching}
       onClick={() => onPlay(game)}
-      className="group relative aspect-[3/4] w-full cursor-pointer overflow-hidden rounded-2xl border border-(--sb-accent-border) bg-[#0a0a0a] p-0 text-left transition-all hover:ring-1 hover:ring-(--sb-accent-fill)/60 disabled:cursor-wait disabled:opacity-70"
+      className={`group relative ${aspect} w-full cursor-pointer overflow-hidden rounded-2xl border border-(--sb-accent-border) bg-[#0a0a0a] p-0 text-left transition-all hover:ring-1 hover:ring-(--sb-accent-fill)/60 disabled:cursor-wait disabled:opacity-70`}
     >
       {game.iconUrl ? (
         <img
@@ -247,13 +248,14 @@ function Casino() {
           </div>
         ) : null}
 
-        <div className="mt-3 grid grid-cols-2 gap-3 pb-4 md:grid-cols-3 lg:grid-cols-4">
+        <div className="mt-3 grid grid-cols-3 gap-2 pb-4 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6">
           {MRX_GAMES.map((game) => (
             <GameCard
               key={game.id}
               game={{ ...game, title: t(game.nameKey) }}
               launching={mrxLaunching === game.id}
               onPlay={handleMrxPlay}
+              size="sm"
             />
           ))}
         </div>
