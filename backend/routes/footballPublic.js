@@ -25,7 +25,6 @@ import {
   pickTopActiveLeagues,
 } from "../Config/leagueRanks.js";
 import { recomputeExtraMarketsCountForFixture } from "../services/extraMarketsCount.js";
-import { writeLiveOddsFromApiResponse } from "../services/liveOddsCache.js";
 import {
   attachLeagueRanksToList,
   bookmakerCacheSuffix,
@@ -104,18 +103,10 @@ async function getRawLiveOddsCoalesced() {
 
   liveOddsInflight = api("football")
     .getLiveOdds()
-    .then(async (raw) => {
+    .then((raw) => {
       // Reset transformed cache when raw changes – it will be lazily
       // rebuilt by the next call to `getTransformedLiveOddsCoalesced`.
       liveOddsSnapshot = { at: Date.now(), raw: raw ?? [], transformed: null };
-
-      // Write live odds to Redis for bet validation to use
-      if (raw?.length) {
-        writeLiveOddsFromApiResponse(raw).catch((err) => {
-          console.error("[getRawLiveOddsCoalesced] Redis write failed:", err);
-        });
-      }
-
       return liveOddsSnapshot.raw;
     })
     .finally(() => {
@@ -180,7 +171,9 @@ function transformLiveOddsForClient(rawLiveOdds) {
 }
 
 /**
- * Drop markets whose provider name is not in the allowed phase.
+ * PHASE-0 settlement gate: drop any market whose provider NAME is not in the
+ * active allowlist (unsupported or mis-mapped). Non-bypassable — applied to
+ * every odds response so no client can place a market that wouldn't settle.
  * Returns a shallow copy so cached objects are not mutated.
  */
 function dropUnsupportedMarkets(fixture) {
@@ -494,7 +487,7 @@ router.get("/fixtures/upcoming", async (req, res) => {
         );
 
     const preferred = await getPreferredBookmakerRecord();
-    const cacheKey = `fixtures:upcoming:v4:${days}d:${bookmakerCacheSuffix(preferred)}:${fixturesListCacheModeSuffix()}`;
+    const cacheKey = `fixtures:upcoming:v6:${days}d:${bookmakerCacheSuffix(preferred)}:${fixturesListCacheModeSuffix()}`;
 
     let data = await getCache(cacheKey);
     if (!data) {

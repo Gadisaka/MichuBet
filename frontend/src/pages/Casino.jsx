@@ -14,8 +14,70 @@ import {
   fetchCasinoStatus,
   fetchInoutDemoLaunchUrl,
   fetchInoutLaunchUrl,
+  generateMrxSsoToken,
   hasAuthToken,
 } from "../services/api";
+import kenoThumb from "../assets/games/keno.png";
+import aviatorThumb from "../assets/games/aviator.png";
+import bingoThumb from "../assets/games/bingo.png";
+
+const GAME_BASE_URL =
+  import.meta.env.VITE_GAME_BASE_URL || "https://games.michot.bet";
+
+const MRX_GAMES = [
+  {
+    id: "keno",
+    nameKey: "casino.kenoName",
+    iconUrl: kenoThumb,
+    ssoTarget: GAME_BASE_URL,
+    path: "/game/keno",
+  },
+  {
+    id: "aviator",
+    nameKey: "casino.aviatorName",
+    iconUrl: aviatorThumb,
+    ssoTarget: GAME_BASE_URL,
+    path: "/game/aviator",
+  },
+  {
+    id: "bingo",
+    nameKey: "casino.bingoName",
+    iconUrl: bingoThumb,
+    ssoTarget: GAME_BASE_URL,
+    path: "/game/bingo",
+  },
+];
+
+function InstantGameCard({ game, launching, onPlay, t }) {
+  const isLaunching = launching === game.id;
+  const title = t(game.nameKey);
+  return (
+    <button
+      type="button"
+      disabled={isLaunching}
+      onClick={() => onPlay(game)}
+      className="group relative aspect-square w-full cursor-pointer overflow-hidden rounded-2xl border border-(--sb-accent-border) bg-[#0a0a0a] p-0 text-left transition-all hover:ring-1 hover:ring-(--sb-accent-fill)/60 disabled:cursor-wait disabled:opacity-70"
+    >
+      <img
+        src={game.iconUrl}
+        alt={title}
+        loading="lazy"
+        className="absolute inset-0 h-full w-full object-cover"
+      />
+      {isLaunching ? (
+        <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/50">
+          <span className="h-5 w-5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+        </div>
+      ) : null}
+
+      <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/40 to-transparent px-1.5 pb-1.5 pt-6">
+        <h3 className="truncate text-[12px] font-semibold text-[#f6f9ff]">
+          {title}
+        </h3>
+      </div>
+    </button>
+  );
+}
 
 function GameCard({ game, onPlay, onDemo, t }) {
   return (
@@ -72,11 +134,12 @@ function Casino() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // null = still checking the master switch; false = casino off (black screen).
+  // null = still checking; false = InOut lobby off (Instant Games still shown).
   const [casinoEnabled, setCasinoEnabled] = useState(null);
 
   const [frame, setFrame] = useState(null);
   const [launching, setLaunching] = useState(false);
+  const [mrxLaunching, setMrxLaunching] = useState(null);
 
   useEffect(() => {
     const ac = new AbortController();
@@ -90,7 +153,11 @@ function Casino() {
   }, []);
 
   useEffect(() => {
-    if (casinoEnabled !== true) return;
+    if (casinoEnabled !== true) {
+      setLoading(false);
+      setGames([]);
+      return;
+    }
     const ac = new AbortController();
     setLoading(true);
     fetchCasinoGames({ signal: ac.signal })
@@ -105,6 +172,33 @@ function Casino() {
       .finally(() => setLoading(false));
     return () => ac.abort();
   }, [casinoEnabled]);
+
+  const handleMrxPlay = useCallback(
+    async (game) => {
+      setError(null);
+      if (!hasAuthToken()) {
+        navigate("/login");
+        return;
+      }
+      if (mrxLaunching) return;
+      setMrxLaunching(game.id);
+      try {
+        const ssoToken = await generateMrxSsoToken();
+        const targetUrl = new URL(game.path || "/", game.ssoTarget);
+        targetUrl.searchParams.set("sso_token", ssoToken);
+        window.open(targetUrl.toString(), "_blank", "noopener,noreferrer");
+      } catch (err) {
+        if (err.message === "NOT_LOGGED_IN") {
+          navigate("/login");
+          return;
+        }
+        setError(err.message || "Could not launch game. Please try again.");
+      } finally {
+        setMrxLaunching(null);
+      }
+    },
+    [mrxLaunching, navigate],
+  );
 
   const handlePlay = useCallback(
     async (game) => {
@@ -142,11 +236,6 @@ function Casino() {
     [launching, language],
   );
 
-  // Master switch off (or still resolving) → blank black screen only.
-  if (casinoEnabled !== true) {
-    return <div className="fixed inset-0 bg-black" />;
-  }
-
   return (
     <PageContainer>
       <div className="sticky top-0 z-50">
@@ -157,10 +246,10 @@ function Casino() {
       <div className="mx-auto w-full max-w-6xl px-2 pt-2 sm:px-3">
         <div className="animate-deposit-panel px-1 pt-1">
           <p className="m-0 text-[11px] font-extrabold uppercase tracking-[0.2em] text-[rgba(255,255,255,0.72)]">
-            {t("casino.eyebrow")}
+            {t("casino.instantEyebrow")}
           </p>
           <h1 className="m-0 bg-gradient-to-r from-[#ffffff] via-[#ffe8a3] to-[#ffffff] bg-clip-text text-xl font-black tracking-tight text-transparent sm:text-2xl">
-            {t("casino.title")}
+            {t("casino.instantTitle")}
           </h1>
         </div>
 
@@ -170,32 +259,57 @@ function Casino() {
           </div>
         ) : null}
 
-        {loading ? (
-          <div className="flex items-center justify-center px-4 py-24 text-[rgba(255,255,255,0.72)]">
-            <div className="h-8 w-8 animate-spin rounded-full border-2 border-[#F6AF01] border-t-transparent" />
-            <span className="ml-3 text-sm font-semibold">
-              {t("casino.loading")}
-            </span>
-          </div>
-        ) : games.length === 0 ? (
-          <div className="mx-1 mb-3 mt-3 rounded-[1.25rem] bg-gradient-to-br from-[#111111]/88 to-[#000000]/92 px-4 py-14 text-center">
-            <p className="m-0 text-sm font-medium text-[rgba(255,255,255,0.72)]">
-              {t("casino.empty")}
-            </p>
-          </div>
-        ) : (
-          <div className="mt-3 grid grid-cols-2 gap-3 pb-6 md:grid-cols-3 lg:grid-cols-4">
-            {games.map((game) => (
-              <GameCard
-                key={game.gameMode}
-                game={game}
-                onPlay={handlePlay}
-                onDemo={handleDemo}
-                t={t}
-              />
-            ))}
-          </div>
-        )}
+        <div className="mt-3 grid grid-cols-3 gap-2 pb-4 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6">
+          {MRX_GAMES.map((game) => (
+            <InstantGameCard
+              key={game.id}
+              game={game}
+              launching={mrxLaunching}
+              onPlay={handleMrxPlay}
+              t={t}
+            />
+          ))}
+        </div>
+
+        {casinoEnabled === true ? (
+          <>
+            <div className="animate-deposit-panel px-1 pt-2">
+              <p className="m-0 text-[11px] font-extrabold uppercase tracking-[0.2em] text-[rgba(255,255,255,0.72)]">
+                {t("casino.inoutEyebrow")}
+              </p>
+              <h2 className="m-0 bg-gradient-to-r from-[#ffffff] via-[#ffe8a3] to-[#ffffff] bg-clip-text text-lg font-black tracking-tight text-transparent sm:text-xl">
+                {t("casino.inoutTitle")}
+              </h2>
+            </div>
+
+            {loading ? (
+              <div className="flex items-center justify-center px-4 py-12 text-[rgba(255,255,255,0.72)]">
+                <div className="h-8 w-8 animate-spin rounded-full border-2 border-[#F6AF01] border-t-transparent" />
+                <span className="ml-3 text-sm font-semibold">
+                  {t("casino.loading")}
+                </span>
+              </div>
+            ) : games.length === 0 ? (
+              <div className="mx-1 mb-3 mt-3 rounded-[1.25rem] bg-gradient-to-br from-[#111111]/88 to-[#000000]/92 px-4 py-14 text-center">
+                <p className="m-0 text-sm font-medium text-[rgba(255,255,255,0.72)]">
+                  {t("casino.empty")}
+                </p>
+              </div>
+            ) : (
+              <div className="mt-3 grid grid-cols-2 gap-3 pb-6 md:grid-cols-3 lg:grid-cols-4">
+                {games.map((game) => (
+                  <GameCard
+                    key={game.gameMode}
+                    game={game}
+                    onPlay={handlePlay}
+                    onDemo={handleDemo}
+                    t={t}
+                  />
+                ))}
+              </div>
+            )}
+          </>
+        ) : null}
       </div>
 
       <SiteFooter />

@@ -16,7 +16,8 @@ import {
  * worker) overlapping ticks queue up instead of stampeding upstream.
  *
  * Cadence rationale (target ≤ 75k upstream calls/day):
- *   - Live poll: 30s ≈ 2,880/day
+ *   - Live odds poll: 60s ≈ 1,440/day (backstop; relaxed from 30s)
+ *   - Live score poll: 5s ≈ 17,280/day (one bulk {live:all} call per tick)
  *   - Near fixtures: cadence × FIXTURES_NEAR_WINDOW_DAYS calendar dates×sports upstream calls/tick
  *   - Deep fixtures: FIXTURES_DEEP_INTERVAL_HOURS × FIXTURES_DAYS_AHEAD span
  *   - Leagues metadata: weekly ≈ negligible
@@ -62,8 +63,23 @@ function buildRepeatables() {
       name: REPEATABLE_JOB_NAMES.LIVE_TICK,
       data: {},
       opts: {
-        repeat: { every: envSeconds("LIVE_POLL_SECONDS", 30 * SECONDS) },
+        // Relaxed to 60s: goal detection + the fixture lock are now driven by
+        // the dedicated fast score poller below. This poller is the backstop
+        // (NS→LIVE / zero-market backfill / Mongo correctness).
+        repeat: { every: envSeconds("LIVE_POLL_SECONDS", 60 * SECONDS) },
         jobId: toJobId(REPEATABLE_JOB_NAMES.LIVE_TICK),
+      },
+    },
+    {
+      // Fast score-only poll: detects score/state changes within ~5s and drives
+      // lockFixture + a targeted odds refresh, on its OWN queue/worker so the
+      // heavier odds poll above can never block detection.
+      queue: QUEUE_NAMES.LIVE_SCORES,
+      name: REPEATABLE_JOB_NAMES.LIVE_SCORES_TICK,
+      data: {},
+      opts: {
+        repeat: { every: envSeconds("LIVE_SCORE_POLL_SECONDS", 5 * SECONDS) },
+        jobId: toJobId(REPEATABLE_JOB_NAMES.LIVE_SCORES_TICK),
       },
     },
     {
