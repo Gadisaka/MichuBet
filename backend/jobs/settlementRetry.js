@@ -19,6 +19,11 @@
  *    by fixture id from API-Sports, update status/scores, and settle. Scoped
  *    to fixtures with real money on them, so upstream volume stays tiny.
  *
+ * PST fixtures honour the 72h postponed wait (`lib/postponedSettlement`):
+ * the retry skips them until the wait expires, then voids the legs. Without
+ * this gate the retry's `force: true` would bypass the wait and void
+ * freshly-postponed fixtures that may still be rescheduled.
+ *
  * Runs on the `settlement-retry` repeatable queue (default every 5 min).
  * Bounded per tick: SETTLEMENT_RETRY_BATCH terminal fixtures and
  * SETTLEMENT_ZOMBIE_BATCH zombie fixtures.
@@ -35,6 +40,7 @@ import {
   buildFixtureSyncData,
   isFixtureResultLocked,
 } from "../lib/fixtureResultLock.js";
+import { evaluatePostponedSettlementWait } from "../lib/postponedSettlement.js";
 import { logAuditEvent } from "../lib/auditLog.js";
 import { recordUnresolvableFixture } from "../lib/settlementMetrics.js";
 
@@ -90,6 +96,7 @@ async function retryTerminalFixtures(now, minStart) {
       api_fixture_id: true,
       status: true,
       start_time: true,
+      postponed_at: true,
     },
     take: DEFAULT_BATCH,
     orderBy: { start_time: "asc" },
@@ -99,9 +106,20 @@ async function retryTerminalFixtures(now, minStart) {
   let completed = 0;
   let stillPending = 0;
   let unresolvable = 0;
+  let postponedWaiting = 0;
 
   for (const fx of stuck) {
     try {
+      // PST grace period: the retry runs settleFixture with force (to bypass
+      // the grading_completed_at gate), which ALSO bypasses the postponed
+      // wait inside settleFixture. Gate here instead so freshly-postponed
+      // fixtures keep their 72h reschedule window.
+      const wait = evaluatePostponedSettlementWait(fx);
+      if (!wait.ok) {
+        postponedWaiting++;
+        continue;
+      }
+
       // Try to enrich first — if the only reason the leg was pending
       // was missing events/stats, this unblocks the next settleFixture
       // call. Enrichment is a no-op when the env flag is off or the
@@ -161,6 +179,7 @@ async function retryTerminalFixtures(now, minStart) {
     completed,
     stillPending,
     unresolvable,
+    postponedWaiting,
   };
 }
 
@@ -250,7 +269,9 @@ async function rescueZombieFixtures(now, minStart) {
           `${fx.status}→${status} score=${incoming.home_score}-${incoming.away_score}`,
       );
 
-      if (TERMINAL_STATUSES.includes(status)) {
+      // PST goes through the postponed 72h wait — the terminal scan owns
+      // its timing on a later tick (grading_completed_at is still unset).
+      if (TERMINAL_STATUSES.includes(status) && status !== "PST") {
         await enrichFixtureResult(fx.id, { sport: sportSlug }).catch(() => {});
         const result = await settleFixture(fx.id, { force: true });
         if (result && !result.skipped) settled++;
@@ -271,7 +292,7 @@ async function rescueZombieFixtures(now, minStart) {
 /**
  * @returns {Promise<{
  *   scanned: number, retried: number, completed: number,
- *   stillPending: number, unresolvable: number,
+ *   stillPending: number, unresolvable: number, postponedWaiting: number,
  *   zombies: { candidates: number, refreshed: number, settled: number, failed: number },
  * }>}
  */
@@ -285,7 +306,7 @@ export async function runSettlementRetry() {
   console.log(
     `[settlementRetry] scanned=${terminal.scanned} retried=${terminal.retried} ` +
       `completed=${terminal.completed} stillPending=${terminal.stillPending} ` +
-      `unresolvable=${terminal.unresolvable} ` +
+      `unresolvable=${terminal.unresolvable} postponedWaiting=${terminal.postponedWaiting} ` +
       `zombies: candidates=${zombies.candidates} refreshed=${zombies.refreshed} ` +
       `settled=${zombies.settled} failed=${zombies.failed}`,
   );

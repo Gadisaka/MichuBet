@@ -59,6 +59,7 @@ import {
 import { logAuditEvent } from "../lib/auditLog.js";
 import { recordUngradedLeg } from "../lib/settlementMetrics.js";
 import { isTicketSettleable } from "../lib/ticketExpiry.js";
+import { evaluatePostponedSettlementWait } from "../lib/postponedSettlement.js";
 
 const FINAL_FIXTURE_STATUSES = new Set(["FT", "AET", "PEN", "AWD", "WO"]);
 const VOID_FIXTURE_STATUSES = new Set(["CANC", "ABD", "PST"]);
@@ -676,6 +677,17 @@ export async function settleFixture(fixtureId, options = {}) {
           skipped: true,
           reason: "not_terminal",
           status: fixture.status,
+        };
+      }
+
+      const postponedWait = evaluatePostponedSettlementWait(fixture, options);
+      if (!postponedWait.ok) {
+        return {
+          skipped: true,
+          reason: postponedWait.reason,
+          waitHoursRemaining: postponedWait.waitHoursRemaining,
+          postponedAt: postponedWait.postponedAt,
+          postponedWaitExpires: postponedWait.postponedWaitExpires,
         };
       }
 
