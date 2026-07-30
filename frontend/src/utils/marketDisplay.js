@@ -90,7 +90,145 @@ function isHtFtMarket(marketName) {
 }
 
 /**
- * Normalize a single HT/FT side token to HOME | DRAW | AWAY | null.
+ * @param {string} marketName
+ * @returns {boolean}
+ */
+function isAsianHandicapMarket(marketName) {
+  const key = normalizeMarketName(marketName);
+  return (
+    key === "asian handicap" ||
+    key === "asian handicap first half" ||
+    key === "asian handicap (2nd half)"
+  );
+}
+
+/**
+ * @param {string} marketName
+ * @returns {boolean}
+ */
+function isHandicapResultMarket(marketName) {
+  const key = normalizeMarketName(marketName);
+  return (
+    key === "handicap result" || key === "handicap result - first half"
+  );
+}
+
+/**
+ * @param {string} marketName
+ * @returns {boolean}
+ */
+function isResultBttsMarket(marketName) {
+  const key = normalizeMarketName(marketName);
+  return (
+    key === "results/both teams score" || key === "result/both teams score"
+  );
+}
+
+/**
+ * @param {string} marketName
+ * @returns {boolean}
+ */
+function isResultTotalMarket(marketName) {
+  const key = normalizeMarketName(marketName);
+  return (
+    key === "result/total goals" ||
+    key === "result/total goals (2nd half)" ||
+    key === "halftime result/total goals"
+  );
+}
+
+/**
+ * @param {string} marketName
+ * @returns {boolean}
+ */
+function isTotalGoalsBttsMarket(marketName) {
+  return normalizeMarketName(marketName) === "total goals/both teams to score";
+}
+
+/**
+ * @param {string} marketName
+ * @returns {boolean}
+ */
+function isHomeAwayMarket(marketName) {
+  return normalizeMarketName(marketName) === "home/away";
+}
+
+/**
+ * @param {string} marketName
+ * @returns {boolean}
+ */
+function isHalfWinnerMarket(marketName) {
+  const key = normalizeMarketName(marketName);
+  return key === "first half winner" || key === "second half winner";
+}
+
+/**
+ * @param {string} marketName
+ * @returns {boolean}
+ */
+function isTeamToScoreMarket(marketName) {
+  const key = normalizeMarketName(marketName);
+  return key === "team to score first" || key === "team to score last";
+}
+
+/**
+ * @param {string} marketName
+ * @returns {boolean}
+ */
+function isWinBothHalvesMarket(marketName) {
+  return normalizeMarketName(marketName) === "win both halves";
+}
+
+/**
+ * @param {string} marketName
+ * @returns {boolean}
+ */
+function isWinToNilMarket(marketName) {
+  return normalizeMarketName(marketName) === "win to nil";
+}
+
+/**
+ * @param {string} marketName
+ * @returns {boolean}
+ */
+function isWinningMarginMarket(marketName) {
+  return normalizeMarketName(marketName) === "winning margin";
+}
+
+/**
+ * @param {string} marketName
+ * @returns {boolean}
+ */
+function isExactGoalsMarket(marketName) {
+  const key = normalizeMarketName(marketName);
+  return (
+    key === "exact goals number" ||
+    key === "exact goals number - first half" ||
+    key === "home team exact goals number" ||
+    key === "away team exact goals number" ||
+    key === "home exact goals number (1st half)" ||
+    key === "away exact goals number (1st half)"
+  );
+}
+
+/**
+ * Markets that show atomic 1/X/2 (or 1/2) as club names.
+ * @param {string} marketName
+ * @returns {boolean}
+ */
+function isAtomicTeamSideMarket(marketName) {
+  return (
+    isMatchWinnerMarket(marketName) ||
+    isHomeAwayMarket(marketName) ||
+    isHalfWinnerMarket(marketName) ||
+    isTeamToScoreMarket(marketName) ||
+    isWinBothHalvesMarket(marketName) ||
+    isWinToNilMarket(marketName)
+  );
+}
+
+/**
+ * Normalize a single side token to HOME | DRAW | AWAY | null.
  * @param {string} raw
  * @returns {"HOME"|"DRAW"|"AWAY"|null}
  */
@@ -131,7 +269,7 @@ function parseHtFtParts(selectionId) {
  * @param {string} awayName
  * @returns {string}
  */
-function formatHtFtSideLabel(rawSide, homeName, awayName) {
+function formatSideLabel(rawSide, homeName, awayName) {
   const side = normalizeHtFtSide(rawSide);
   if (side === "HOME") return homeName;
   if (side === "DRAW") return "Draw";
@@ -148,7 +286,138 @@ function formatHtFtSideLabel(rawSide, homeName, awayName) {
 function formatHtFtDisplayLabel(selectionId, homeName, awayName) {
   const parts = parseHtFtParts(selectionId);
   if (!parts) return String(selectionId || "").trim();
-  return `${formatHtFtSideLabel(parts.ht, homeName, awayName)}/${formatHtFtSideLabel(parts.ft, homeName, awayName)}`;
+  return `${formatSideLabel(parts.ht, homeName, awayName)}/${formatSideLabel(parts.ft, homeName, awayName)}`;
+}
+
+/**
+ * Atomic side / No for team-to-score and win-to-nil style picks.
+ * @param {string} selectionId
+ * @param {string} homeName
+ * @param {string} awayName
+ * @returns {string|null}
+ */
+function formatAtomicTeamSideLabel(selectionId, homeName, awayName) {
+  const raw = String(selectionId || "").trim();
+  const lower = raw.toLowerCase();
+  if (["no", "none", "neither", "no goal", "no score"].includes(lower)) {
+    return "No";
+  }
+  const token = canonicalSelectionToken(raw);
+  if (token === "1") return homeName;
+  if (token === "x") return "Draw";
+  if (token === "2") return awayName;
+  return null;
+}
+
+/**
+ * Handicap-style: "Home -0.5", "Away +1", "1 (-1)", "Draw 0".
+ * @param {string} selectionId
+ * @param {string} homeName
+ * @param {string} awayName
+ * @returns {string}
+ */
+function formatHandicapDisplayLabel(selectionId, homeName, awayName) {
+  const raw = String(selectionId || "").trim();
+  const sideMatch = /\b(home|away|draw|h|a|d|1|2|x)\b/i.exec(raw);
+  if (!sideMatch) return raw;
+  const sideLabel = formatSideLabel(sideMatch[1], homeName, awayName);
+  return raw.replace(sideMatch[0], sideLabel);
+}
+
+/**
+ * Compound with a leading side token: "Home/Yes", "Home/Over 2.5".
+ * @param {string} selectionId
+ * @param {string} homeName
+ * @param {string} awayName
+ * @returns {string}
+ */
+function formatSideCompoundDisplayLabel(selectionId, homeName, awayName) {
+  const raw = String(selectionId || "").trim();
+  const slash = raw.indexOf("/");
+  if (slash <= 0) {
+    const atomic = formatAtomicTeamSideLabel(raw, homeName, awayName);
+    return atomic ?? raw;
+  }
+  const left = raw.slice(0, slash).trim();
+  const right = raw.slice(slash + 1).trim();
+  return `${formatSideLabel(left, homeName, awayName)}/${right}`;
+}
+
+/**
+ * Winning Margin: "1 by 2", "Home by 2", "Draw".
+ * @param {string} selectionId
+ * @param {string} homeName
+ * @param {string} awayName
+ * @returns {string}
+ */
+function formatWinningMarginDisplayLabel(selectionId, homeName, awayName) {
+  const raw = String(selectionId || "").trim();
+  const byMatch = raw.match(
+    /^(.+?)\s+by\s+(\d+(?:\s*-\s*\d+)?|\d+\+)$/i,
+  );
+  if (byMatch) {
+    const sideLabel = formatSideLabel(byMatch[1], homeName, awayName);
+    return `${sideLabel} by ${byMatch[2].replace(/\s+/g, "")}`;
+  }
+  const atomic = formatAtomicTeamSideLabel(raw, homeName, awayName);
+  return atomic ?? raw;
+}
+
+/**
+ * Parse Total Goals/BTTS combo into ou + btts + line.
+ * @param {string} selectionId
+ * @returns {{ ou: "Over"|"Under"|null, btts: "Yes"|"No"|null, line: number|null }}
+ */
+function parseTotalGoalsBttsParts(selectionId) {
+  const raw = String(selectionId || "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, " ");
+
+  let ou = null;
+  if (/\bover\b/.test(raw) || /^o\//.test(raw) || /(?:^|\/)o(?:\/|\s|$)/.test(raw)) {
+    ou = "Over";
+  }
+  if (/\bunder\b/.test(raw) || /^u\//.test(raw) || /(?:^|\/)u(?:\/|\s|$)/.test(raw)) {
+    ou = "Under";
+  }
+
+  let btts = null;
+  if (/\byes\b/.test(raw)) btts = "Yes";
+  else if (/\bno\b/.test(raw)) btts = "No";
+
+  const line = parseOuThreshold(raw);
+
+  return { ou, btts, line };
+}
+
+/**
+ * Display as Yes/Under 2.5 (BTTS first, then OU + line).
+ * @param {string} selectionId
+ * @returns {string}
+ */
+function formatTotalGoalsBttsDisplayLabel(selectionId) {
+  const { ou, btts, line } = parseTotalGoalsBttsParts(selectionId);
+  if (!ou || !btts || line == null) {
+    return String(selectionId || "").trim();
+  }
+  return `${btts}/${ou} ${line}`;
+}
+
+/**
+ * Exact goals: "more 7" / "7+" → "more than 7".
+ * @param {string} selectionId
+ * @returns {string}
+ */
+function formatExactGoalsDisplayLabel(selectionId) {
+  const raw = String(selectionId || "").trim();
+  const plus = raw.match(/^(\d+)\+$/);
+  if (plus) return `more than ${plus[1]}`;
+  const moreN = raw.match(/^more(?:\s+than)?\s+(\d+)$/i);
+  if (moreN) return `more than ${moreN[1]}`;
+  const orMore = raw.match(/^(?:or\s+)?more\s+(\d+)$/i);
+  if (orMore) return `more than ${orMore[1]}`;
+  return raw;
 }
 
 /**
@@ -191,16 +460,36 @@ export function formatSelectionDisplayLabel({
   const id = canonicalSelectionToken(selectionId);
   const homeName = String(home || "Home").trim() || "Home";
   const awayName = String(away || "Away").trim() || "Away";
+  const raw = String(selectionId || "").trim();
 
-  if (isMatchWinnerMarket(marketName)) {
-    if (id === "1") return homeName;
-    if (id === "x") return "Draw";
-    if (id === "2") return awayName;
+  if (isAtomicTeamSideMarket(marketName)) {
+    const atomic = formatAtomicTeamSideLabel(raw, homeName, awayName);
+    if (atomic) return atomic;
   }
 
   // HT/FT before DC: "Home/Draw" is a compound HT/FT outcome, not double chance.
   if (isHtFtMarket(marketName)) {
     return formatHtFtDisplayLabel(selectionId, homeName, awayName);
+  }
+
+  if (isAsianHandicapMarket(marketName) || isHandicapResultMarket(marketName)) {
+    return formatHandicapDisplayLabel(raw, homeName, awayName);
+  }
+
+  if (isResultBttsMarket(marketName) || isResultTotalMarket(marketName)) {
+    return formatSideCompoundDisplayLabel(raw, homeName, awayName);
+  }
+
+  if (isWinningMarginMarket(marketName)) {
+    return formatWinningMarginDisplayLabel(raw, homeName, awayName);
+  }
+
+  if (isTotalGoalsBttsMarket(marketName)) {
+    return formatTotalGoalsBttsDisplayLabel(raw);
+  }
+
+  if (isExactGoalsMarket(marketName)) {
+    return formatExactGoalsDisplayLabel(raw);
   }
 
   // Double Chance (and DC compact tokens even if market name is missing)
@@ -215,7 +504,7 @@ export function formatSelectionDisplayLabel({
     if (id === "x2") return `Draw or ${awayName}`;
   }
 
-  return String(selectionId || "").trim();
+  return raw;
 }
 
 /**
@@ -287,6 +576,28 @@ export function sortOddsWithinMarket(marketName, odds) {
         htFtSideRank(normalizeHtFtSide(aParts.ft)) -
         htFtSideRank(normalizeHtFtSide(bParts.ft))
       );
+    });
+  }
+
+  if (isTotalGoalsBttsMarket(marketName)) {
+    return [...odds].sort((a, b) => {
+      const aParts = parseTotalGoalsBttsParts(a.id);
+      const bParts = parseTotalGoalsBttsParts(b.id);
+      const aLine = aParts.line;
+      const bLine = bParts.line;
+      if (aLine != null && bLine != null && aLine !== bLine) {
+        return bLine - aLine;
+      }
+      if (aLine != null && bLine == null) return -1;
+      if (aLine == null && bLine != null) return 1;
+      // Over before Under
+      const aOu = aParts.ou === "Over" ? 0 : aParts.ou === "Under" ? 1 : 2;
+      const bOu = bParts.ou === "Over" ? 0 : bParts.ou === "Under" ? 1 : 2;
+      if (aOu !== bOu) return aOu - bOu;
+      // Yes before No
+      const aBtts = aParts.btts === "Yes" ? 0 : aParts.btts === "No" ? 1 : 2;
+      const bBtts = bParts.btts === "Yes" ? 0 : bParts.btts === "No" ? 1 : 2;
+      return aBtts - bBtts;
     });
   }
 

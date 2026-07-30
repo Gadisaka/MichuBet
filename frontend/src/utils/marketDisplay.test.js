@@ -138,7 +138,148 @@ describe("formatSelectionDisplayLabel", () => {
     ).toBe("Shenyang Urban/Tianjin Teda");
   });
 
-  it("leaves other markets as-is", () => {
+  it("uses club names for Asian Handicap and Handicap Result", () => {
+    expect(
+      formatSelectionDisplayLabel({
+        marketName: "Asian Handicap",
+        selectionId: "Home -0.5",
+        ...teams,
+      }),
+    ).toBe("Arsenal -0.5");
+    expect(
+      formatSelectionDisplayLabel({
+        marketName: "Asian Handicap",
+        selectionId: "Away +1",
+        ...teams,
+      }),
+    ).toBe("Chelsea +1");
+    expect(
+      formatSelectionDisplayLabel({
+        marketName: "Handicap Result",
+        selectionId: "Home -1",
+        ...teams,
+      }),
+    ).toBe("Arsenal -1");
+  });
+
+  it("uses club names for result combos and 1/2 markets", () => {
+    expect(
+      formatSelectionDisplayLabel({
+        marketName: "Results/Both Teams Score",
+        selectionId: "Home/Yes",
+        ...teams,
+      }),
+    ).toBe("Arsenal/Yes");
+    expect(
+      formatSelectionDisplayLabel({
+        marketName: "Result/Total Goals",
+        selectionId: "Away/Over 2.5",
+        ...teams,
+      }),
+    ).toBe("Chelsea/Over 2.5");
+    expect(
+      formatSelectionDisplayLabel({
+        marketName: "Home/Away",
+        selectionId: "1",
+        ...teams,
+      }),
+    ).toBe("Arsenal");
+    expect(
+      formatSelectionDisplayLabel({
+        marketName: "First Half Winner",
+        selectionId: "2",
+        ...teams,
+      }),
+    ).toBe("Chelsea");
+    expect(
+      formatSelectionDisplayLabel({
+        marketName: "Team To Score First",
+        selectionId: "Home",
+        ...teams,
+      }),
+    ).toBe("Arsenal");
+    expect(
+      formatSelectionDisplayLabel({
+        marketName: "Win To Nil",
+        selectionId: "Away",
+        ...teams,
+      }),
+    ).toBe("Chelsea");
+  });
+
+  it("formats Winning Margin as club by N", () => {
+    expect(
+      formatSelectionDisplayLabel({
+        marketName: "Winning Margin",
+        selectionId: "1 by 2",
+        ...teams,
+      }),
+    ).toBe("Arsenal by 2");
+    expect(
+      formatSelectionDisplayLabel({
+        marketName: "Winning Margin",
+        selectionId: "Home by 3",
+        ...teams,
+      }),
+    ).toBe("Arsenal by 3");
+  });
+
+  it("rewrites Total Goals/BTTS to Yes/Under form", () => {
+    expect(
+      formatSelectionDisplayLabel({
+        marketName: "Total Goals/Both Teams To Score",
+        selectionId: "u/yes 2.5",
+        ...teams,
+      }),
+    ).toBe("Yes/Under 2.5");
+    expect(
+      formatSelectionDisplayLabel({
+        marketName: "Total Goals/Both Teams To Score",
+        selectionId: "o/no 2.5",
+        ...teams,
+      }),
+    ).toBe("No/Over 2.5");
+    expect(
+      formatSelectionDisplayLabel({
+        marketName: "Total Goals/Both Teams To Score",
+        selectionId: "Over 2.5/Yes",
+        ...teams,
+      }),
+    ).toBe("Yes/Over 2.5");
+  });
+
+  it("rewrites Exact Goals more N to more than N", () => {
+    expect(
+      formatSelectionDisplayLabel({
+        marketName: "Exact Goals Number",
+        selectionId: "more 7",
+        ...teams,
+      }),
+    ).toBe("more than 7");
+    expect(
+      formatSelectionDisplayLabel({
+        marketName: "Home Team Exact Goals Number",
+        selectionId: "more 3",
+        ...teams,
+      }),
+    ).toBe("more than 3");
+    expect(
+      formatSelectionDisplayLabel({
+        marketName: "Away Team Exact Goals Number",
+        selectionId: "3+",
+        ...teams,
+      }),
+    ).toBe("more than 3");
+    expect(
+      formatSelectionDisplayLabel({
+        marketName: "Exact Goals Number",
+        selectionId: "2",
+        ...teams,
+      }),
+    ).toBe("2");
+  });
+
+  it("leaves plain totals and BTTS as-is", () => {
     expect(
       formatSelectionDisplayLabel({
         marketName: "Goals Over/Under",
@@ -218,6 +359,20 @@ describe("sortOddsWithinMarket", () => {
       "Draw/Away",
       "Away/Home",
     ]);
+  });
+
+  it("sorts Total Goals/BTTS by line, Over before Under, Yes before No", () => {
+    const odds = [
+      { id: "u/yes 2.5", value: "10.00" },
+      { id: "o/no 2.5", value: "4.33" },
+      { id: "u/no 2.5", value: "2.88" },
+      { id: "o/yes 2.5", value: "2.25" },
+    ];
+    expect(
+      sortOddsWithinMarket("Total Goals/Both Teams To Score", odds).map(
+        (o) => o.id,
+      ),
+    ).toEqual(["o/yes 2.5", "o/no 2.5", "u/yes 2.5", "u/no 2.5"]);
   });
 
   it("does not reorder non-OU markets", () => {
