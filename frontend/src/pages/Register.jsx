@@ -14,6 +14,7 @@ import {
 } from "../components/common/accountFormClasses";
 import { topHeaderData, topNavItems } from "../data/homepageData";
 import { getApiOrigin } from "../services/api";
+import { saveAuthSession } from "../utils/authSession";
 
 function Register() {
   const navigate = useNavigate();
@@ -64,8 +65,7 @@ function Register() {
         return;
       }
 
-      sessionStorage.setItem("token", token);
-      sessionStorage.setItem("user", JSON.stringify(data.user));
+      saveAuthSession({ token, user: data.user });
       navigate("/");
     } catch {
       setError("Network error. Please try again.");
