@@ -38,6 +38,7 @@ function OddsGrid({
             key={`${marketLabel}-${odd.id}`}
             label={meta.displayLabel || meta.label}
             value={odd.value}
+            layout="stacked"
             selected={selectedOdds?.has(selectionId)}
             onClick={() =>
               onOddsClick?.({
@@ -55,7 +56,7 @@ function OddsGrid({
                 fromLive,
               })
             }
-            className="min-h-[36px]"
+            className="min-h-[44px]"
           />
         );
       })}

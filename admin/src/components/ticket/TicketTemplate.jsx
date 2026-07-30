@@ -4,7 +4,11 @@ import {
   slipGrossTaxNetForTicket,
 } from "../../utils/winningsTax";
 import receiptLogo from "../../assets/image.png";
-import { formatCashierReceiptLine, formatSelectionLabelForPrint } from "./receiptFormat";
+import {
+  formatCashierReceiptLine,
+  formatSelectionLabelForPrint,
+  sortSelectionsByKickoff,
+} from "./receiptFormat";
 import { TICKET_FOOTER_LINES } from "./ticketFooter";
 
 /**
@@ -62,7 +66,9 @@ function formatLeagueLine(country, leagueName) {
 }
 
 function buildSelectionLines(ticket) {
-  const selections = Array.isArray(ticket?.selections) ? ticket.selections : [];
+  const selections = sortSelectionsByKickoff(
+    Array.isArray(ticket?.selections) ? ticket.selections : [],
+  );
   return selections.map((selection, index) => {
     const home = selection?.match?.homeTeam || "";
     const away = selection?.match?.awayTeam || "";

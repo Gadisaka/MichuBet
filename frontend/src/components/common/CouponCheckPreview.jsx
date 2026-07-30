@@ -6,12 +6,12 @@ import {
 
 /**
  * Coupon check preview — displays list of paid tickets for a coupon number.
- * Shows coupon, selections, odds, status, and credited cashback when present.
- * Does not show stake or potential win.
+ * Shows coupon, stake/odds/won or cashback, selections, and status.
  *
  * Used by the "Check Coupon" feature in betslip and CheckTicket page.
  * `tickets` is the array from `fetchPublicCouponCheck`:
- * `[{ couponNumber, receiptNumber, status, createdAt, cashbackAmount, selections: [...] }]`
+ * `[{ couponNumber, receiptNumber, status, createdAt, stake, totalOdds,
+ *    potentialWin, netPayout, cashbackAmount, selections: [...] }]`
  */
 
 const TICKET_STATUS_CLS = {
@@ -42,10 +42,23 @@ function formatOdds(value) {
   return n.toFixed(2);
 }
 
+function formatEtb(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return "—";
+  return `${n.toFixed(2)} ETB`;
+}
+
 function formatCashbackEtb(value) {
   const n = Number(value);
   if (!Number.isFinite(n) || n <= 0) return null;
   return `${n.toFixed(2)} ETB`;
+}
+
+function wonAmount(ticket) {
+  const net = Number(ticket?.netPayout);
+  if (Number.isFinite(net)) return net;
+  const gross = Number(ticket?.potentialWin);
+  return Number.isFinite(gross) ? gross : null;
 }
 
 function formatLeagueLine(sel) {
@@ -63,11 +76,40 @@ function ReceiptDivider() {
   );
 }
 
+function SummaryStat({ label, value, highlight = false }) {
+  return (
+    <div className="min-w-0 flex-1 text-center">
+      <p className="m-0 text-[10px] font-bold uppercase tracking-[0.12em] text-[#777]">
+        {label}
+      </p>
+      <p
+        className={`mt-0.5 text-[13px] font-black leading-tight ${
+          highlight ? "text-[#16a34a]" : "text-[#0a0a0a]"
+        }`}
+      >
+        {value}
+      </p>
+    </div>
+  );
+}
+
 function SingleTicketCard({ ticket, className = "" }) {
   if (!ticket) return null;
   const selections = ticket.selections || [];
   const ticketStatus = mapTicketUiStatus(ticket.status);
+  const rawStatus = String(ticket.status || "").toUpperCase();
+  const isWon = rawStatus === "WON" || rawStatus === "PAID";
+  const isPaid = rawStatus === "PAID";
   const cashbackLabel = formatCashbackEtb(ticket.cashbackAmount);
+  const payout = wonAmount(ticket);
+  const payoutLabel = payout != null ? formatEtb(payout) : null;
+
+  let highlightColumn = null;
+  if (isWon && payoutLabel) {
+    highlightColumn = { label: "Won", value: payoutLabel };
+  } else if (cashbackLabel) {
+    highlightColumn = { label: "Cashback", value: cashbackLabel };
+  }
 
   return (
     <div
@@ -88,13 +130,25 @@ function SingleTicketCard({ ticket, className = "" }) {
         >
           {ticketStatus.label}
         </p>
-        {cashbackLabel ? (
-          <p className="mt-2 text-[12px] font-black uppercase tracking-[0.12em] text-[#0a0a0a]">
-            Cashback{" "}
-            <span className="tracking-normal">{cashbackLabel}</span>
-          </p>
+      </div>
+
+      <div className="mt-3 flex items-start justify-between gap-2">
+        <SummaryStat label="Stake" value={formatEtb(ticket.stake)} />
+        <SummaryStat label="Odds" value={formatOdds(ticket.totalOdds)} />
+        {highlightColumn ? (
+          <SummaryStat
+            label={highlightColumn.label}
+            value={highlightColumn.value}
+            highlight
+          />
         ) : null}
       </div>
+
+      {isPaid && payoutLabel ? (
+        <p className="mt-2 text-center text-[12px] font-black uppercase tracking-[0.08em] text-[#16a34a]">
+          Paid: <span className="tracking-normal">{payoutLabel}</span>
+        </p>
+      ) : null}
 
       <ReceiptDivider />
 

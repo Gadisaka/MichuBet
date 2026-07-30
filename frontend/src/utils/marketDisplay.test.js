@@ -28,8 +28,13 @@ describe("getMarketDisplayName", () => {
     );
   });
 
-  it("maps Double Chance and falls back for unknowns", () => {
+  it("maps Double Chance, HT/FT, Odd/Even and falls back for unknowns", () => {
     expect(getMarketDisplayName("Double Chance")).toBe("DOUBLE CHANCE");
+    expect(getMarketDisplayName("HT/FT Double")).toBe("HALFTIME/FULLTIME");
+    expect(getMarketDisplayName("Odd/Even")).toBe("ODD/EVEN");
+    expect(getMarketDisplayName("Odd/Even - First Half")).toBe(
+      "ODD/EVEN 1ST HALF",
+    );
     expect(getMarketDisplayName("Corners Over Under")).toBe(
       "Corners Over Under",
     );
@@ -106,6 +111,33 @@ describe("formatSelectionDisplayLabel", () => {
     ).toBe("Tianjin Teda or Draw");
   });
 
+  it("maps HT/FT compound labels to team names", () => {
+    expect(
+      formatSelectionDisplayLabel({
+        marketName: "HT/FT Double",
+        selectionId: "Home/Draw",
+        home: "Tianjin Teda",
+        away: "Shenyang Urban",
+      }),
+    ).toBe("Tianjin Teda/Draw");
+    expect(
+      formatSelectionDisplayLabel({
+        marketName: "HT/FT Double",
+        selectionId: "1/X",
+        home: "Tianjin Teda",
+        away: "Shenyang Urban",
+      }),
+    ).toBe("Tianjin Teda/Draw");
+    expect(
+      formatSelectionDisplayLabel({
+        marketName: "HT/FT Double",
+        selectionId: "Away/Home",
+        home: "Tianjin Teda",
+        away: "Shenyang Urban",
+      }),
+    ).toBe("Shenyang Urban/Tianjin Teda");
+  });
+
   it("leaves other markets as-is", () => {
     expect(
       formatSelectionDisplayLabel({
@@ -125,10 +157,12 @@ describe("formatSelectionDisplayLabel", () => {
 });
 
 describe("sortMarketsByPriority", () => {
-  it("orders hero markets like zoran (1X2 → BTTS → DC → TOTAL)", () => {
+  it("orders hero markets like zoran (1X2 → BTTS → DC → TOTAL → HT/FT → Odd/Even)", () => {
     const input = [
+      { category: "Odd/Even", odds: [] },
       { category: "Goals Over/Under", odds: [] },
       { category: "Corners Over Under", odds: [] },
+      { category: "HT/FT Double", odds: [] },
       { category: "Double Chance", odds: [] },
       { category: "Both Teams Score", odds: [] },
       { category: "Match Winner", odds: [] },
@@ -138,18 +172,20 @@ describe("sortMarketsByPriority", () => {
       "Both Teams Score",
       "Double Chance",
       "Goals Over/Under",
+      "HT/FT Double",
+      "Odd/Even",
       "Corners Over Under",
     ]);
   });
 
   it("preserves relative order among non-hero markets", () => {
     const input = [
-      { category: "Odd/Even", odds: [] },
       { category: "Corners Over Under", odds: [] },
+      { category: "Exact Score", odds: [] },
     ];
     expect(sortMarketsByPriority(input).map((c) => c.category)).toEqual([
-      "Odd/Even",
       "Corners Over Under",
+      "Exact Score",
     ]);
   });
 });
@@ -167,6 +203,23 @@ describe("sortOddsWithinMarket", () => {
     ).toEqual(["Over 4.5", "Under 4.5", "Over 2.5", "Under 2.5"]);
   });
 
+  it("sorts HT/FT by HT side then FT side (Home → Draw → Away)", () => {
+    const odds = [
+      { id: "Away/Home", value: "13" },
+      { id: "Home/Draw", value: "8" },
+      { id: "Home/Home", value: "4" },
+      { id: "Draw/Away", value: "11" },
+      { id: "Home/Away", value: "9" },
+    ];
+    expect(sortOddsWithinMarket("HT/FT Double", odds).map((o) => o.id)).toEqual([
+      "Home/Home",
+      "Home/Draw",
+      "Home/Away",
+      "Draw/Away",
+      "Away/Home",
+    ]);
+  });
+
   it("does not reorder non-OU markets", () => {
     const odds = [
       { id: "Yes", value: "1.80" },
@@ -177,11 +230,12 @@ describe("sortOddsWithinMarket", () => {
 });
 
 describe("gridColsForMarket", () => {
-  it("returns fixed 3/2 cols for hero markets", () => {
+  it("returns fixed 3/2/4 cols for hero markets", () => {
     expect(gridColsForMarket("Match Winner")).toBe("grid-cols-3");
     expect(gridColsForMarket("Double Chance")).toBe("grid-cols-3");
     expect(gridColsForMarket("Both Teams Score")).toBe("grid-cols-2");
     expect(gridColsForMarket("Goals Over/Under")).toBe("grid-cols-2");
+    expect(gridColsForMarket("HT/FT Double")).toBe("grid-cols-4");
   });
 });
 
@@ -206,5 +260,14 @@ describe("resolveExpansionSelectionMeta", () => {
     expect(meta.displayLabel).toBe("Arsenal");
     expect(meta.marketCode).toBe("MATCH_WINNER");
     expect(meta.marketParams).toEqual({ side: "HOME" });
+  });
+
+  it("keeps HT/FT placement label and team-aware displayLabel", () => {
+    const meta = resolveExpansionSelectionMeta("HT/FT Double", "Home/Draw", {
+      home: "Tianjin Teda",
+      away: "Shenyang Urban",
+    });
+    expect(meta.label).toBe("HOME/DRAW");
+    expect(meta.displayLabel).toBe("Tianjin Teda/Draw");
   });
 });

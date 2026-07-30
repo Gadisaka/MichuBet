@@ -51,6 +51,30 @@ function mapPrintSideToken(token) {
   return mapped ?? token;
 }
 
+function kickoffTimestamp(selection) {
+  const raw = selection?.match?.startTime;
+  if (raw == null || raw === "") return null;
+  const ms = new Date(raw).getTime();
+  return Number.isFinite(ms) ? ms : null;
+}
+
+/** Earliest kickoff first; missing/invalid startTime sorts last (stable). */
+export function sortSelectionsByKickoff(selections) {
+  if (!Array.isArray(selections)) return [];
+  return selections
+    .map((selection, index) => ({ selection, index }))
+    .sort((a, b) => {
+      const ta = kickoffTimestamp(a.selection);
+      const tb = kickoffTimestamp(b.selection);
+      if (ta == null && tb == null) return a.index - b.index;
+      if (ta == null) return 1;
+      if (tb == null) return -1;
+      if (ta !== tb) return ta - tb;
+      return a.index - b.index;
+    })
+    .map(({ selection }) => selection);
+}
+
 /** Print-only: map 1/2/X pick tokens to Home/Away/Draw on thermal + PDF slips. */
 export function formatSelectionLabelForPrint(label) {
   const raw = String(label ?? "").trim();

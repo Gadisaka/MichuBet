@@ -12,7 +12,11 @@ import {
   formatTaxLineLabel,
   slipGrossTaxNetForTicket,
 } from "../../utils/winningsTax.js";
-import { formatCashierReceiptLine, formatSelectionLabelForPrint } from "./receiptFormat.js";
+import {
+  formatCashierReceiptLine,
+  formatSelectionLabelForPrint,
+  sortSelectionsByKickoff,
+} from "./receiptFormat.js";
 import { TICKET_FOOTER_LINES } from "./ticketFooter.js";
 import {
   createBarcodeCanvasForPrint,
@@ -360,7 +364,9 @@ function buildTicketEscPosParts(ticket, opts) {
   const { width = "80mm", platformWinningsTax = null } = opts;
 
   const chars = width === "58mm" ? CHARS_58MM : CHARS_80MM;
-  const selections = Array.isArray(ticket?.selections) ? ticket.selections : [];
+  const selections = sortSelectionsByKickoff(
+    Array.isArray(ticket?.selections) ? ticket.selections : [],
+  );
 
   const { tax, net, gross } = slipGrossTaxNetForTicket(
     ticket?.potentialWin,

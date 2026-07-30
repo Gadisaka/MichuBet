@@ -1,18 +1,43 @@
-function OddsCell({ label, value, selected, onClick, className = "" }) {
+function OddsCell({
+  label,
+  value,
+  selected,
+  onClick,
+  className = "",
+  layout = "horizontal",
+}) {
+  const stacked = layout === "stacked";
+
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`flex min-h-8 cursor-pointer items-center justify-between gap-1 rounded-xl border px-2 transition-all duration-200 ${
+      className={`${
+        stacked
+          ? "flex min-h-[44px] cursor-pointer flex-col items-center justify-center gap-0.5 rounded-xl border px-1.5 py-1.5 text-center transition-all duration-200"
+          : "flex min-h-8 cursor-pointer items-center justify-between gap-1 rounded-xl border px-2 transition-all duration-200"
+      } ${
         selected
           ? "border-[#F6AF01] bg-(--sb-accent-surface-deep) shadow-[0_0_12px_rgba(246,175,1,0.28)]"
           : "border-transparent bg-(--sb-bg-page)/90 text-[#ffffff] hover:bg-(--sb-bg-card)"
       } ${className}`.trim()}
     >
       {label ? (
-        <span className="text-[13px] font-bold text-[#ffffff]">{label}</span>
+        <span
+          className={`font-bold text-[#ffffff] ${
+            stacked
+              ? "max-w-full truncate text-[10px] leading-tight"
+              : "text-[13px]"
+          }`}
+        >
+          {label}
+        </span>
       ) : null}
-      <span className={`text-sm font-bold ${selected ? "text-[#F6AF01]" : "text-[#ffffff]"}`}>
+      <span
+        className={`font-bold ${
+          stacked ? "text-[13px] leading-none" : "text-sm"
+        } ${selected ? "text-[#F6AF01]" : "text-[#ffffff]"}`}
+      >
         {value}
       </span>
     </button>

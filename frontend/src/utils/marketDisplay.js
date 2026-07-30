@@ -8,6 +8,8 @@ const MARKET_PRIORITY = [
   "both teams to score",
   "double chance",
   "goals over/under",
+  "ht/ft double",
+  "odd/even",
 ];
 
 /** Display headers keyed by normalized API name. */
@@ -23,6 +25,10 @@ const DISPLAY_NAMES = {
   "goals over/under": "TOTAL",
   "goals over/under first half": "TOTAL 1ST HALF",
   "goals over/under - second half": "TOTAL 2ND HALF",
+  "ht/ft double": "HALFTIME/FULLTIME",
+  "odd/even": "ODD/EVEN",
+  "odd/even - first half": "ODD/EVEN 1ST HALF",
+  "odd/even - second half": "ODD/EVEN 2ND HALF",
 };
 
 /**
@@ -76,6 +82,76 @@ function isGoalsOverUnderMarket(marketName) {
 }
 
 /**
+ * @param {string} marketName
+ * @returns {boolean}
+ */
+function isHtFtMarket(marketName) {
+  return normalizeMarketName(marketName) === "ht/ft double";
+}
+
+/**
+ * Normalize a single HT/FT side token to HOME | DRAW | AWAY | null.
+ * @param {string} raw
+ * @returns {"HOME"|"DRAW"|"AWAY"|null}
+ */
+function normalizeHtFtSide(raw) {
+  const key = String(raw || "")
+    .trim()
+    .toUpperCase();
+  if (["1", "H", "HOME"].includes(key)) return "HOME";
+  if (["X", "D", "DRAW"].includes(key)) return "DRAW";
+  if (["2", "A", "AWAY"].includes(key)) return "AWAY";
+  return null;
+}
+
+/**
+ * @param {"HOME"|"DRAW"|"AWAY"|null} side
+ * @returns {number}
+ */
+function htFtSideRank(side) {
+  if (side === "HOME") return 0;
+  if (side === "DRAW") return 1;
+  if (side === "AWAY") return 2;
+  return 99;
+}
+
+/**
+ * @param {string} selectionId
+ * @returns {{ ht: string, ft: string } | null}
+ */
+function parseHtFtParts(selectionId) {
+  const parts = String(selectionId || "").split("/");
+  if (parts.length !== 2) return null;
+  return { ht: parts[0].trim(), ft: parts[1].trim() };
+}
+
+/**
+ * @param {string} rawSide
+ * @param {string} homeName
+ * @param {string} awayName
+ * @returns {string}
+ */
+function formatHtFtSideLabel(rawSide, homeName, awayName) {
+  const side = normalizeHtFtSide(rawSide);
+  if (side === "HOME") return homeName;
+  if (side === "DRAW") return "Draw";
+  if (side === "AWAY") return awayName;
+  return String(rawSide || "").trim();
+}
+
+/**
+ * @param {string} selectionId
+ * @param {string} homeName
+ * @param {string} awayName
+ * @returns {string}
+ */
+function formatHtFtDisplayLabel(selectionId, homeName, awayName) {
+  const parts = parseHtFtParts(selectionId);
+  if (!parts) return String(selectionId || "").trim();
+  return `${formatHtFtSideLabel(parts.ht, homeName, awayName)}/${formatHtFtSideLabel(parts.ft, homeName, awayName)}`;
+}
+
+/**
  * Normalize selection ids so Home/Draw-style API values map to compact tokens.
  * @param {string} selectionId
  * @returns {string}
@@ -120,6 +196,11 @@ export function formatSelectionDisplayLabel({
     if (id === "1") return homeName;
     if (id === "x") return "Draw";
     if (id === "2") return awayName;
+  }
+
+  // HT/FT before DC: "Home/Draw" is a compound HT/FT outcome, not double chance.
+  if (isHtFtMarket(marketName)) {
+    return formatHtFtDisplayLabel(selectionId, homeName, awayName);
   }
 
   // Double Chance (and DC compact tokens even if market name is missing)
@@ -190,6 +271,25 @@ export function sortOddsWithinMarket(marketName, odds) {
   if (!Array.isArray(odds) || odds.length < 2) {
     return Array.isArray(odds) ? [...odds] : [];
   }
+
+  if (isHtFtMarket(marketName)) {
+    return [...odds].sort((a, b) => {
+      const aParts = parseHtFtParts(a.id);
+      const bParts = parseHtFtParts(b.id);
+      if (!aParts && !bParts) return 0;
+      if (!aParts) return 1;
+      if (!bParts) return -1;
+      const htDiff =
+        htFtSideRank(normalizeHtFtSide(aParts.ht)) -
+        htFtSideRank(normalizeHtFtSide(bParts.ht));
+      if (htDiff !== 0) return htDiff;
+      return (
+        htFtSideRank(normalizeHtFtSide(aParts.ft)) -
+        htFtSideRank(normalizeHtFtSide(bParts.ft))
+      );
+    });
+  }
+
   if (!isGoalsOverUnderMarket(marketName)) return [...odds];
 
   return [...odds].sort((a, b) => {
@@ -214,6 +314,9 @@ export function sortOddsWithinMarket(marketName, odds) {
  * @returns {string}
  */
 export function gridColsForMarket(marketName) {
+  if (isHtFtMarket(marketName)) {
+    return "grid-cols-4";
+  }
   if (isMatchWinnerMarket(marketName) || isDoubleChanceMarket(marketName)) {
     return "grid-cols-3";
   }

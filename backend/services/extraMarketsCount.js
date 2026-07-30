@@ -1,7 +1,12 @@
 import prisma from "../Config/db.js";
+import { isProviderMarketNameAllowed } from "./markets/marketSupport.js";
 
 /** Matches list summary + frontend `MAIN_MARKET_NAMES` (non–“extra” markets). */
 export const EXTRA_MARKETS_SUMMARY_NAMES = ["Match Winner", "Double Chance"];
+
+const SUMMARY_NAME_SET = new Set(
+  EXTRA_MARKETS_SUMMARY_NAMES.map((n) => n.toLowerCase()),
+);
 
 function normalizeSelectionLabel(value) {
   const raw = String(value || "")
@@ -31,7 +36,15 @@ function countOddCellsInMarket(oddLines = []) {
   return count;
 }
 
-async function countAvailableOddCellsForFixture(fixtureId) {
+function isSummaryMarketName(name) {
+  return SUMMARY_NAME_SET.has(String(name || "").trim().toLowerCase());
+}
+
+/**
+ * Load markets with lines and keep only allowlisted names (same gate as
+ * `dropUnsupportedMarkets` on GET /odds).
+ */
+async function loadAllowlistedMarketsWithLines(fixtureId) {
   const markets = await prisma.fixtureMarket.findMany({
     where: {
       fixture_id: fixtureId,
@@ -40,27 +53,23 @@ async function countAvailableOddCellsForFixture(fixtureId) {
     include: { odd_lines: true },
   });
 
-  return markets.reduce(
-    (sum, market) => sum + countOddCellsInMarket(market.odd_lines),
-    0,
-  );
+  return markets.filter((market) => isProviderMarketNameAllowed(market?.name));
 }
 
 /**
  * Count of fixture markets other than MW/DC that have at least one odd line
- * (any bookmaker). Updated whenever odds rows change for that fixture.
+ * and are allowlisted for public odds. Updated whenever odds rows change.
  */
 export async function recomputeExtraMarketsCountForFixture(fixtureId) {
-  const [extraMarkets, oddCells] = await Promise.all([
-    prisma.fixtureMarket.count({
-      where: {
-        fixture_id: fixtureId,
-        name: { notIn: EXTRA_MARKETS_SUMMARY_NAMES },
-        odd_lines: { some: {} },
-      },
-    }),
-    countAvailableOddCellsForFixture(fixtureId),
-  ]);
+  const markets = await loadAllowlistedMarketsWithLines(fixtureId);
+
+  const oddCells = markets.reduce(
+    (sum, market) => sum + countOddCellsInMarket(market.odd_lines),
+    0,
+  );
+  const extraMarkets = markets.filter(
+    (market) => !isSummaryMarketName(market.name),
+  ).length;
 
   await prisma.fixture.update({
     where: { id: fixtureId },

@@ -853,9 +853,9 @@ export async function getPublicReceiptTicket(req, res) {
 }
 
 /**
- * Minimal payload for coupon check — no stake / potential win.
+ * Payload for coupon check — selections, status, stake/odds/payout, and cashback.
  * Includes credited cashbackAmount when a BONUS ledger row exists.
- * Used by getPublicCouponCheck to return selections, status, and cashback.
+ * Used by getPublicCouponCheck.
  */
 function mapPublicCouponCheckPayload(ticket, cashbackAmount = null) {
   const snapshot = Array.isArray(ticket.selection_snapshot)
@@ -938,12 +938,17 @@ function mapPublicCouponCheckPayload(ticket, cashbackAmount = null) {
     cashbackAmount != null && Number(cashbackAmount) > 0
       ? Number(cashbackAmount)
       : null;
+  const taxBreakdown = ticketWinningsTaxBreakdown(ticket);
 
   return {
     couponNumber: ticket.coupon_number,
     receiptNumber: ticket.receipt_number ?? null,
     status: ticket.status,
     createdAt: ticket.created_at,
+    stake: ticket.stake,
+    totalOdds: ticket.total_odds,
+    potentialWin: ticket.potential_win,
+    netPayout: taxBreakdown.netPayout,
     selections: selectionLegs,
     cashbackAmount: credited,
   };
@@ -953,8 +958,8 @@ function mapPublicCouponCheckPayload(ticket, cashbackAmount = null) {
  * GET /api/cms/check-coupon?couponNumber=
  * Public coupon check — returns list of paid tickets (those with receipt_number).
  * Unpaid tickets (no receipt_number) are filtered out.
- * Returns minimal fields: couponNumber, receiptNumber, status, selections,
- * and cashbackAmount when a BONUS cashback credit exists for the ticket.
+ * Returns couponNumber, receiptNumber, status, stake, odds, payout fields,
+ * selections, and cashbackAmount when a BONUS cashback credit exists.
  */
 export async function getPublicCouponCheck(req, res) {
   try {
