@@ -43,7 +43,7 @@ function TableOddButton({ value, selected, onClick }) {
       className={`flex h-full min-h-[36px] w-full items-center justify-center rounded-xl border text-[14px] font-semibold transition-all duration-200 ${
         selected
           ? "border-[#F6AF01] bg-(--sb-accent-surface-deep) text-[#F6AF01] shadow-[0_0_12px_rgba(246,175,1,0.35)]"
-          : "border-transparent bg-(--sb-bg-page) text-[#ffffff] hover:bg-(--sb-bg-card)"
+          : "border-transparent bg-(--sb-bg-card-elevated) text-[#ffffff] hover:bg-(--sb-bg-card)"
       }`.trim()}
     >
       {value ?? "-"}
@@ -76,8 +76,8 @@ function MatchRow({
       ref={rowRef}
       className={`overflow-hidden rounded-xl transition-all duration-300 ${
         isExpanded
-          ? "bg-(--sb-bg-card-elevated) shadow-[0_8px_28px_-8px_rgba(246,175,1,0.12)]"
-          : "bg-(--sb-bg-page) shadow-[0_4px_14px_-6px_rgba(0,0,0,0.35)] hover:bg-(--sb-bg-card)"
+          ? "bg-(--sb-bg-card) shadow-[0_8px_28px_-8px_rgba(246,175,1,0.12)]"
+          : "bg-(--sb-bg-card) shadow-[0_4px_14px_-6px_rgba(0,0,0,0.35)] hover:bg-(--sb-bg-card-elevated)"
       }`}
     >
       <div

@@ -24,6 +24,10 @@ function toUiOdd(value) {
   return n.toFixed(2);
 }
 
+/**
+ * Atomic side aliases only. Do NOT collapse compounds like Home/Draw → 1x here:
+ * those mean Double Chance in one market and HT/FT in another.
+ */
 function normalizeSelectionLabel(value) {
   const raw = String(value || "")
     .trim()
@@ -31,12 +35,19 @@ function normalizeSelectionLabel(value) {
   if (["home", "1"].includes(raw)) return "1";
   if (["draw", "x"].includes(raw)) return "x";
   if (["away", "2"].includes(raw)) return "2";
-  if (["1x", "home/draw", "home or draw"].includes(raw)) return "1x";
-  if (["12", "home/away", "home or away"].includes(raw)) return "12";
-  if (["x2", "draw/away", "draw or away"].includes(raw)) return "x2";
-  // For non-1X2/DC markets (Over/Under, Asian Handicap, Correct Score, …),
-  // keep the upstream label verbatim so the UI can display it as-is.
+  // Over/Under, HT/FT, Asian Handicap, Correct Score, explicit 1x/12/x2, …
   return String(value || "").trim();
+}
+
+/** Map a Double Chance selection id to the compact summary strip key. */
+function toDoubleChanceSummaryKey(id) {
+  const raw = String(id || "")
+    .trim()
+    .toLowerCase();
+  if (["1x", "home/draw", "home or draw", "x1"].includes(raw)) return "1x";
+  if (["12", "home/away", "home or away", "21"].includes(raw)) return "12";
+  if (["x2", "draw/away", "draw or away", "2x"].includes(raw)) return "x2";
+  return null;
 }
 
 function toCategoryOdds(lines = []) {
@@ -124,8 +135,9 @@ function toSummaryMarkets(markets = []) {
       if (name.includes("match winner") && ["1", "x", "2"].includes(key)) {
         map[key] = value;
       }
-      if (name.includes("double chance") && ["1x", "12", "x2"].includes(key)) {
-        map[key] = value;
+      if (name.includes("double chance")) {
+        const dcKey = toDoubleChanceSummaryKey(id);
+        if (dcKey) map[dcKey] = value;
       }
     }
   }

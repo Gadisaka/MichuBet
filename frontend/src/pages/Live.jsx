@@ -341,7 +341,7 @@ function LiveOddButton({ value, selected, onClick }) {
       className={`flex h-[36px] w-full items-center justify-center rounded-xl border text-[13px] font-semibold transition-all duration-200 ${
         selected
           ? "border-(--sb-accent) bg-(--sb-accent-surface-deep) text-(--sb-accent-text-muted) shadow-[0_0_12px_rgba(246,175,1,0.35)]"
-          : "border-transparent bg-[#000000] text-[#ffffff] hover:bg-[#111111]"
+          : "border-transparent bg-(--sb-bg-card-elevated) text-[#ffffff] hover:bg-(--sb-bg-card)"
       }`.trim()}
     >
       {value ?? "-"}

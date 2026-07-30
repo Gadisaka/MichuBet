@@ -75,12 +75,42 @@ describe("mapFixtureToMatch summary strip", () => {
     const fromStrip = Object.fromEntries(
       match.markets.map(({ id, value }) => [id, value]),
     );
-    for (const row of dcDetailed.odds) {
-      const lid = row.id.toLowerCase();
-      if (["1x", "x2", "12"].includes(lid)) {
-        expect(fromStrip[lid]).toBe(row.value);
-      }
-    }
+    expect(fromStrip["1x"]).toBe("1.40");
+    expect(fromStrip.x2).toBe("1.50");
+    expect(fromStrip["12"]).toBe("1.36");
+    expect(dcDetailed.odds.find((o) => String(o.id).toLowerCase() === "1x")?.value).toBe(
+      "1.40",
+    );
+  });
+
+  it("keeps HT/FT Home/Draw compounds (does not collapse to 1x)", () => {
+    const match = mapFixtureToMatch({
+      ...baseFx(),
+      markets: [
+        {
+          name: "HT/FT Double",
+          odd_lines: [
+            { value: "Home/Home", odd: 1.83 },
+            { value: "Home/Draw", odd: 4.0 },
+            { value: "Draw/Draw", odd: 8.0 },
+            { value: "Away/Home", odd: 21.0 },
+            { value: "Home/Away", odd: 9.0 },
+            { value: "Draw/Away", odd: 11.0 },
+          ],
+        },
+      ],
+    });
+
+    const htft = match.detailedOdds.extra.find(
+      (m) => m.category === "HT/FT Double",
+    );
+    const ids = htft?.odds?.map((o) => o.id) ?? [];
+    expect(ids).toContain("Home/Draw");
+    expect(ids).toContain("Home/Away");
+    expect(ids).toContain("Draw/Away");
+    expect(ids).not.toContain("1x");
+    expect(ids).not.toContain("12");
+    expect(ids).not.toContain("x2");
   });
 
   it("applyOddsToMatch keeps list strip; detail drives expanded markets only", () => {

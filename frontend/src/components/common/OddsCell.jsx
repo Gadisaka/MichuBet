@@ -19,14 +19,14 @@ function OddsCell({
       } ${
         selected
           ? "border-[#F6AF01] bg-(--sb-accent-surface-deep) shadow-[0_0_12px_rgba(246,175,1,0.28)]"
-          : "border-transparent bg-(--sb-bg-page)/90 text-[#ffffff] hover:bg-(--sb-bg-card)"
+          : "border-transparent bg-(--sb-bg-card-elevated) text-[#ffffff] hover:bg-(--sb-bg-card)"
       } ${className}`.trim()}
     >
       {label ? (
         <span
           className={`font-bold text-[#ffffff] ${
             stacked
-              ? "max-w-full truncate text-[10px] leading-tight"
+              ? "max-w-full whitespace-normal break-words text-balance text-[10px] leading-tight"
               : "text-[13px]"
           }`}
         >

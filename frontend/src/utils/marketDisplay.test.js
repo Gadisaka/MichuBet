@@ -230,12 +230,12 @@ describe("sortOddsWithinMarket", () => {
 });
 
 describe("gridColsForMarket", () => {
-  it("returns fixed 3/2/4 cols for hero markets", () => {
+  it("returns fixed 3/2 cols and responsive HT/FT", () => {
     expect(gridColsForMarket("Match Winner")).toBe("grid-cols-3");
     expect(gridColsForMarket("Double Chance")).toBe("grid-cols-3");
     expect(gridColsForMarket("Both Teams Score")).toBe("grid-cols-2");
     expect(gridColsForMarket("Goals Over/Under")).toBe("grid-cols-2");
-    expect(gridColsForMarket("HT/FT Double")).toBe("grid-cols-4");
+    expect(gridColsForMarket("HT/FT Double")).toBe("grid-cols-2 md:grid-cols-4");
   });
 });
 

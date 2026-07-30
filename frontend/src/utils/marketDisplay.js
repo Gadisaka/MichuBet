@@ -315,7 +315,7 @@ export function sortOddsWithinMarket(marketName, odds) {
  */
 export function gridColsForMarket(marketName) {
   if (isHtFtMarket(marketName)) {
-    return "grid-cols-4";
+    return "grid-cols-2 md:grid-cols-4";
   }
   if (isMatchWinnerMarket(marketName) || isDoubleChanceMarket(marketName)) {
     return "grid-cols-3";
@@ -323,7 +323,7 @@ export function gridColsForMarket(marketName) {
   if (isBttsMarket(marketName) || isGoalsOverUnderMarket(marketName)) {
     return "grid-cols-2";
   }
-  return "grid-cols-2 sm:grid-cols-3 lg:grid-cols-4";
+  return "grid-cols-2 md:grid-cols-3 lg:grid-cols-4";
 }
 
 /**
