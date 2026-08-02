@@ -8,6 +8,7 @@ import SiteFooter from "../components/layout/SiteFooter";
 import TopHeader from "../components/layout/TopHeader";
 import MatchesPagination from "../components/common/MatchesPagination";
 import BetSlipPanel from "../components/sections/BetSlipPanel";
+import CategoryTiles from "../components/sections/CategoryTiles";
 import HeroBanner from "../components/sections/HeroBanner";
 import MatchesTable from "../components/sections/MatchesTable";
 import MatchesTabs from "../components/sections/MatchesTabs";
@@ -32,6 +33,7 @@ import {
   loadBetSlipState,
   persistBetSlipState,
 } from "../utils/betSlipPersistence";
+import { pruneExpiredSlips } from "../utils/selectionExpiry";
 import { usePlayerSiteBranding } from "../hooks/usePlayerSiteBranding";
 import { normalizeApiFixtureId } from "../utils/fixtureId";
 import {
@@ -45,6 +47,7 @@ import { slicePageItems } from "../utils/pagination";
 const HISTORY_HOME_FIXTURE = "__home_fixture_drop";
 const HISTORY_HOME_SCROLL_PIN = "__home_scroll_pin";
 const SCROLL_PIN_THRESHOLD_PX = 56;
+const BET_SLIP_PRUNE_MS = 15_000;
 
 function Home() {
   const initialBet = loadBetSlipState();
@@ -209,8 +212,19 @@ function Home() {
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- enrich persisted slips when fixture metadata refreshes
-    setSlips((prev) => enrichSlipsFromMatches(prev, allMatches));
+    setSlips((prev) =>
+      pruneExpiredSlips(enrichSlipsFromMatches(prev, allMatches)),
+    );
   }, [allMatches]);
+
+  useEffect(() => {
+    const tick = () => {
+      setSlips((prev) => pruneExpiredSlips(prev));
+    };
+    tick();
+    const id = window.setInterval(tick, BET_SLIP_PRUNE_MS);
+    return () => window.clearInterval(id);
+  }, []);
 
   useEffect(() => {
     persistBetSlipState(slips, activeSlip);
@@ -504,6 +518,7 @@ function Home() {
                 />
               </div>
               <HeroBanner />
+              <CategoryTiles />
               <MatchesTabs
                 sports={toolbarSports}
                 times={timeOptions}

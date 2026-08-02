@@ -15,6 +15,7 @@
  */
 import { prisma } from "../Config/db.js";
 import { logAuditEvent } from "../lib/auditLog.js";
+import { creditWallet, debitWallet } from "../lib/walletBalance.js";
 
 function toPositiveInt(value, fallback) {
   const parsed = Number.parseInt(value, 10);
@@ -461,28 +462,37 @@ export async function approveRequest(req, res) {
       });
       if (!wallet) throw new Error("WALLET_NOT_FOUND");
 
-      const balanceBefore = Number(wallet.balance);
       const amount = Number(transaction.amount);
-      let balanceAfter;
+      let applied;
 
       if (transaction.type === "DEPOSIT") {
-        balanceAfter = balanceBefore + amount;
+        // Admin-approved deposits to player wallets are not withdrawable.
+        applied = await creditWallet(tx, wallet, amount, {
+          withdrawable: false,
+        });
       } else {
-        if (balanceBefore < amount) throw new Error("INSUFFICIENT_BALANCE");
-        balanceAfter = balanceBefore - amount;
+        // Player withdrawals must come from withdrawable; cashier floats use plain balance.
+        try {
+          applied = await debitWallet(tx, wallet, amount, {
+            fromWithdrawable: wallet.wallet_type === "PLAYER",
+          });
+        } catch (err) {
+          if (
+            err?.message === "INSUFFICIENT_BALANCE" ||
+            err?.message === "INSUFFICIENT_WITHDRAWABLE"
+          ) {
+            throw new Error("INSUFFICIENT_BALANCE");
+          }
+          throw err;
+        }
       }
-
-      await tx.wallet.update({
-        where: { id: wallet.id },
-        data: { balance: balanceAfter },
-      });
 
       const updatedTx = await tx.transaction.update({
         where: { id },
         data: {
           reference: transaction.reference.replace("pending:", `approved:${req.user.sub}:`),
-          balance_before: balanceBefore,
-          balance_after: balanceAfter,
+          balance_before: applied.balanceBefore,
+          balance_after: applied.balanceAfter,
         },
       });
 

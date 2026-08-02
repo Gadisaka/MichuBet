@@ -2,6 +2,8 @@
  * Map GET /api/cms/ticket-by-coupon selection legs to bet slip rows (matches placeBet / MatchesTable payloads).
  */
 
+import { isSelectionExpired } from "./selectionExpiry";
+
 function safeSlug(s) {
   return String(s || "")
     .replace(/\|/g, "/")
@@ -60,5 +62,5 @@ export function mapCouponSelectionsToSlipRows(couponNumber, selections = []) {
     }
   });
 
-  return [...byFixture.values()];
+  return [...byFixture.values()].filter((row) => !isSelectionExpired(row));
 }

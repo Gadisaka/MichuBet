@@ -59,6 +59,11 @@ import {
 import { logAuditEvent } from "../lib/auditLog.js";
 import { recordUngradedLeg } from "../lib/settlementMetrics.js";
 import { isTicketSettleable } from "../lib/ticketExpiry.js";
+import {
+  creditWallet,
+  restoreWallet,
+  walletSnapshot,
+} from "../lib/walletBalance.js";
 import { evaluatePostponedSettlementWait } from "../lib/postponedSettlement.js";
 
 const FINAL_FIXTURE_STATUSES = new Set(["FT", "AET", "PEN", "AWD", "WO"]);
@@ -313,12 +318,9 @@ export async function creditOnlineWinnerInTx(tx, ticketId) {
   const { netPayout: amount } = ticketWinningsTaxBreakdown(ticket);
   if (amount <= 0) return { skipped: true, reason: "non_positive_payout" };
 
-  const balanceBefore = Number(wallet.balance) || 0;
-  const balanceAfter = balanceBefore + amount;
-
-  await tx.wallet.update({
-    where: { id: wallet.id },
-    data: { balance: balanceAfter },
+  const beforeSnap = walletSnapshot(wallet);
+  const credited = await creditWallet(tx, wallet, amount, {
+    withdrawable: true,
   });
   try {
     await tx.transaction.create({
@@ -326,8 +328,8 @@ export async function creditOnlineWinnerInTx(tx, ticketId) {
         wallet_id: wallet.id,
         type: "PAYOUT",
         amount,
-        balance_before: balanceBefore,
-        balance_after: balanceAfter,
+        balance_before: credited.balanceBefore,
+        balance_after: credited.balanceAfter,
         reference: settlementRef,
       },
     });
@@ -339,10 +341,7 @@ export async function creditOnlineWinnerInTx(tx, ticketId) {
       // the caller's failure path. To be defensive in Mongo (which
       // doesn't have true rollback on all Prisma paths), we restore
       // the balance explicitly here.
-      await tx.wallet.update({
-        where: { id: wallet.id },
-        data: { balance: balanceBefore },
-      });
+      await restoreWallet(tx, wallet, beforeSnap);
       return { skipped: true, reason: "already_credited_race" };
     }
     throw err;
@@ -352,7 +351,11 @@ export async function creditOnlineWinnerInTx(tx, ticketId) {
     data: { status: "PAID" },
   });
 
-  return { credited: amount, balanceAfter, reason: "credited" };
+  return {
+    credited: amount,
+    balanceAfter: credited.balanceAfter,
+    reason: "credited",
+  };
 }
 
 /**
@@ -390,12 +393,9 @@ export async function refundOnlineTicketInTx(tx, ticketId) {
   const amount = Number(ticket.stake) || 0;
   if (amount <= 0) return { skipped: true, reason: "non_positive_stake" };
 
-  const balanceBefore = Number(wallet.balance) || 0;
-  const balanceAfter = balanceBefore + amount;
-
-  await tx.wallet.update({
-    where: { id: wallet.id },
-    data: { balance: balanceAfter },
+  const beforeSnap = walletSnapshot(wallet);
+  const credited = await creditWallet(tx, wallet, amount, {
+    withdrawable: false,
   });
   try {
     await tx.transaction.create({
@@ -403,23 +403,24 @@ export async function refundOnlineTicketInTx(tx, ticketId) {
         wallet_id: wallet.id,
         type: "DEPOSIT",
         amount,
-        balance_before: balanceBefore,
-        balance_after: balanceAfter,
+        balance_before: credited.balanceBefore,
+        balance_after: credited.balanceAfter,
         reference: refundRef,
       },
     });
   } catch (err) {
     if (isUniqueConstraintError(err)) {
-      await tx.wallet.update({
-        where: { id: wallet.id },
-        data: { balance: balanceBefore },
-      });
+      await restoreWallet(tx, wallet, beforeSnap);
       return { skipped: true, reason: "already_refunded_race" };
     }
     throw err;
   }
 
-  return { refunded: amount, balanceAfter, reason: "refunded" };
+  return {
+    refunded: amount,
+    balanceAfter: credited.balanceAfter,
+    reason: "refunded",
+  };
 }
 
 function mergeLegResult(selection, v1Outcome, v2Outcome) {

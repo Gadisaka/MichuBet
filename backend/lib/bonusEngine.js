@@ -10,6 +10,11 @@
  * @module lib/bonusEngine
  */
 import { toMoney, d } from "./moneyDecimal.js";
+import {
+  creditWallet,
+  restoreWallet,
+  walletSnapshot,
+} from "./walletBalance.js";
 
 /** @param {string} userId */
 export function welcomeBonusRef(userId) {
@@ -188,12 +193,37 @@ export function pickCashbackTier(result, tiers) {
 }
 
 /**
+ * Combined odds for the cashback ratio: product of leg odds with VOID legs
+ * collapsed to a 1.0 multiplier (same rule settlement uses for payouts).
+ *
+ * Recomputed from the final graded legs rather than read off
+ * `ticket.total_odds`, because that column is frozen the moment the ticket
+ * first turns LOST — at which point legs that are still PENDING are counted
+ * at full odds and never revised if they later VOID.
+ *
+ * @param {Array<{ result?: string, odds?: number }>} selections
+ * @returns {number | null}
+ */
+export function cashbackTotalOddsFromSelections(selections) {
+  if (!Array.isArray(selections) || selections.length === 0) return null;
+  let product = 1;
+  for (const sel of selections) {
+    if (String(sel?.result ?? "").toUpperCase() === "VOID") continue;
+    const o = Number(sel?.odds);
+    if (!Number.isFinite(o) || o <= 0) return null;
+    product *= o;
+  }
+  return product;
+}
+
+/**
  * Tiered cashback evaluation (pure, no DB). Computes eligibility against
  * the configured gates and resolves the payout tier from the ratio
- * `result = total_odds / largestLostLegOdds`.
+ * `result = totalOdds / largestLostLegOdds`, where `totalOdds` is recomputed
+ * from the final legs (VOID → 1.0).
  *
  * @param {Object} p
- * @param {import("@prisma/client").Ticket} p.ticket — pre-LOST total_odds, stake, created_at
+ * @param {import("@prisma/client").Ticket} p.ticket — stake, created_at; total_odds used only as fallback
  * @param {Array<{ result?: string, odds?: number }>} [p.selections]
  * @param {Array<string>} [p.fixtureStatuses] — feed statuses for the ticket's fixtures
  * @param {Array<string>} [p.matchStatuses] — admin Match statuses for the ticket's matches
@@ -287,7 +317,11 @@ export function evaluateCashback({
   }
   if (largestLostOdds <= 0) return fail("no_lost_leg");
 
-  const totalOdds = Number(ticket.total_odds);
+  // Recompute from the final legs; ticket.total_odds is a snapshot taken when
+  // the ticket first turned LOST and can still price later-VOIDed legs in full.
+  const fromSelections = cashbackTotalOddsFromSelections(selections);
+  const totalOdds =
+    fromSelections != null ? fromSelections : Number(ticket.total_odds);
   if (!Number.isFinite(totalOdds) || totalOdds <= 0) {
     return fail("invalid_total_odds");
   }
@@ -313,7 +347,7 @@ export function evaluateCashback({
  * requires `context` (selections, fixture/match statuses, now). Otherwise
  * falls back to the legacy flat `% of stake` model for backward compat.
  *
- * @param {import("@prisma/client").Ticket} ticket — pre-LOST total_odds & stake
+ * @param {import("@prisma/client").Ticket} ticket — stake (+ total_odds fallback)
  * @param {import("@prisma/client").Bonus | null} bonus
  * @param {{ selections?: Array, fixtureStatuses?: Array<string>, matchStatuses?: Array<string>, now?: Date } | null} [context]
  */
@@ -371,13 +405,10 @@ export async function creditBonusIfNew(tx, { walletId, amount, reference }) {
 
   const w = await tx.wallet.findUnique({ where: { id: walletId } });
   if (!w) return { credited: false, reason: "no_wallet" };
-  const before = Number(w.balance) || 0;
-  const after = toMoney(d(before).add(a));
+  const beforeSnap = walletSnapshot(w);
 
-  await tx.wallet.update({
-    where: { id: walletId },
-    data: { balance: after },
-  });
+  // Bonuses are not withdrawable until the player has played through.
+  const credited = await creditWallet(tx, w, a, { withdrawable: false });
 
   try {
     await tx.transaction.create({
@@ -385,23 +416,20 @@ export async function creditBonusIfNew(tx, { walletId, amount, reference }) {
         wallet_id: walletId,
         type: "BONUS",
         amount: a,
-        balance_before: before,
-        balance_after: after,
+        balance_before: credited.balanceBefore,
+        balance_after: credited.balanceAfter,
         reference,
       },
     });
   } catch (err) {
     if (isUniqueConstraintError(err)) {
-      await tx.wallet.update({
-        where: { id: walletId },
-        data: { balance: before },
-      });
+      await restoreWallet(tx, w, beforeSnap);
       return { credited: false, reason: "duplicate_race" };
     }
     throw err;
   }
 
-  return { credited: true, balanceAfter: after };
+  return { credited: true, balanceAfter: credited.balanceAfter };
 }
 
 /**

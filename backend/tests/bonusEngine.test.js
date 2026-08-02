@@ -10,6 +10,7 @@ import {
   computeCashbackAmount,
   evaluateCashback,
   pickCashbackTier,
+  cashbackTotalOddsFromSelections,
   potentialWinWithAccumulator,
   roundMoney,
 } from "../lib/bonusEngine.js";
@@ -39,13 +40,20 @@ function tieredBonus(overrides = {}) {
   };
 }
 
-/** Build N selections, the last one LOST with `lostOdds`, the rest WON. */
-function selections(count, lostOdds) {
+/**
+ * Build N selections, the last one LOST with `lostOdds`, the rest WON.
+ * Won-leg odds are chosen so the placement product equals `totalOdds`
+ * (cashback reads the product of selection.odds, not ticket.total_odds).
+ */
+function selections(count, lostOdds, totalOdds = 96) {
   const out = [];
+  const wonCount = Math.max(0, count - 1);
+  const wonProduct = totalOdds / lostOdds;
+  const eachWon = wonCount > 0 ? Math.pow(wonProduct, 1 / wonCount) : 1;
   for (let i = 0; i < count; i++) {
     out.push({
       result: i === count - 1 ? "LOST" : "WON",
-      odds: i === count - 1 ? lostOdds : 1.5,
+      odds: i === count - 1 ? lostOdds : eachWon,
     });
   }
   return out;
@@ -156,13 +164,15 @@ test("evaluateCashback worked example: 96 odds / 2.3 lost = 41.73 -> stake x1", 
 });
 
 test("evaluateCashback uses the largest lost-leg odds (conservative)", () => {
-  // total 300, two LOST legs (2.0 and 3.0) -> 300/3 = 100 -> x4
+  // Placement 5*4*2*3*2.5 = 300; lost legs 2.0 and 3.0 → 300/3 = 100 → x4
   const ev = evaluateCashback({
-    ticket: { user_id: "u1", stake: 10, total_odds: 300, created_at: new Date() },
+    ticket: { user_id: "u1", stake: 10, total_odds: 22.5, created_at: new Date() },
     selections: [
-      { result: "WON", odds: 1.5 },
+      { result: "WON", odds: 5 },
+      { result: "WON", odds: 4 },
       { result: "LOST", odds: 2.0 },
       { result: "LOST", odds: 3.0 },
+      { result: "WON", odds: 2.5 },
     ],
     bonus: tieredBonus(),
     now: new Date(),
@@ -230,7 +240,53 @@ test("evaluateCashback gate: result below minResult", () => {
   // 40 / 2.3 = 17.39 < 20
   const ev = evaluateCashback({
     ticket: { user_id: "u1", stake: 10, total_odds: 40, created_at: new Date() },
-    selections: selections(3, 2.3),
+    selections: selections(3, 2.3, 40),
+    bonus: tieredBonus(),
+  });
+  assert.equal(ev.eligible, false);
+  assert.equal(ev.reason, "below_min_result");
+});
+
+test("cashbackTotalOddsFromSelections multiplies legs and collapses VOID to 1.0", () => {
+  assert.equal(
+    cashbackTotalOddsFromSelections([
+      { result: "WON", odds: 3 },
+      { result: "WON", odds: 3 },
+      { result: "WON", odds: 3 },
+      { result: "LOST", odds: 2.5 },
+    ]),
+    67.5,
+  );
+  assert.equal(
+    cashbackTotalOddsFromSelections([
+      { result: "WON", odds: 3 },
+      { result: "VOID", odds: 3 },
+      { result: "WON", odds: 3 },
+      { result: "LOST", odds: 2.5 },
+    ]),
+    22.5,
+  );
+});
+
+test("evaluateCashback recomputes odds from final legs, not the LOST snapshot", () => {
+  // ticket.total_odds was frozen at 67.5 when the slip first turned LOST, while
+  // the 3.0 leg was still PENDING. It later VOIDed, so the real ratio is
+  // 3*1*3*2.5 = 22.5 → 22.5/2.5 = 9, below minResult. Paying off the stale
+  // snapshot (67.5/2.5 = 27) would wrongly hand out a x1 tier.
+  const ev = evaluateCashback({
+    ticket: {
+      user_id: "u1",
+      stake: 10,
+      total_odds: 67.5,
+      created_at: new Date(),
+    },
+    selections: [
+      { result: "WON", odds: 3 },
+      { result: "VOID", odds: 3 },
+      { result: "WON", odds: 3 },
+      { result: "LOST", odds: 2.5 },
+    ],
+    fixtureStatuses: ["FT", "FT", "FT", "FT"],
     bonus: tieredBonus(),
   });
   assert.equal(ev.eligible, false);
@@ -254,12 +310,8 @@ test("evaluateCashback gate: any PENDING leg defers cashback", () => {
 
 test("evaluateCashback pays once all pending legs are resolved", () => {
   const ev = evaluateCashback({
-    ticket: { user_id: "u1", stake: 10, total_odds: 96, created_at: new Date() },
-    selections: [
-      { result: "WON", odds: 1.5 },
-      { result: "LOST", odds: 2.3 },
-      { result: "WON", odds: 1.5 },
-    ],
+    ticket: { user_id: "u1", stake: 10, total_odds: 5.175, created_at: new Date() },
+    selections: selections(3, 2.3, 96),
     bonus: tieredBonus(),
   });
   assert.equal(ev.eligible, true);
@@ -269,9 +321,9 @@ test("evaluateCashback pays once all pending legs are resolved", () => {
 
 test("computeCashbackAmount uses tiered path when rules.tiers present", () => {
   const amount = computeCashbackAmount(
-    { user_id: "u1", stake: 10, total_odds: 96, created_at: new Date() },
+    { user_id: "u1", stake: 10, total_odds: 5.175, created_at: new Date() },
     tieredBonus(),
-    { selections: selections(3, 2.3), now: new Date() },
+    { selections: selections(3, 2.3, 96), now: new Date() },
   );
   assert.equal(amount, 10);
 });

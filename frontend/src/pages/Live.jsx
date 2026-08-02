@@ -35,9 +35,11 @@ import {
   loadBetSlipState,
   persistBetSlipState,
 } from "../utils/betSlipPersistence";
+import { pruneExpiredSlips } from "../utils/selectionExpiry";
 import { slicePageItems } from "../utils/pagination";
 
 const LIVE_REFRESH_MS = 10_000;
+const BET_SLIP_PRUNE_MS = 15_000;
 const LIVE_MARKETS = ["1", "x", "2"];
 
 /** Interval / clock-slice markets (not full-match 1X2). */
@@ -286,13 +288,13 @@ function LiveExpansion({ match, onClose, onOddsClick, selectedOdds }) {
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-1 border-b border-white/8 px-3 py-2">
+      <div className="flex items-center gap-1 overflow-x-auto whitespace-nowrap border-b border-white/8 px-3 py-2">
         {MARKET_FILTER_CHIPS.map((chip) => (
           <button
             key={chip.id}
             type="button"
             onClick={() => setActiveChipId(chip.id)}
-            className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold ${
+            className={`shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-semibold ${
               chip.id === activeChipId
                 ? "border-(--sb-accent) bg-(--sb-accent-surface) text-(--sb-accent-text-soft)"
                 : "border-[#2f3047] bg-[#131a2c] text-[rgba(255,255,255,0.72)]"
@@ -734,8 +736,19 @@ function Live() {
   const { catalogItems } = useFootballSidebarCatalog();
 
   useEffect(() => {
-    setSlips((prev) => enrichSlipsFromMatches(prev, allMatches));
+    setSlips((prev) =>
+      pruneExpiredSlips(enrichSlipsFromMatches(prev, allMatches)),
+    );
   }, [allMatches]);
+
+  useEffect(() => {
+    const tick = () => {
+      setSlips((prev) => pruneExpiredSlips(prev));
+    };
+    tick();
+    const id = window.setInterval(tick, BET_SLIP_PRUNE_MS);
+    return () => window.clearInterval(id);
+  }, []);
 
   useEffect(() => {
     persistBetSlipState(slips, activeSlip);

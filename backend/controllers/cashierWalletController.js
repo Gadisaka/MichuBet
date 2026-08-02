@@ -19,6 +19,7 @@ import {
   normalizeSixDigitWithdrawCode,
   SHOP_WITHDRAW_REF_PREFIX,
 } from "../lib/shopWithdraw.js";
+import { creditWallet } from "../lib/walletBalance.js";
 
 function toPositiveInt(value, fallback) {
   const parsed = Number.parseInt(value, 10);
@@ -85,25 +86,22 @@ export async function cashierDeposit(req, res) {
       const hadFirst = playerUser?.first_deposit_at ?? null;
 
       const cashierBefore = Number(cWallet.balance);
-      const playerBefore = Number(pWallet.balance);
 
       if (cashierBefore < numericAmount) {
         throw new Error("INSUFFICIENT_BALANCE");
       }
 
       const cashierAfter = cashierBefore - numericAmount;
-      const playerAfter = playerBefore + numericAmount;
 
-      // Deduct from cashier
+      // Deduct from cashier float (withdrawable unused for CASHIER)
       await tx.wallet.update({
         where: { id: cWallet.id },
         data: { balance: cashierAfter },
       });
 
-      // Add to player
-      await tx.wallet.update({
-        where: { id: pWallet.id },
-        data: { balance: playerAfter },
+      // Add to player — deposit is not withdrawable until played through
+      const playerCredit = await creditWallet(tx, pWallet, numericAmount, {
+        withdrawable: false,
       });
 
       const depositRefBase = `cashier-deposit:${req.user.sub}:to:${player.id}`;
@@ -126,8 +124,8 @@ export async function cashierDeposit(req, res) {
           wallet_id: pWallet.id,
           type: "DEPOSIT",
           amount: numericAmount,
-          balance_before: playerBefore,
-          balance_after: playerAfter,
+          balance_before: playerCredit.balanceBefore,
+          balance_after: playerCredit.balanceAfter,
           reference: `${depositRefBase}:player`,
         },
       });
@@ -150,7 +148,7 @@ export async function cashierDeposit(req, res) {
 
       return {
         cashierBalance: cashierAfter,
-        playerBalance: Number(pFinal?.balance ?? playerAfter),
+        playerBalance: Number(pFinal?.balance ?? playerCredit.balanceAfter),
         cashierTxId: cashierTx.id,
         playerTxId: playerTx.id,
       };
@@ -320,6 +318,12 @@ export async function approveWithdrawRequest(req, res) {
     }
     if (error.message === "INSUFFICIENT_PLAYER_BALANCE") {
       return res.status(400).json({ message: "Player has insufficient balance" });
+    }
+    if (error.message === "INSUFFICIENT_WITHDRAWABLE") {
+      return res.status(400).json({
+        message:
+          "Player withdrawable balance is insufficient. Only winnings are withdrawable; unused deposits stay locked.",
+      });
     }
     if (error.message === "CASHIER_WALLET_NOT_FOUND") {
       return res.status(404).json({ message: "Cashier wallet not found" });
@@ -505,6 +509,12 @@ export async function redeemShopWithdraw(req, res) {
     }
     if (error.message === "INSUFFICIENT_PLAYER_BALANCE") {
       return res.status(400).json({ message: "Player has insufficient balance" });
+    }
+    if (error.message === "INSUFFICIENT_WITHDRAWABLE") {
+      return res.status(400).json({
+        message:
+          "Player withdrawable balance is insufficient. Only winnings are withdrawable; unused deposits stay locked.",
+      });
     }
     if (error.message === "CASHIER_WALLET_NOT_FOUND") {
       return res.status(404).json({ message: "Cashier wallet not found" });

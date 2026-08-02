@@ -1,23 +1,28 @@
 /**
  * InOut Games wallet operations.
  *
- * Seamless-wallet money movements for casino play. Each function is idempotent
- * through the DB-level `Transaction.reference @unique` constraint (see the note
- * on the model in schema.prisma) and mirrors the concurrency-safe pattern used
- * by `services/ticketSettlementService.js` (re-read wallet, unique-ref insert,
- * P2002 -> idempotent return, restoring the balance bump on a losing race).
+ * Seamless-wallet money movements for casino play. Idempotent via
+ * `Transaction.reference @unique`. Uses `walletBalance.js` so PLAYER
+ * withdrawable accounting stays consistent with sportsbook stakes/payouts:
+ *   bet      -> debitWallet (stake: non-withdrawable first)
+ *   withdraw -> creditWallet(withdrawable: true) for wins; zero = ledger only
+ *   rollback -> creditWallet(withdrawable: false) (stake refund)
  *
  * Ledger references:
  *   bet      -> inout:bet:{transactionId}      (type BET,    debit)
  *   withdraw -> inout:withdraw:{transactionId} (type PAYOUT, credit)
  *   rollback -> inout:rollback:{transactionId} (type PAYOUT, credit/refund)
  *
- * Amounts are treated as fiat (ETB) and rounded to 2 decimals.
- *
  * @module services/inoutWallet
  */
 import { prisma } from "../Config/db.js";
-import { toMoney, d } from "../lib/moneyDecimal.js";
+import { toMoney } from "../lib/moneyDecimal.js";
+import {
+  creditWallet,
+  debitWallet,
+  restoreWallet,
+  walletSnapshot,
+} from "../lib/walletBalance.js";
 
 export function betRef(transactionId) {
   return `inout:bet:${transactionId}`;
@@ -44,10 +49,9 @@ async function findPlayerWallet(tx, userId) {
 }
 
 /**
- * Result shape shared by all operations.
  * @typedef {Object} WalletOpResult
- * @property {"ok"|"insufficient_funds"|"no_wallet"|"duplicate"} status
- * @property {number} [balance] Wallet balance after the operation.
+ * @property {"ok"|"insufficient_funds"|"no_wallet"|"duplicate"|"debit_not_found"} status
+ * @property {number} [balance]
  */
 
 /**
@@ -77,16 +81,21 @@ export async function debitForBet(userId, amount, transactionId) {
     const wallet = await findPlayerWallet(tx, userId);
     if (!wallet) return { status: "no_wallet" };
 
-    const before = Number(wallet.balance) || 0;
-    if (d(before).lessThan(stake)) {
-      return { status: "insufficient_funds", balance: before };
+    const beforeSnap = walletSnapshot(wallet);
+    let debited;
+    try {
+      debited = await debitWallet(tx, wallet, stake, {
+        fromWithdrawable: false,
+      });
+    } catch (err) {
+      if (err?.message === "INSUFFICIENT_BALANCE") {
+        return {
+          status: "insufficient_funds",
+          balance: beforeSnap.balance,
+        };
+      }
+      throw err;
     }
-    const after = toMoney(d(before).sub(stake));
-
-    await tx.wallet.update({
-      where: { id: wallet.id },
-      data: { balance: after },
-    });
 
     try {
       await tx.transaction.create({
@@ -94,53 +103,47 @@ export async function debitForBet(userId, amount, transactionId) {
           wallet_id: wallet.id,
           type: "BET",
           amount: stake,
-          balance_before: before,
-          balance_after: after,
+          balance_before: debited.balanceBefore,
+          balance_after: debited.balanceAfter,
           reference,
         },
       });
     } catch (err) {
       if (isUniqueConstraintError(err)) {
-        await tx.wallet.update({
-          where: { id: wallet.id },
-          data: { balance: before },
-        });
+        await restoreWallet(tx, wallet, beforeSnap);
         const dup = await tx.transaction.findFirst({
           where: { reference },
           select: { balance_after: true },
         });
         return {
           status: "duplicate",
-          balance: Number(dup?.balance_after ?? before),
+          balance: Number(dup?.balance_after ?? beforeSnap.balance),
         };
       }
       throw err;
     }
 
-    return { status: "ok", balance: after };
+    return { status: "ok", balance: debited.balanceAfter };
   });
 }
 
 /**
- * Credit a payout to the player wallet.
- *
- * Shared by `withdraw` (win/loss result, stake already included) and
- * `rollback` (stake refund). The caller supplies the reference + amount.
- *
- * When `debitId` is provided we require the referenced bet
- * (`inout:bet:{debitId}`) to exist before crediting. This satisfies the
- * provider's `DEBIT_TRANSACTION_NOT_FOUND` contract (a credit/refund for a
- * debit we never recorded must error and leave the balance untouched) while
- * still honouring the money-safety case: if a bet response was lost on the
- * network but we DID debit, the debit row exists and the refund proceeds.
+ * Credit a payout/refund. `asWithdrawable` true for game wins; false for rollbacks.
  *
  * @param {string} userId
- * @param {number} amount Positive credit amount.
- * @param {string} reference Unique idempotency reference.
- * @param {string} [debitId] Original bet transaction id to verify.
+ * @param {number} amount
+ * @param {string} reference
+ * @param {string} [debitId]
+ * @param {boolean} asWithdrawable
  * @returns {Promise<WalletOpResult>}
  */
-async function creditPayout(userId, amount, reference, debitId) {
+async function creditPayout(
+  userId,
+  amount,
+  reference,
+  debitId,
+  asWithdrawable,
+) {
   const credit = toMoney(amount);
 
   return prisma.$transaction(async (tx) => {
@@ -161,18 +164,33 @@ async function creditPayout(userId, amount, reference, debitId) {
     }
 
     const wallet = await findPlayerWallet(tx, userId);
-    if (!wallet) return { status: "no_wallet" };
+    if (!wallet || wallet.wallet_type !== "PLAYER") {
+      return { status: "no_wallet" };
+    }
 
-    const before = Number(wallet.balance) || 0;
-    // A zero-value result (e.g. a losing round) is a valid, successful
-    // settlement: record it for idempotency without changing the balance.
-    const after = credit > 0 ? toMoney(d(before).add(credit)) : before;
+    const beforeSnap = walletSnapshot(wallet);
+    let balanceAfter = beforeSnap.balance;
+    let balanceBefore = beforeSnap.balance;
 
     if (credit > 0) {
-      await tx.wallet.update({
-        where: { id: wallet.id },
-        data: { balance: after },
+      const credited = await creditWallet(tx, wallet, credit, {
+        withdrawable: asWithdrawable,
       });
+      balanceBefore = credited.balanceBefore;
+      balanceAfter = credited.balanceAfter;
+
+      // InOut game wins must unlock withdrawable.
+      if (asWithdrawable) {
+        const expectedWithdrawable = toMoney(
+          (beforeSnap.withdrawable ?? 0) + credit,
+        );
+        if (
+          credited.withdrawableAfter <
+          Math.min(expectedWithdrawable, credited.balanceAfter)
+        ) {
+          throw new Error("INOUT_WIN_WITHDRAWABLE_NOT_APPLIED");
+        }
+      }
     }
 
     try {
@@ -181,18 +199,15 @@ async function creditPayout(userId, amount, reference, debitId) {
           wallet_id: wallet.id,
           type: "PAYOUT",
           amount: credit,
-          balance_before: before,
-          balance_after: after,
+          balance_before: balanceBefore,
+          balance_after: balanceAfter,
           reference,
         },
       });
     } catch (err) {
       if (isUniqueConstraintError(err)) {
         if (credit > 0) {
-          await tx.wallet.update({
-            where: { id: wallet.id },
-            data: { balance: before },
-          });
+          await restoreWallet(tx, wallet, beforeSnap);
         }
         const dup = await tx.transaction.findFirst({
           where: { reference },
@@ -200,36 +215,39 @@ async function creditPayout(userId, amount, reference, debitId) {
         });
         return {
           status: "duplicate",
-          balance: Number(dup?.balance_after ?? before),
+          balance: Number(dup?.balance_after ?? beforeSnap.balance),
         };
       }
       throw err;
     }
 
-    return { status: "ok", balance: after };
+    return { status: "ok", balance: balanceAfter };
   });
 }
 
 /**
  * Credit the result of a finished game (withdraw webhook).
- * @param {string} userId
- * @param {number} result Total to credit (stake already included).
- * @param {string} transactionId InOut transaction id (idempotency key).
- * @param {string} [debitId] Original bet transaction id to verify.
- * @returns {Promise<WalletOpResult>}
+ * Wins increase withdrawable; zero-result losses only write the ledger row.
  */
 export async function creditForWithdraw(userId, result, transactionId, debitId) {
-  return creditPayout(userId, result, withdrawRef(transactionId), debitId);
+  return creditPayout(
+    userId,
+    result,
+    withdrawRef(transactionId),
+    debitId,
+    true,
+  );
 }
 
 /**
- * Refund a bet stake (rollback webhook).
- * @param {string} userId
- * @param {number} amount Stake to refund.
- * @param {string} transactionId InOut transaction id (idempotency key).
- * @param {string} [debitId] Original bet transaction id to verify.
- * @returns {Promise<WalletOpResult>}
+ * Refund a bet stake (rollback webhook) — balance only, not withdrawable.
  */
 export async function refundForRollback(userId, amount, transactionId, debitId) {
-  return creditPayout(userId, amount, rollbackRef(transactionId), debitId);
+  return creditPayout(
+    userId,
+    amount,
+    rollbackRef(transactionId),
+    debitId,
+    false,
+  );
 }

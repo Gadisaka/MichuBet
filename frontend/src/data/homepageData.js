@@ -4,23 +4,32 @@ export const topHeaderData = {
   timeLabel: "ID: 726",
 };
 
-/** Labels come from i18n `nav.*` via `PrimaryNav`. */
+/**
+ * Labels come from i18n `nav.*` via `PrimaryNav`.
+ *
+ * Promoted partner games (Chicken Road 2, Chicken Coin) take the first game
+ * slots after the HOME/LIVE navigation entries.
+ */
 export const topNavItems = [
   { id: "home", icon: "home", path: "/" },
   { id: "live", icon: "radio", path: "/live" },
-  { id: "games", icon: "gamepad", path: "/casino" },
-  { id: "fastKeno", icon: "hash", path: "/casino?launch=keno", launch: "keno" },
+  {
+    id: "chickenRoad",
+    icon: "bird",
+    path: "/casino?launch=chicken-road-two",
+    launch: "chicken-road-two",
+  },
+  {
+    id: "chickenCoin",
+    icon: "coins",
+    path: "/casino?launch=chicken-coin",
+    launch: "chicken-coin",
+  },
   {
     id: "aviator",
     icon: "rocket",
     path: "/casino?launch=aviator",
     launch: "aviator",
-  },
-  {
-    id: "chickenRoad",
-    icon: "bird",
-    path: "/casino?launch=chicken-road-two-bonus",
-    launch: "chicken-road-two-bonus",
   },
   { id: "bingo", icon: "grid", path: "/casino?launch=bingo", launch: "bingo" },
   {
@@ -29,6 +38,48 @@ export const topNavItems = [
     path: "/casino?launch=megablock",
     launch: "megablock",
   },
+  { id: "fastKeno", icon: "hash", path: "/casino?launch=keno", launch: "keno" },
+  { id: "games", icon: "gamepad", path: "/casino" },
+];
+
+/**
+ * Quick-play tiles under the home hero. Array order is display order, so promo
+ * placements are changed here without touching the component.
+ *
+ * `kind`:
+ *  - `brand` — pinned provider tile, links to the lobby (no single game)
+ *  - `inout` — InOut game; `gameMode` must match the provider catalog. The tile
+ *    is hidden when the game is disabled in admin or the casino is switched off.
+ *  - `mrx`   — MRX instant game launched by `launch` id, artwork bundled locally
+ *  - `link`  — plain internal link rendered with a lucide icon
+ *
+ * `iconUrl` is a fallback only; the live `icon_url` from the synced catalog wins
+ * so provider artwork updates don't need a deploy.
+ */
+export const homeCategoryTiles = [
+  { id: "inout", kind: "brand", pinned: true, path: "/casino" },
+  {
+    id: "chickenRoad",
+    kind: "inout",
+    gameMode: "chicken-road-two",
+    iconUrl: "https://icons.inout.games/io_chiken-road-2.png",
+  },
+  {
+    id: "chickenCoin",
+    kind: "inout",
+    gameMode: "chicken-coin",
+    iconUrl: "https://icons.inout.games/io_chicken_coin.png",
+  },
+  { id: "aviator", kind: "mrx", launch: "aviator", asset: "aviator" },
+  { id: "bingo", kind: "mrx", launch: "bingo", asset: "bingo" },
+  {
+    id: "megaBlock",
+    kind: "inout",
+    gameMode: "megablock",
+    iconUrl: "https://icons.inout.games/io_megablock.png",
+  },
+  { id: "fastKeno", kind: "mrx", launch: "keno", asset: "keno" },
+  { id: "allGames", kind: "link", icon: "gamepad", path: "/casino" },
 ];
 
 export const topLeagues = [

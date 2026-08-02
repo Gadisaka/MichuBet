@@ -47,12 +47,6 @@ const MRX_GAMES = [
   },
 ];
 
-/** InOut gameModes launched from the top nav (session token via backend). */
-const NAV_INOUT_LAUNCHES = {
-  "chicken-road-two-bonus": { title: "Chicken Road 2" },
-  megablock: { title: "Mega Block" },
-};
-
 function GameCard({ game, onPlay, launching = false, size = "lg" }) {
   const aspect = size === "sm" ? "aspect-square" : "aspect-[3/4]";
   return (
@@ -198,6 +192,9 @@ function Casino() {
     [launching, language, navigate],
   );
 
+  // Deep links (`/casino?launch=<id>`) come from the top nav and the home tiles.
+  // MRX ids resolve from the static list; anything else is matched against the
+  // synced InOut catalog, so promoting a new game needs no frontend change.
   useEffect(() => {
     if (!launchId) {
       handledLaunchRef.current = null;
@@ -213,17 +210,20 @@ function Casino() {
       return;
     }
 
-    const navInout = NAV_INOUT_LAUNCHES[launchId];
-    if (navInout) {
-      handledLaunchRef.current = launchId;
-      clearLaunchParam();
-      handlePlay({ gameMode: launchId, title: navInout.title });
-      return;
-    }
+    if (loading) return;
 
+    const inoutGame = games.find((g) => g.gameMode === launchId);
     handledLaunchRef.current = launchId;
     clearLaunchParam();
-  }, [launchId, clearLaunchParam, handleMrxPlay, handlePlay]);
+    if (inoutGame) handlePlay(inoutGame);
+  }, [
+    launchId,
+    loading,
+    games,
+    clearLaunchParam,
+    handleMrxPlay,
+    handlePlay,
+  ]);
 
   return (
     <PageContainer>
@@ -233,42 +233,27 @@ function Casino() {
       </div>
 
       <div className="mx-auto w-full max-w-6xl px-2 pt-2 sm:px-3">
-        <div className="animate-deposit-panel px-1 pt-1">
-          <p className="m-0 text-[11px] font-extrabold uppercase tracking-[0.2em] text-[rgba(255,255,255,0.72)]">
-            {t("casino.instantEyebrow")}
-          </p>
-          <h1 className="m-0 bg-gradient-to-r from-[#ffffff] via-[#ffe8a3] to-[#ffffff] bg-clip-text text-xl font-black tracking-tight text-transparent sm:text-2xl">
-            {t("casino.instantTitle")}
-          </h1>
-        </div>
-
         {error ? (
-          <div className="mx-1 mt-3 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+          <div className="mx-1 mt-2 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
             {error}
           </div>
         ) : null}
 
-        <div className="mt-3 grid grid-cols-3 gap-2 pb-4 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6">
-          {MRX_GAMES.map((game) => (
-            <GameCard
-              key={game.id}
-              game={{ ...game, title: t(game.nameKey) }}
-              launching={mrxLaunching === game.id}
-              onPlay={handleMrxPlay}
-              size="sm"
-            />
-          ))}
-        </div>
-
         {casinoEnabled === true ? (
           <>
-            <div className="animate-deposit-panel px-1 pt-2">
-              <p className="m-0 text-[11px] font-extrabold uppercase tracking-[0.2em] text-[rgba(255,255,255,0.72)]">
-                {t("casino.inoutEyebrow")}
-              </p>
-              <h2 className="m-0 bg-gradient-to-r from-[#ffffff] via-[#ffe8a3] to-[#ffffff] bg-clip-text text-lg font-black tracking-tight text-transparent sm:text-xl">
+            <div className="animate-deposit-panel px-1 pt-1">
+              <div className="flex items-center gap-2">
+                <p className="m-0 text-[11px] font-extrabold uppercase tracking-[0.2em] text-[rgba(255,255,255,0.72)]">
+                  {t("casino.inoutEyebrow")}
+                </p>
+                <span className="inline-flex items-center gap-1 rounded-full bg-[#F6AF01] px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wide text-[#000000]">
+                  <AppIcon name="star" size={9} />
+                  {t("categories.pinned")}
+                </span>
+              </div>
+              <h1 className="m-0 bg-gradient-to-r from-[#ffffff] via-[#ffe8a3] to-[#ffffff] bg-clip-text text-xl font-black tracking-tight text-transparent sm:text-2xl">
                 {t("casino.inoutTitle")}
-              </h2>
+              </h1>
             </div>
 
             {loading ? (
@@ -285,7 +270,7 @@ function Casino() {
                 </p>
               </div>
             ) : (
-              <div className="mt-3 grid grid-cols-2 gap-3 pb-6 md:grid-cols-3 lg:grid-cols-4">
+              <div className="mt-3 grid grid-cols-2 gap-3 pb-4 md:grid-cols-3 lg:grid-cols-4">
                 {games.map((game) => (
                   <GameCard
                     key={game.gameMode}
@@ -297,6 +282,27 @@ function Casino() {
             )}
           </>
         ) : null}
+
+        <div className="animate-deposit-panel px-1 pt-2">
+          <p className="m-0 text-[11px] font-extrabold uppercase tracking-[0.2em] text-[rgba(255,255,255,0.72)]">
+            {t("casino.instantEyebrow")}
+          </p>
+          <h2 className="m-0 bg-gradient-to-r from-[#ffffff] via-[#ffe8a3] to-[#ffffff] bg-clip-text text-lg font-black tracking-tight text-transparent sm:text-xl">
+            {t("casino.instantTitle")}
+          </h2>
+        </div>
+
+        <div className="mt-3 grid grid-cols-3 gap-2 pb-6 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6">
+          {MRX_GAMES.map((game) => (
+            <GameCard
+              key={game.id}
+              game={{ ...game, title: t(game.nameKey) }}
+              launching={mrxLaunching === game.id}
+              onPlay={handleMrxPlay}
+              size="sm"
+            />
+          ))}
+        </div>
       </div>
 
       <SiteFooter />

@@ -1,7 +1,17 @@
 /**
  * Idempotent wallet credits when canceling tickets.
+ *
+ * Player refunds restore balance only (not withdrawable) so deposit→bet→cancel
+ * cannot turn deposits into cashable funds.
+ *
  * @module services/ticketCancelRefunds
  */
+
+import {
+  creditWallet,
+  restoreWallet,
+  walletSnapshot,
+} from "../lib/walletBalance.js";
 
 /**
  * @param {import("@prisma/client").Prisma.TransactionClient} tx
@@ -24,12 +34,10 @@ export async function creditWalletIfNotRefunded(tx, { walletId, amount, referenc
   if (!wallet) return null;
 
   const numericAmount = Number(amount);
-  const balanceBefore = Number(wallet.balance) || 0;
-  const balanceAfter = balanceBefore + numericAmount;
-
-  await tx.wallet.update({
-    where: { id: wallet.id },
-    data: { balance: balanceAfter },
+  const beforeSnap = walletSnapshot(wallet);
+  // Refunds are never withdrawable — prevents deposit/bet/cancel laundering.
+  const credited = await creditWallet(tx, wallet, numericAmount, {
+    withdrawable: false,
   });
 
   try {
@@ -38,17 +46,14 @@ export async function creditWalletIfNotRefunded(tx, { walletId, amount, referenc
         wallet_id: wallet.id,
         type: "DEPOSIT",
         amount: numericAmount,
-        balance_before: balanceBefore,
-        balance_after: balanceAfter,
+        balance_before: credited.balanceBefore,
+        balance_after: credited.balanceAfter,
         reference,
       },
     });
   } catch (err) {
     if (err?.code === "P2002") {
-      await tx.wallet.update({
-        where: { id: wallet.id },
-        data: { balance: balanceBefore },
-      });
+      await restoreWallet(tx, wallet, beforeSnap);
       return { skipped: true, reason: "already_refunded_race" };
     }
     throw err;
@@ -57,7 +62,7 @@ export async function creditWalletIfNotRefunded(tx, { walletId, amount, referenc
   return {
     amount: numericAmount,
     walletId: wallet.id,
-    balanceAfter,
+    balanceAfter: credited.balanceAfter,
     walletType: wallet.wallet_type,
   };
 }

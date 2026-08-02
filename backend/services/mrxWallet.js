@@ -1,11 +1,9 @@
 /**
  * MRX Instant Games wallet bridge operations.
  *
- * Idempotent via `Transaction.reference @unique`. Plain balance updates
- * (MichuBet has no withdrawable field) — same concurrency pattern as
- * `services/inoutWallet.js`:
- *   GAME_FEE     -> debit + BET ledger
- *   GAME_WINNING -> credit + PAYOUT ledger
+ * Idempotent via `Transaction.reference @unique`. Uses `walletBalance.js`:
+ *   GAME_FEE     -> debitWallet (stake) + BET ledger
+ *   GAME_WINNING -> creditWallet(withdrawable: true) + PAYOUT ledger
  *
  * References:
  *   fee -> mrx:fee:{id}
@@ -15,8 +13,14 @@
  */
 import { prisma } from "../Config/db.js";
 import { feeRef, winRef } from "../lib/mrxWalletRefs.js";
-import { toMoney, d } from "../lib/moneyDecimal.js";
+import { toMoney } from "../lib/moneyDecimal.js";
 import { normalizeEthiopiaPhone } from "../lib/phone.js";
+import {
+  creditWallet,
+  debitWallet,
+  restoreWallet,
+  walletSnapshot,
+} from "../lib/walletBalance.js";
 
 export { feeRef, winRef };
 
@@ -85,17 +89,27 @@ export async function debitGameFee(phone, amount, referenceId) {
     if (!found) return { status: "user_not_found" };
     if (!found.wallet) return { status: "no_wallet" };
 
-    const wallet = found.wallet;
-    const before = Number(wallet.balance) || 0;
-    if (d(before).lessThan(stake)) {
-      return { status: "insufficient_funds", balance: before };
+    // Re-load full wallet so wallet_type + withdrawable are never partial.
+    const wallet = await tx.wallet.findUnique({ where: { id: found.wallet.id } });
+    if (!wallet || wallet.wallet_type !== "PLAYER") {
+      return { status: "no_wallet" };
     }
-    const after = toMoney(d(before).sub(stake));
 
-    await tx.wallet.update({
-      where: { id: wallet.id },
-      data: { balance: after },
-    });
+    const beforeSnap = walletSnapshot(wallet);
+    let debited;
+    try {
+      debited = await debitWallet(tx, wallet, stake, {
+        fromWithdrawable: false,
+      });
+    } catch (err) {
+      if (err?.message === "INSUFFICIENT_BALANCE") {
+        return {
+          status: "insufficient_funds",
+          balance: beforeSnap.balance,
+        };
+      }
+      throw err;
+    }
 
     try {
       await tx.transaction.create({
@@ -103,35 +117,32 @@ export async function debitGameFee(phone, amount, referenceId) {
           wallet_id: wallet.id,
           type: "BET",
           amount: stake,
-          balance_before: before,
-          balance_after: after,
+          balance_before: debited.balanceBefore,
+          balance_after: debited.balanceAfter,
           reference,
         },
       });
     } catch (err) {
       if (isUniqueConstraintError(err)) {
-        await tx.wallet.update({
-          where: { id: wallet.id },
-          data: { balance: before },
-        });
+        await restoreWallet(tx, wallet, beforeSnap);
         const dup = await tx.transaction.findFirst({
           where: { reference },
           select: { balance_after: true },
         });
         return {
           status: "duplicate",
-          balance: Number(dup?.balance_after ?? before),
+          balance: Number(dup?.balance_after ?? beforeSnap.balance),
         };
       }
       throw err;
     }
 
-    return { status: "ok", balance: after };
+    return { status: "ok", balance: debited.balanceAfter };
   });
 }
 
 /**
- * Credit a game win (GAME_WINNING).
+ * Credit a game win (GAME_WINNING) — increases withdrawable.
  *
  * @param {string} phone
  * @param {number} amount
@@ -158,14 +169,24 @@ export async function creditGameWinning(phone, amount, referenceId) {
     if (!found) return { status: "user_not_found" };
     if (!found.wallet) return { status: "no_wallet" };
 
-    const wallet = found.wallet;
-    const before = Number(wallet.balance) || 0;
-    const after = toMoney(d(before).add(credit));
+    // Re-load full wallet so wallet_type + withdrawable are never partial.
+    const wallet = await tx.wallet.findUnique({ where: { id: found.wallet.id } });
+    if (!wallet || wallet.wallet_type !== "PLAYER") {
+      return { status: "no_wallet" };
+    }
 
-    await tx.wallet.update({
-      where: { id: wallet.id },
-      data: { balance: after },
+    const beforeSnap = walletSnapshot(wallet);
+    const credited = await creditWallet(tx, wallet, credit, {
+      withdrawable: true,
     });
+
+    // Game wins must unlock withdrawable; catch silent accounting failures.
+    const expectedWithdrawable = toMoney(
+      (beforeSnap.withdrawable ?? 0) + credit,
+    );
+    if (credited.withdrawableAfter < Math.min(expectedWithdrawable, credited.balanceAfter)) {
+      throw new Error("MRX_WIN_WITHDRAWABLE_NOT_APPLIED");
+    }
 
     try {
       await tx.transaction.create({
@@ -173,29 +194,26 @@ export async function creditGameWinning(phone, amount, referenceId) {
           wallet_id: wallet.id,
           type: "PAYOUT",
           amount: credit,
-          balance_before: before,
-          balance_after: after,
+          balance_before: credited.balanceBefore,
+          balance_after: credited.balanceAfter,
           reference,
         },
       });
     } catch (err) {
       if (isUniqueConstraintError(err)) {
-        await tx.wallet.update({
-          where: { id: wallet.id },
-          data: { balance: before },
-        });
+        await restoreWallet(tx, wallet, beforeSnap);
         const dup = await tx.transaction.findFirst({
           where: { reference },
           select: { balance_after: true },
         });
         return {
           status: "duplicate",
-          balance: Number(dup?.balance_after ?? before),
+          balance: Number(dup?.balance_after ?? beforeSnap.balance),
         };
       }
       throw err;
     }
 
-    return { status: "ok", balance: after };
+    return { status: "ok", balance: credited.balanceAfter };
   });
 }

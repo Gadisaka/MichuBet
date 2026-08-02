@@ -553,6 +553,77 @@ function parseOuThreshold(selectionId) {
 
 /**
  * @param {string} marketName
+ * @returns {boolean}
+ */
+function isDrawNoBetMarket(marketName) {
+  const key = normalizeMarketName(marketName);
+  return key === "draw no bet" || key.startsWith("draw no bet (");
+}
+
+/**
+ * Markets whose selections should render Home → Draw → Away.
+ * @param {string} marketName
+ * @returns {boolean}
+ */
+function needsTeamSideSort(marketName) {
+  return (
+    isAtomicTeamSideMarket(marketName) ||
+    isDoubleChanceMarket(marketName) ||
+    isDrawNoBetMarket(marketName) ||
+    isAsianHandicapMarket(marketName) ||
+    isHandicapResultMarket(marketName) ||
+    isResultBttsMarket(marketName) ||
+    isResultTotalMarket(marketName) ||
+    isWinningMarginMarket(marketName)
+  );
+}
+
+/**
+ * Sort key: Home(0) → Draw(1) → Away(2) → No(3), plus a secondary tie-break.
+ * @param {string} selectionId
+ * @returns {[number, number]}
+ */
+function selectionSideSortKey(selectionId) {
+  const raw = String(selectionId || "").trim();
+  const token = canonicalSelectionToken(raw);
+
+  if (token === "1x") return [0, 0];
+  if (token === "12") return [1, 0];
+  if (token === "x2") return [2, 0];
+  if (token === "1") return [0, 0];
+  if (token === "x") return [1, 0];
+  if (token === "2") return [2, 0];
+
+  const lower = raw.toLowerCase();
+  if (["no", "none", "neither", "no goal", "no score"].includes(lower)) {
+    return [3, 0];
+  }
+
+  const slash = raw.indexOf("/");
+  if (slash > 0) {
+    const left = normalizeHtFtSide(raw.slice(0, slash).trim());
+    if (left) {
+      const right = raw.slice(slash + 1).trim().toLowerCase();
+      let secondary = 0;
+      if (right.startsWith("under") || right.startsWith("no")) secondary = 1;
+      return [htFtSideRank(left), secondary];
+    }
+  }
+
+  const sideMatch = /\b(home|away|draw|h|a|d|1|2|x)\b/i.exec(raw);
+  if (sideMatch) {
+    const side = normalizeHtFtSide(sideMatch[1]);
+    if (side) {
+      const line = parseOuThreshold(raw);
+      return [htFtSideRank(side), line ?? 0];
+    }
+  }
+
+  return [99, 0];
+}
+
+/**
+ * @param {string} marketName
  * @param {Array<{ id: string, value: string }>} odds
  * @returns {typeof odds}
  */
@@ -598,6 +669,15 @@ export function sortOddsWithinMarket(marketName, odds) {
       const aBtts = aParts.btts === "Yes" ? 0 : aParts.btts === "No" ? 1 : 2;
       const bBtts = bParts.btts === "Yes" ? 0 : bParts.btts === "No" ? 1 : 2;
       return aBtts - bBtts;
+    });
+  }
+
+  if (needsTeamSideSort(marketName)) {
+    return [...odds].sort((a, b) => {
+      const [aSide, aSecondary] = selectionSideSortKey(a.id);
+      const [bSide, bSecondary] = selectionSideSortKey(b.id);
+      if (aSide !== bSide) return aSide - bSide;
+      return aSecondary - bSecondary;
     });
   }
 

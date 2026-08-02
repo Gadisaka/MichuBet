@@ -104,13 +104,14 @@ function seedSelection({
   });
 }
 
-function seedWallet({ id, userId, balance }) {
+function seedWallet({ id, userId, balance, withdrawable = 0 }) {
   const store = getStore();
   store.wallet.set(id, {
     id,
     user_id: userId,
     wallet_type: "PLAYER",
     balance,
+    withdrawable,
   });
 }
 
@@ -150,6 +151,7 @@ test("single-leg WON ticket transitions to PAID and credits player wallet", asyn
   // Stake was already debited at placement (not modeled here); credit
   // increases balance by potential_win = 200.
   assert.equal(wallet.balance, 250);
+  assert.equal(wallet.withdrawable, 200);
 
   const txns = [...store.transaction.values()];
   assert.equal(txns.length, 1);
@@ -626,6 +628,78 @@ test("LOST ticket credits tiered cashback (totalOdds/lostOdds picks tier)", asyn
   assert.equal(bonusTx.reference, "bonus:cashback:tk-t");
   assert.equal(bonusTx.amount, 10); // stake 10 x tier multiplier 1
   assert.equal(store.wallet.get("w-t").balance, 10);
+});
+
+test("cashback ignores the stale LOST total_odds snapshot when a later leg VOIDs", async () => {
+  resetStore();
+  const store = getStore();
+  seedTieredCashbackBonus();
+  // The losing leg grades first, so ticket.total_odds is frozen at
+  // 3*2.5*10*3 = 225 while three legs are still PENDING. One of them later
+  // VOIDs (unknown market), making the real combined odds 1*2.5*10*3 = 75.
+  // Correct ratio 75/2.5 = 30 → x1 → 10. Paying off the 225 snapshot would
+  // read 90 → x3 → 30, a 3x overpayment.
+  process.env.SETTLEMENT_ENGINE = "v2";
+  seedFixture({ id: "fx-sl", status: "FT", homeScore: 0, awayScore: 2 });
+  seedFixture({ id: "fx-sw1", status: "FT", homeScore: 2, awayScore: 0 });
+  seedFixture({ id: "fx-sw2", status: "FT", homeScore: 3, awayScore: 1 });
+  seedFixture({ id: "fx-sv", status: "FT", homeScore: 1, awayScore: 0 });
+  seedTicket({ id: "tk-snap", userId: "u-snap", stake: 10, totalOdds: 225 });
+  seedSelection({
+    id: "snap-l",
+    ticketId: "tk-snap",
+    fixtureId: "fx-sl",
+    selection: "1",
+    marketCode: "MATCH_WINNER",
+    odds: 2.5,
+  });
+  seedSelection({
+    id: "snap-w1",
+    ticketId: "tk-snap",
+    fixtureId: "fx-sw1",
+    selection: "1",
+    marketCode: "MATCH_WINNER",
+    odds: 10,
+  });
+  seedSelection({
+    id: "snap-w2",
+    ticketId: "tk-snap",
+    fixtureId: "fx-sw2",
+    selection: "1",
+    marketCode: "MATCH_WINNER",
+    odds: 3,
+  });
+  seedSelection({
+    id: "snap-v",
+    ticketId: "tk-snap",
+    fixtureId: "fx-sv",
+    selection: "1",
+    marketCode: "NOT_A_REAL_MARKET",
+    odds: 3,
+  });
+  seedWallet({ id: "w-snap", userId: "u-snap", balance: 0 });
+
+  const early = await settlement.settleFixture("fx-sl");
+  assert.equal(early.ticketsLost, 1);
+  assert.equal(store.ticket.get("tk-snap").status, "LOST");
+  // Snapshot priced the three still-PENDING legs at full odds.
+  assert.equal(store.ticket.get("tk-snap").total_odds, 225);
+
+  await settlement.settleFixture("fx-sw1");
+  await settlement.settleFixture("fx-sw2");
+  await settlement.settleFixture("fx-sv");
+
+  assert.equal(store.ticketSelection.get("snap-v").result, SELECTION_RESULT.VOID);
+  // Already-terminal ticket: the snapshot is never revised.
+  assert.equal(store.ticket.get("tk-snap").total_odds, 225);
+
+  const bonusTx = [...store.transaction.values()].find((t) => t.type === "BONUS");
+  assert.ok(bonusTx, "expected deferred cashback once every leg resolved");
+  assert.equal(bonusTx.reference, "bonus:cashback:tk-snap");
+  assert.equal(bonusTx.amount, 10, "must price off final odds (75), not snapshot (225)");
+  assert.equal(store.wallet.get("w-snap").balance, 10);
+
+  delete process.env.SETTLEMENT_ENGINE;
 });
 
 test("LOST ticket with a postponed leg is NOT eligible for tiered cashback", async () => {

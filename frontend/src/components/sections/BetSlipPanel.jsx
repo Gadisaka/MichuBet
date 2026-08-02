@@ -433,14 +433,17 @@ function BetSlipPanel({
     setBetResult(null);
     try {
       const data = await fetchPublicCouponTicket(trimmed);
+      const sourceSelections = data.selections ?? [];
       const rows = mapCouponSelectionsToSlipRows(
         data.couponNumber ?? trimmed,
-        data.selections ?? [],
+        sourceSelections,
       );
       if (!rows.length) {
         setBetResult({
           type: "error",
-          message: "This ticket has no selections to load.",
+          message: sourceSelections.length
+            ? "All selections on this coupon have already started."
+            : "This ticket has no selections to load.",
         });
         setTimeout(() => setBetResult(null), 4000);
         return;

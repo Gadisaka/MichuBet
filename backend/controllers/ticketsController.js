@@ -41,6 +41,7 @@ import {
 } from "../services/heldTicketService.js";
 import { logPlacementValidation } from "../lib/placementValidationLogger.js";
 import { toMoney, d, sub } from "../lib/moneyDecimal.js";
+import { debitWallet } from "../lib/walletBalance.js";
 import {
   buildCouponNumber,
   couponLookupCandidates,
@@ -1902,22 +1903,16 @@ export async function createPrebookTicket(req, res) {
           });
           if (!wallet) throw new Error("PLAYER_WALLET_NOT_FOUND");
 
-          const balanceBefore = toMoney(wallet.balance);
-          if (balanceBefore < numericStake)
-            throw new Error("INSUFFICIENT_BALANCE");
-
-          const balanceAfter = toMoney(sub(balanceBefore, numericStake));
-          await tx.wallet.update({
-            where: { id: wallet.id },
-            data: { balance: balanceAfter },
+          const debited = await debitWallet(tx, wallet, numericStake, {
+            fromWithdrawable: false,
           });
           await tx.transaction.create({
             data: {
               wallet_id: wallet.id,
               type: "BET",
               amount: numericStake,
-              balance_before: balanceBefore,
-              balance_after: balanceAfter,
+              balance_before: debited.balanceBefore,
+              balance_after: debited.balanceAfter,
               reference: idempotencyKey
                 ? `idem:${authenticatedUserId}:${idempotencyKey}`
                 : `ticket:${receiptNumber}`,
@@ -1937,7 +1932,7 @@ export async function createPrebookTicket(req, res) {
           }
 
           const ticket = await tx.ticket.create({ data });
-          return { ticket, balanceAfter };
+          return { ticket, balanceAfter: debited.balanceAfter };
         }),
         ),
       );
@@ -2983,11 +2978,30 @@ export async function updateTicketStake(req, res) {
 }
 
 /**
+ * Clear a prepare-print receipt reservation when the sale does not complete
+ * (e.g. insufficient cashier balance). Receipt presence marks the ticket as
+ * paid/settleable, so orphaned receipts must not remain on OPEN tickets.
+ */
+async function clearUnpaidPrintReservation(ticketId) {
+  if (!ticketId) return;
+  const printReference = `ticket-print:${ticketId}`;
+  const existingPrint = await prisma.transaction.findFirst({
+    where: { type: "BET", reference: printReference },
+    select: { id: true },
+  });
+  if (existingPrint) return;
+  await prisma.ticket.updateMany({
+    where: { id: ticketId, status: "OPEN" },
+    data: { receipt_number: null },
+  });
+}
+
+/**
  * POST /api/tickets/:id/prepare-print
- * Validates odds/markets AND reserves a receipt number for an OPEN ticket in one
- * round trip before physical print (no wallet debit). The merged validation
- * keeps the cashier print flow to a single pre-print call; drift/version/lock
- * prompts surface here with the same 409 shapes the frontend already handles.
+ * Validates odds/markets, checks cashier balance, AND reserves a receipt number
+ * for an OPEN ticket in one round trip before physical print (no wallet debit).
+ * Balance is checked before receipt assignment because receipt_number is what
+ * marks a ticket as paid/settleable in reports and coupon check.
  */
 export async function preparePrintTicket(req, res) {
   try {
@@ -3044,6 +3058,35 @@ export async function preparePrintTicket(req, res) {
         meta: validation.logMeta || {},
       });
       return res.status(validation.statusCode).json(validation.body);
+    }
+
+    if (!cashier.wallet_id) {
+      return res.status(404).json({ message: "Cashier wallet not found" });
+    }
+    const wallet = await perfSpan(req.id, "print.prepare.walletLookup", () =>
+      prisma.wallet.findUnique({
+        where: { id: cashier.wallet_id },
+        select: { balance: true },
+      }),
+    );
+    if (!wallet) {
+      return res.status(404).json({ message: "Cashier wallet not found" });
+    }
+    const stakeAmount = toMoney(ticket.stake);
+    const balanceBefore = toMoney(wallet.balance);
+    if (balanceBefore < stakeAmount) {
+      // Drop any orphaned receipt from a previous aborted print attempt.
+      if (String(ticket.receipt_number || "").trim()) {
+        await clearUnpaidPrintReservation(ticket.id);
+      }
+      await logPlacementValidation({
+        actorUserId: req.user?.sub || null,
+        actorRole: req.user?.role || "CASHIER",
+        flowChannel: "CASHIER",
+        rejectionReason: "insufficient_balance",
+        status: "REJECTED",
+      });
+      return res.status(400).json({ message: "Insufficient cashier balance" });
     }
 
     let receiptNumber = ticket.receipt_number;
@@ -3366,6 +3409,16 @@ export async function confirmPrintTicket(req, res) {
         rejectionReason: "insufficient_balance",
         status: "REJECTED",
       });
+      // prepare-print may have already reserved a receipt; clear it so the
+      // ticket is not left looking paid/settleable without a wallet debit.
+      try {
+        await clearUnpaidPrintReservation(req.params.id);
+      } catch (revertErr) {
+        console.error(
+          "confirmPrintTicket insufficient balance receipt revert failed:",
+          revertErr?.message || revertErr,
+        );
+      }
       return res.status(400).json({ message: "Insufficient cashier balance" });
     }
     if (error?.statusCode === 409) {

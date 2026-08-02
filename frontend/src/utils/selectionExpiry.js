@@ -50,3 +50,21 @@ export function slipHasExpiredSelection(selections, now = Date.now()) {
   if (!Array.isArray(selections)) return false;
   return selections.some((s) => isSelectionExpired(s, now));
 }
+
+/** Drop prematch legs past kickoff (and terminal legs). Live legs stay until finished. */
+export function pruneExpiredSelections(selections, now = Date.now()) {
+  if (!Array.isArray(selections) || selections.length === 0) return selections;
+  const next = selections.filter((s) => !isSelectionExpired(s, now));
+  return next.length === selections.length ? selections : next;
+}
+
+export function pruneExpiredSlips(slips, now = Date.now()) {
+  if (!slips || typeof slips !== "object") return slips;
+  const n1 = pruneExpiredSelections(slips.betslip1, now);
+  const n2 = pruneExpiredSelections(slips.betslip2, now);
+  const n3 = pruneExpiredSelections(slips.betslip3, now);
+  if (n1 === slips.betslip1 && n2 === slips.betslip2 && n3 === slips.betslip3) {
+    return slips;
+  }
+  return { betslip1: n1, betslip2: n2, betslip3: n3 };
+}

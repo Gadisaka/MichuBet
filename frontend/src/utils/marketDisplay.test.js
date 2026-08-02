@@ -382,6 +382,47 @@ describe("sortOddsWithinMarket", () => {
     ];
     expect(sortOddsWithinMarket("Both Teams Score", odds)).toEqual(odds);
   });
+
+  it("sorts Match Winner Home → Draw → Away even when API sends Away first", () => {
+    const odds = [
+      { id: "Away", value: "3.40" },
+      { id: "Draw", value: "3.20" },
+      { id: "Home", value: "2.10" },
+    ];
+    expect(sortOddsWithinMarket("Match Winner", odds).map((o) => o.id)).toEqual([
+      "Home",
+      "Draw",
+      "Away",
+    ]);
+  });
+
+  it("sorts Home/Away and Draw No Bet with Home before Away", () => {
+    const odds = [
+      { id: "Away", value: "2.05" },
+      { id: "Home", value: "1.70" },
+    ];
+    expect(sortOddsWithinMarket("Home/Away", odds).map((o) => o.id)).toEqual([
+      "Home",
+      "Away",
+    ]);
+    expect(sortOddsWithinMarket("Draw No Bet", odds).map((o) => o.id)).toEqual([
+      "Home",
+      "Away",
+    ]);
+  });
+
+  it("sorts Double Chance as 1X → 12 → X2", () => {
+    const odds = [
+      { id: "x2", value: "1.40" },
+      { id: "12", value: "1.30" },
+      { id: "1x", value: "1.25" },
+    ];
+    expect(sortOddsWithinMarket("Double Chance", odds).map((o) => o.id)).toEqual([
+      "1x",
+      "12",
+      "x2",
+    ]);
+  });
 });
 
 describe("gridColsForMarket", () => {

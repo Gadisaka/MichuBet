@@ -35,12 +35,32 @@ import CashierInboxList from "../../components/notifications/CashierInboxList";
 import FixturesSelectionPanel from "../../components/cashier/FixturesSelectionPanel";
 import { formatSelectionResult } from "../../components/ticket/receiptFormat";
 import { capGrossPotentialWin } from "../../utils/bettingStakeLimits";
-import { isSelectionRemovable } from "../../utils/selectionExpiry";
+import {
+  isSelectionRemovable,
+  isSelectionStarted,
+} from "../../utils/selectionExpiry";
 import { formatCouponNumberInput } from "../../utils/couponNumber";
 import {
   formatTaxLineLabel,
   slipGrossTaxNetForTicket,
 } from "../../utils/winningsTax";
+
+const STARTED_SELECTION_PRUNE_MS = 15_000;
+
+function getStartedSelectionIds(ticket, now = Date.now()) {
+  return (ticket?.selections || [])
+    .filter((selection) => isSelectionStarted(selection.match?.startTime, now))
+    .map((selection) => selection.id)
+    .filter(Boolean);
+}
+
+function canEditSellSelections(ticket, sellConfirmed) {
+  return (
+    ticket?.status === "OPEN" &&
+    !sellConfirmed &&
+    isFirstSaleTicket(ticket)
+  );
+}
 
 const LEFT_TABS = [
   { id: "sell", label: "Sell Ticket" },
@@ -257,20 +277,26 @@ function TicketDetail({
                     ? home || "-"
                     : "-";
               const marketText = String(selection.marketLabel ?? "").trim();
-              const startingSoon = isSelectionRemovable(selection.match?.startTime);
+              const started = isSelectionStarted(selection.match?.startTime);
+              const startingSoon =
+                !started && isSelectionRemovable(selection.match?.startTime);
               const isRemoving = removingSelectionId === selection.id;
               return (
                 <tr
                   key={selection.id}
                   className={`border-b border-[var(--border)] last:border-0 ${
-                    startingSoon ? "bg-[var(--surfaceMuted)]/40" : ""
+                    started || startingSoon ? "bg-[var(--surfaceMuted)]/40" : ""
                   }`}
                 >
                   <td className="px-3 py-2 text-xs text-[var(--muted)]">
                     {selection.match?.startTime
                       ? new Date(selection.match.startTime).toLocaleString()
                       : "-"}
-                    {startingSoon ? (
+                    {started ? (
+                      <span className="mt-0.5 block text-[10px] font-semibold uppercase text-[var(--danger)]">
+                        Started
+                      </span>
+                    ) : startingSoon ? (
                       <span className="mt-0.5 block text-[10px] font-semibold uppercase text-[var(--danger)]">
                         Starting soon
                       </span>
@@ -504,6 +530,7 @@ export default function CashierTicketsPage() {
   const removeSelection = useRemoveTicketSelectionMutation();
   const addSelection = useAddTicketSelectionMutation();
   const printInFlightRef = useRef(false);
+  const pruningStartedRef = useRef(false);
   const playerInfoPagesQuery = usePlayerInfoPagesQuery();
   const payoutContactEntries =
     playerInfoPagesQuery.data?.pages?.["contact-us"]?.entries ?? [];
@@ -621,6 +648,61 @@ export default function CashierTicketsPage() {
     });
   };
 
+  const pruneStartedSellSelections = async (ticket, { announce = true } = {}) => {
+    if (!ticket?.id || !canEditSellSelections(ticket, false)) {
+      return ticket;
+    }
+
+    const startedIds = getStartedSelectionIds(ticket);
+    if (startedIds.length === 0) return ticket;
+
+    const remainingCount = (ticket.selections || []).length - startedIds.length;
+    if (remainingCount < 1) {
+      if (announce) {
+        setSellError(
+          "All selections on this ticket have already started. Reject it or add new selections.",
+        );
+      }
+      return ticket;
+    }
+
+    if (pruningStartedRef.current) return ticket;
+    pruningStartedRef.current = true;
+    setRemovingSelectionId(startedIds[0]);
+    try {
+      let updated = ticket;
+      let removed = 0;
+      for (const selectionId of startedIds) {
+        const stillStarted = getStartedSelectionIds(updated);
+        if (!stillStarted.includes(selectionId)) continue;
+        if ((updated.selections || []).length <= 1) break;
+        updated = await removeSelection.mutateAsync({
+          ticketId: updated.id,
+          selectionId,
+        });
+        removed += 1;
+      }
+      if (removed > 0) {
+        setSellTicket(updated);
+        setSellConfirmed(false);
+        if (announce) {
+          setActionSuccess(
+            removed === 1
+              ? "Removed 1 started selection. Review updated odds and confirm."
+              : `Removed ${removed} started selections. Review updated odds and confirm.`,
+          );
+        }
+      }
+      return updated;
+    } catch (error) {
+      setSellError(error?.message || "Failed to remove started selections");
+      return ticket;
+    } finally {
+      pruningStartedRef.current = false;
+      setRemovingSelectionId("");
+    }
+  };
+
   const loadCouponTicket = async ({
     type,
     couponNumber,
@@ -648,6 +730,7 @@ export default function CashierTicketsPage() {
         const ticket = await lookupCoupon.mutateAsync(trimmedCoupon);
         setSellTicket(ticket);
         setSellStakeInput(String(toNumber(ticket?.stake)));
+        await pruneStartedSellSelections(ticket);
       } else {
         const ticket = await lookupReceipt.mutateAsync(trimmedReceipt);
         setPayoutTicket(ticket);
@@ -787,8 +870,20 @@ export default function CashierTicketsPage() {
         return;
       }
 
-      // Single pre-print round trip: prepare-print now validates odds/markets
-      // AND reserves the receipt number (drift/lock prompts still fire here).
+      const stakeAmount = toNumber(ticketForWalletAndPrint.stake);
+      if (
+        cashierBalance != null &&
+        Number.isFinite(stakeAmount) &&
+        toNumber(cashierBalance) < stakeAmount
+      ) {
+        setSellError("Insufficient cashier balance");
+        setActionSuccess("");
+        setTicketPreviewOpen(false);
+        return;
+      }
+
+      // Single pre-print round trip: prepare-print validates odds/markets,
+      // checks cashier balance, and reserves the receipt number.
       setActionSuccess("Validating ticket before print...");
       const prepareResult = await runWithDriftRetry(preparePrint.mutateAsync, {
         ticketId: ticketForWalletAndPrint.id,
@@ -878,6 +973,22 @@ export default function CashierTicketsPage() {
       }
       setActionSuccess("");
       setTicketPreviewOpen(false);
+      if (
+        /insufficient/i.test(String(error?.message || "")) &&
+        ticketForWalletAndPrint?.id
+      ) {
+        try {
+          const refreshed = await loadTicketById.mutateAsync(
+            ticketForWalletAndPrint.id,
+          );
+          setSellTicket(refreshed);
+        } catch {
+          /* keep current ticket if refresh fails */
+        }
+        Promise.all([slipsQuery.refetch(), walletQuery.refetch()]).catch(
+          () => {},
+        );
+      }
     } finally {
       printInFlightRef.current = false;
     }
@@ -1048,6 +1159,19 @@ export default function CashierTicketsPage() {
     };
   }, [payoutAction, payoutTicket?.id]);
 
+  useEffect(() => {
+    if (!canEditSellSelections(sellTicket, sellConfirmed)) return undefined;
+
+    const tick = () => {
+      if (!sellTicket || pruningStartedRef.current) return;
+      if (getStartedSelectionIds(sellTicket).length === 0) return;
+      void pruneStartedSellSelections(sellTicket, { announce: true });
+    };
+
+    const id = window.setInterval(tick, STARTED_SELECTION_PRUNE_MS);
+    return () => window.clearInterval(id);
+  }, [sellTicket, sellConfirmed]);
+
   return (
     <AdminShell user={user} onLogout={logout}>
       <div className="mb-6">
@@ -1187,7 +1311,7 @@ export default function CashierTicketsPage() {
                   </button>
                 </form>
 
-                <div className="mt-3 flex flex-wrap gap-2">
+                <div className="mt-3 flex flex-wrap items-end gap-2">
                   {sellTicket && isFirstSaleTicket(sellTicket) ? (
                     <button
                       type="button"
@@ -1218,6 +1342,22 @@ export default function CashierTicketsPage() {
                   >
                     Print Ticket
                   </PrimaryButton>
+                  <div className="flex min-w-0 flex-col gap-1">
+                    <label className="text-[11px] font-semibold uppercase tracking-wide text-[var(--muted)]">
+                      Edit Stake (ETB)
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      step="1"
+                      value={sellStakeInput}
+                      onChange={(event) =>
+                        setSellStakeInput(event.target.value)
+                      }
+                      disabled={!sellTicket || sellConfirmed || isBusy}
+                      className="w-36 rounded-sm border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm outline-none focus:border-[var(--accent)] disabled:opacity-60"
+                    />
+                  </div>
                   <button
                     type="button"
                     onClick={() => {
@@ -1255,63 +1395,45 @@ export default function CashierTicketsPage() {
                       className="mt-4 rounded-sm border border-[var(--border)] bg-[var(--surfaceMuted)] px-3 py-3"
                     />
 
-                    <div className="mt-4 rounded-sm border border-[var(--border)] bg-[var(--surfaceMuted)] px-3 py-3">
-                      <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
-                        Edit Stake (ETB)
-                      </label>
-                      <div className="flex flex-wrap items-center gap-3">
-                        <input
-                          type="number"
-                          min="1"
-                          step="1"
-                          value={sellStakeInput}
-                          onChange={(event) =>
-                            setSellStakeInput(event.target.value)
-                          }
-                          disabled={sellConfirmed || isBusy}
-                          className="w-40 rounded-sm border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm outline-none focus:border-[var(--accent)] disabled:opacity-60"
-                        />
-                        {sellShowTax ? (
-                          <div className="min-w-0 flex-1 space-y-1 text-xs">
-                            <div className="flex justify-between gap-4">
-                              <span className="text-[var(--muted)]">
-                                Gross win
-                              </span>
-                              <span className="font-semibold text-[var(--foreground)]">
-                                {formatCurrency(sellTaxBreakdown.gross)}
-                              </span>
-                            </div>
-                            <div className="flex justify-between gap-4">
-                              <span className="text-[var(--muted)]">
-                                {sellTicket
-                                  ? formatTaxLineLabel(
-                                      sellTicket,
-                                      platformWinningsTax,
-                                    )
-                                  : "Tax"}
-                              </span>
-                              <span className="font-semibold text-[var(--foreground)]">
-                                {formatCurrency(sellTaxBreakdown.tax)}
-                              </span>
-                            </div>
-                            <div className="flex justify-between gap-4 border-t border-[var(--border)] pt-1">
-                              <span className="font-semibold text-[var(--muted)]">
-                                Net payout
-                              </span>
-                              <span className="font-semibold text-[var(--foreground)]">
-                                {formatCurrency(sellTaxBreakdown.net)}
-                              </span>
-                            </div>
-                          </div>
-                        ) : (
-                          <span className="text-xs text-[var(--muted)]">
-                            Possible Win:{" "}
-                            <span className="font-semibold text-[var(--foreground)]">
-                              {formatCurrency(sellCappedPossibleWin)}
+                    <div className="mt-3 rounded-sm border border-[var(--border)] bg-[var(--surfaceMuted)] px-3 py-3">
+                      {sellShowTax ? (
+                        <div className="space-y-1 text-xs">
+                          <div className="flex justify-between gap-4">
+                            <span className="text-[var(--muted)]">
+                              Gross win
                             </span>
+                            <span className="font-semibold text-[var(--foreground)]">
+                              {formatCurrency(sellTaxBreakdown.gross)}
+                            </span>
+                          </div>
+                          <div className="flex justify-between gap-4">
+                            <span className="text-[var(--muted)]">
+                              {formatTaxLineLabel(
+                                sellTicket,
+                                platformWinningsTax,
+                              )}
+                            </span>
+                            <span className="font-semibold text-[var(--foreground)]">
+                              {formatCurrency(sellTaxBreakdown.tax)}
+                            </span>
+                          </div>
+                          <div className="flex justify-between gap-4 border-t border-[var(--border)] pt-1">
+                            <span className="font-semibold text-[var(--muted)]">
+                              Net payout
+                            </span>
+                            <span className="font-semibold text-[var(--foreground)]">
+                              {formatCurrency(sellTaxBreakdown.net)}
+                            </span>
+                          </div>
+                        </div>
+                      ) : (
+                        <p className="text-xs text-[var(--muted)]">
+                          Possible Win:{" "}
+                          <span className="font-semibold text-[var(--foreground)]">
+                            {formatCurrency(sellCappedPossibleWin)}
                           </span>
-                        )}
-                      </div>
+                        </p>
+                      )}
                       {sellConfirmed && (
                         <p className="mt-2 text-[11px] text-[var(--muted)]">
                           Stake is locked once the ticket is confirmed.

@@ -109,9 +109,24 @@ function model(name) {
       }
       const next = { ...row };
       for (const [k, v] of Object.entries(data)) {
-        next[k] = v && typeof v === "object" && !Array.isArray(v) && !(v instanceof Date)
-          ? { ...v }
-          : v;
+        if (
+          v &&
+          typeof v === "object" &&
+          !Array.isArray(v) &&
+          !(v instanceof Date) &&
+          Object.prototype.hasOwnProperty.call(v, "increment")
+        ) {
+          next[k] = Number(next[k] ?? 0) + Number(v.increment);
+        } else if (
+          v &&
+          typeof v === "object" &&
+          !Array.isArray(v) &&
+          !(v instanceof Date)
+        ) {
+          next[k] = { ...v };
+        } else {
+          next[k] = v;
+        }
       }
       map.set(where.id, next);
       return clone(next);

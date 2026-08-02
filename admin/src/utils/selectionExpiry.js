@@ -5,3 +5,9 @@ export function isSelectionRemovable(startTime, now = Date.now()) {
   const kickoff = new Date(startTime).getTime();
   return Number.isFinite(kickoff) && now + BUFFER_MS >= kickoff;
 }
+
+/** True when kickoff time has already passed. */
+export function isSelectionStarted(startTime, now = Date.now()) {
+  const kickoff = new Date(startTime).getTime();
+  return Number.isFinite(kickoff) && now >= kickoff;
+}

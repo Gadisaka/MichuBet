@@ -138,12 +138,24 @@ const NAV_SECTIONS = [
   },
 ];
 
+const LG_MEDIA_QUERY = "(min-width: 1024px)";
+
+function getInitialSidebarOpen() {
+  if (typeof window === "undefined") return true;
+  return window.matchMedia(LG_MEDIA_QUERY).matches;
+}
+
 // ─── Component ──────────────────────────────────────────────────────────────
 export default function AdminShell({ user, onLogout, children }) {
   const { pathname } = useLocation();
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(getInitialSidebarOpen);
   const [profileOpen, setProfileOpen] = useState(false);
   const profileRef = useRef(null);
+  const isDesktopRef = useRef(
+    typeof window !== "undefined"
+      ? window.matchMedia(LG_MEDIA_QUERY).matches
+      : true,
+  );
 
   useEffect(() => {
     function onClick(e) {
@@ -154,6 +166,21 @@ export default function AdminShell({ user, onLogout, children }) {
     document.addEventListener("mousedown", onClick);
     return () => document.removeEventListener("mousedown", onClick);
   }, []);
+
+  useEffect(() => {
+    const media = window.matchMedia(LG_MEDIA_QUERY);
+    function onChange(e) {
+      isDesktopRef.current = e.matches;
+      // Reset to the breakpoint default when crossing lg.
+      setSidebarOpen(e.matches);
+    }
+    media.addEventListener("change", onChange);
+    return () => media.removeEventListener("change", onChange);
+  }, []);
+
+  function closeSidebarIfMobile() {
+    if (!isDesktopRef.current) setSidebarOpen(false);
+  }
 
   let filteredSections = [];
   if (user?.role === "CASHIER") {
@@ -204,18 +231,30 @@ export default function AdminShell({ user, onLogout, children }) {
 
       {/* Sidebar */}
       <aside
-        className={`fixed inset-y-0 left-0 z-40 flex w-60 flex-col border-r border-[var(--border)] bg-[var(--surface)] transition-transform duration-200 lg:static lg:translate-x-0 ${
-          sidebarOpen ? "translate-x-0" : "-translate-x-full"
+        className={`fixed inset-y-0 left-0 z-40 flex flex-col border-r border-[var(--border)] bg-[var(--surface)] transition-[transform,width] duration-200 lg:static ${
+          sidebarOpen
+            ? "w-60 translate-x-0"
+            : "w-60 -translate-x-full lg:w-0 lg:translate-x-0 lg:border-r-0 lg:overflow-hidden"
         }`}
       >
-        <div className="flex h-14 shrink-0 items-center gap-2 border-b border-[var(--border)] px-5">
-          <span className="text-base font-bold tracking-tight">Michotbet</span>
-          <span className="text-[0.65rem] font-semibold uppercase tracking-widest text-[var(--muted)]">
-            Admin
-          </span>
+        <div className="flex h-14 w-60 shrink-0 items-center justify-between gap-2 border-b border-[var(--border)] px-4">
+          <div className="flex min-w-0 items-center gap-2">
+            <span className="text-base font-bold tracking-tight">Michotbet</span>
+            <span className="text-[0.65rem] font-semibold uppercase tracking-widest text-[var(--muted)]">
+              Admin
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setSidebarOpen(false)}
+            className="rounded-sm p-1.5 text-[var(--muted)] hover:bg-[var(--surfaceMuted)] hover:text-[var(--text)]"
+            aria-label="Close sidebar"
+          >
+            <SidebarCloseIcon className="h-4 w-4" />
+          </button>
         </div>
 
-        <nav className="flex-1 overflow-y-auto px-3 py-4">
+        <nav className="w-60 flex-1 overflow-y-auto px-3 py-4">
           {filteredSections.map((section, si) => (
             <div key={si} className={si > 0 ? "mt-5" : ""}>
               {section.label && (
@@ -231,7 +270,7 @@ export default function AdminShell({ user, onLogout, children }) {
                       key={item.label}
                       type="button"
                       onClick={() => {
-                        setSidebarOpen(false);
+                        closeSidebarIfMobile();
                         item.action();
                       }}
                       className="mt-1 flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left text-sm font-medium transition-colors text-[var(--danger)] hover:bg-[var(--surfaceMuted)]"
@@ -247,7 +286,7 @@ export default function AdminShell({ user, onLogout, children }) {
                   <Link
                     key={item.to}
                     to={item.to}
-                    onClick={() => setSidebarOpen(false)}
+                    onClick={closeSidebarIfMobile}
                     className={`mt-1 flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm font-medium transition-colors ${
                       active
                         ? "bg-[var(--accent)]/10 text-[var(--accent)]"
@@ -265,21 +304,24 @@ export default function AdminShell({ user, onLogout, children }) {
       </aside>
 
       {/* Main column */}
-      <div className="flex flex-1 flex-col">
+      <div className="flex min-w-0 flex-1 flex-col">
         {/* Top bar */}
         <header className="flex h-14 shrink-0 items-center justify-between border-b border-[var(--border)] bg-[var(--surface)] px-4 lg:px-6">
-          {/* Left: hamburger (mobile) */}
+          {/* Left: open/close sidebar */}
           <button
             type="button"
-            onClick={() => setSidebarOpen(true)}
-            className="rounded-sm p-1.5 text-[var(--muted)] lg:hidden"
-            aria-label="Open menu"
+            onClick={() => setSidebarOpen((open) => !open)}
+            className="rounded-sm border border-[var(--border)] bg-[var(--surface)] p-1.5 text-[var(--muted)] hover:bg-[var(--surfaceMuted)] hover:text-[var(--text)]"
+            aria-label={sidebarOpen ? "Close sidebar" : "Open sidebar"}
+            aria-expanded={sidebarOpen}
+            title={sidebarOpen ? "Close sidebar" : "Open sidebar"}
           >
-            <HamburgerIcon className="h-5 w-5" />
+            {sidebarOpen ? (
+              <SidebarCloseIcon className="h-5 w-5" />
+            ) : (
+              <HamburgerIcon className="h-5 w-5" />
+            )}
           </button>
-
-          {/* Spacer so right side stays right on desktop */}
-          <div className="hidden lg:block" />
 
           {/* Right: role tag, theme, profile */}
           <div className="flex items-center gap-2.5">
@@ -350,6 +392,24 @@ function HamburgerIcon({ className }) {
       strokeLinecap="round"
     >
       <path d="M4 6h16M4 12h16M4 18h16" />
+    </svg>
+  );
+}
+
+function SidebarCloseIcon({ className }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <rect x="3" y="3" width="18" height="18" rx="2" />
+      <path d="M9 3v18" />
+      <path d="M16 15l-3-3 3-3" />
     </svg>
   );
 }

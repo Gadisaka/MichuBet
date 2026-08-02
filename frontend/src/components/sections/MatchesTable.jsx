@@ -15,8 +15,9 @@ import {
   sortOddsWithinMarket,
 } from "../../utils/marketDisplay";
 
+/** Fluid tracks so the center column fits lg/xl without page-level side scroll. */
 const TABLE_GRID_COLS =
-  "grid-cols-[64px_minmax(220px,1fr)_repeat(6,82px)_58px_22px]";
+  "grid-cols-[48px_minmax(0,1.4fr)_repeat(6,minmax(40px,1fr))_40px_16px] xl:grid-cols-[56px_minmax(120px,1.5fr)_repeat(6,minmax(52px,70px))_44px_18px] 2xl:grid-cols-[60px_minmax(160px,1.6fr)_repeat(6,72px)_48px_20px]";
 const MATCH_MARKETS = ["1", "x", "2", "1x", "x2", "12"];
 
 function parseDate(date) {
@@ -40,7 +41,7 @@ function TableOddButton({ value, selected, onClick }) {
     <button
       type="button"
       onClick={onClick}
-      className={`flex h-full min-h-[36px] w-full items-center justify-center rounded-xl border text-[14px] font-semibold transition-all duration-200 ${
+      className={`flex h-full min-h-[32px] w-full items-center justify-center rounded-lg border text-[12px] font-semibold transition-all duration-200 xl:min-h-[36px] xl:rounded-xl xl:text-[14px] ${
         selected
           ? "border-[#F6AF01] bg-(--sb-accent-surface-deep) text-[#F6AF01] shadow-[0_0_12px_rgba(246,175,1,0.35)]"
           : "border-transparent bg-(--sb-bg-card-elevated) text-[#ffffff] hover:bg-(--sb-bg-card)"
@@ -74,7 +75,7 @@ function MatchRow({
   return (
     <article
       ref={rowRef}
-      className={`overflow-hidden rounded-xl transition-all duration-300 ${
+      className={`min-w-0 overflow-hidden rounded-xl transition-all duration-300 ${
         isExpanded
           ? "bg-(--sb-bg-card) shadow-[0_8px_28px_-8px_rgba(246,175,1,0.12)]"
           : "bg-(--sb-bg-card) shadow-[0_4px_14px_-6px_rgba(0,0,0,0.35)] hover:bg-(--sb-bg-card-elevated)"
@@ -188,41 +189,41 @@ function MatchRow({
             onToggle();
           }
         }}
-        className={`hidden md:grid ${TABLE_GRID_COLS} min-h-[46px] min-w-[860px] cursor-pointer items-stretch border-b border-white/8 px-2 py-1 hover:bg-[#0a0a0a]/35`}
+        className={`hidden min-w-0 md:grid ${TABLE_GRID_COLS} min-h-[46px] cursor-pointer items-stretch border-b border-white/8 px-1.5 py-1 hover:bg-[#0a0a0a]/35 xl:px-2`}
       >
-        <div className="flex flex-col justify-center border-r border-white/8 pr-2 text-center text-[10px]">
+        <div className="flex min-w-0 flex-col justify-center border-r border-white/8 pr-1.5 text-center text-[10px]">
           <span className="font-medium text-[#6f7895]">{datePart}</span>
           <span className="font-bold text-(--sb-positive)">{timePart}</span>
         </div>
-        <div className="flex flex-col justify-center gap-0.5 border-r border-white/8 px-2 py-0.5 text-[14px] font-semibold text-[#f3f4ff]">
-          <div className="flex min-h-[22px] items-center gap-2">
+        <div className="flex min-w-0 flex-col justify-center gap-0.5 border-r border-white/8 px-1.5 py-0.5 text-[12px] font-semibold text-[#f3f4ff] xl:px-2 xl:text-[14px]">
+          <div className="flex min-h-[20px] min-w-0 items-center gap-1.5 xl:min-h-[22px] xl:gap-2">
             {match.homeTeamLogo ? (
               <LogoImg
                 src={match.homeTeamLogo}
                 alt=""
-                size={18}
-                className="border border-transparent bg-[#000000]"
+                size={16}
+                className="shrink-0 border border-transparent bg-[#000000]"
               />
             ) : null}
-            <span className="truncate">{home}</span>
+            <span className="min-w-0 truncate">{home}</span>
           </div>
-          <div className="flex min-h-[22px] items-center gap-2 text-[#d3d9eb]">
+          <div className="flex min-h-[20px] min-w-0 items-center gap-1.5 text-[#d3d9eb] xl:min-h-[22px] xl:gap-2">
             {match.awayTeamLogo ? (
               <LogoImg
                 src={match.awayTeamLogo}
                 alt=""
-                size={18}
-                className="border border-transparent bg-[#000000]"
+                size={16}
+                className="shrink-0 border border-transparent bg-[#000000]"
               />
             ) : null}
-            <span className="truncate">{away}</span>
+            <span className="min-w-0 truncate">{away}</span>
           </div>
         </div>
         {MATCH_MARKETS.map((marketId) => {
           const value = marketMap[marketId];
           const selectionId = `${match.match}-${marketId.toUpperCase()}`;
           return (
-            <div key={marketId} className="px-1">
+            <div key={marketId} className="min-w-0 px-0.5 xl:px-1">
               <TableOddButton
                 value={value ?? "-"}
                 selected={selectedOdds?.has(selectionId)}
@@ -245,7 +246,7 @@ function MatchRow({
             </div>
           );
         })}
-        <div className="flex items-center justify-end px-1 text-[11px] font-bold text-(--sb-positive)">
+        <div className="flex min-w-0 items-center justify-end px-0.5 text-[10px] font-bold text-(--sb-positive) xl:px-1 xl:text-[11px]">
           +{match.sideBets}
         </div>
         <div className="flex items-center justify-center text-[#33456b]">
@@ -301,11 +302,11 @@ function MatchExpansionSkeleton({ onClose }) {
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-1 border-b border-white/8 px-3 py-2">
+      <div className="flex items-center gap-1 overflow-x-auto whitespace-nowrap border-b border-white/8 px-3 py-2">
         {[1, 2, 3, 4].map((i) => (
           <div
             key={i}
-            className="h-7 w-16 animate-pulse rounded-full bg-[#1a243c]"
+            className="h-7 w-16 shrink-0 animate-pulse rounded-full bg-[#1a243c]"
           />
         ))}
       </div>
@@ -466,13 +467,13 @@ function MatchExpansion({ match, onClose, onOddsClick, selectedOdds }) {
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-1 border-b border-white/8 px-3 py-2">
+      <div className="flex items-center gap-1 overflow-x-auto whitespace-nowrap border-b border-white/8 px-3 py-2">
         {MARKET_FILTER_CHIPS.map((chip) => (
           <button
             key={chip.id}
             type="button"
             onClick={() => setActiveChipId(chip.id)}
-            className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-all duration-200 ${
+            className={`shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-all duration-200 ${
               chip.id === activeChipId
                 ? "border-(--sb-accent) bg-(--sb-accent-surface) text-(--sb-accent-text-soft) shadow-[0_4px_12px_-4px_rgba(246,175,1,0.25)]"
                 : "border-transparent bg-[#0a0a0a]/55 text-[rgba(255,255,255,0.72)] hover:bg-[#111111]"
@@ -589,14 +590,14 @@ function MatchesTable({
   }, [expandedMatchId]);
 
   return (
-    <Panel className="animate-deposit-panel overflow-hidden">
-      <div className="space-y-2 p-2">
+    <Panel className="animate-deposit-panel min-w-0 overflow-hidden">
+      <div className="min-w-0 space-y-2 p-2">
         {groupedMatches.map(([league, leagueMatches]) => {
           const head = leagueMatches[0];
           return (
             <section
               key={league}
-              className="overflow-hidden rounded-xl"
+              className="min-w-0 overflow-hidden rounded-xl"
             >
               <header className="border-b border-white/8 bg-[#0a0a0a]/40">
                 <div className="flex items-center gap-2 border-b border-white/8 px-2.5 py-2 text-sm font-semibold text-[#d9dded]">
@@ -627,27 +628,25 @@ function MatchesTable({
                     {formatLeagueLabel(league)} [{leagueMatches.length}]
                   </span>
                 </div>
-                <div className="overflow-x-auto">
-                  <div
-                    className={`hidden md:grid ${TABLE_GRID_COLS} min-w-[860px] px-2 py-1 text-[11px] font-bold text-[#d4dcf0]`}
-                  >
-                    <span />
-                    <span />
-                    {MATCH_MARKETS.map((marketId) => (
-                      <span
-                        key={`header-${league}-${marketId}`}
-                        className="px-1 text-center"
-                      >
-                        {marketId.toUpperCase()}
-                      </span>
-                    ))}
-                    <span className="text-center text-[#8b95b2]">+</span>
-                    <span />
-                  </div>
+                <div
+                  className={`hidden min-w-0 md:grid ${TABLE_GRID_COLS} px-1.5 py-1 text-[10px] font-bold text-[#d4dcf0] xl:px-2 xl:text-[11px]`}
+                >
+                  <span />
+                  <span />
+                  {MATCH_MARKETS.map((marketId) => (
+                    <span
+                      key={`header-${league}-${marketId}`}
+                      className="min-w-0 px-0.5 text-center xl:px-1"
+                    >
+                      {marketId.toUpperCase()}
+                    </span>
+                  ))}
+                  <span className="text-center text-[#8b95b2]">+</span>
+                  <span />
                 </div>
               </header>
 
-              <div className="space-y-0 overflow-x-auto bg-[#0a0f1c]/50 py-0.5">
+              <div className="min-w-0 space-y-0 bg-[#0a0f1c]/50 py-0.5">
                 {leagueMatches.map((match) => {
                   const isExpanded = expandedMatchId === match.id;
                   return (
