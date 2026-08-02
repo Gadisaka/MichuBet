@@ -244,10 +244,11 @@ export default function AdminShell({ user, onLogout, children }) {
               Admin
             </span>
           </div>
+          {/* Mobile only — on desktop the top-bar toggle is the single control */}
           <button
             type="button"
             onClick={() => setSidebarOpen(false)}
-            className="rounded-sm p-1.5 text-[var(--muted)] hover:bg-[var(--surfaceMuted)] hover:text-[var(--text)]"
+            className="rounded-sm p-1.5 text-[var(--muted)] hover:bg-[var(--surfaceMuted)] hover:text-[var(--text)] lg:hidden"
             aria-label="Close sidebar"
           >
             <SidebarCloseIcon className="h-4 w-4" />
