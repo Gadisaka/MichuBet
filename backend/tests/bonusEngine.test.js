@@ -9,8 +9,11 @@ import {
   computeWelcomeFlatAmount,
   computeCashbackAmount,
   evaluateCashback,
+  evaluateCashbackV3,
   pickCashbackTier,
+  sumLostOdds,
   cashbackTotalOddsFromSelections,
+  DEFAULT_CASHBACK_V3_TRACKS,
   potentialWinWithAccumulator,
   roundMoney,
 } from "../lib/bonusEngine.js";
@@ -324,6 +327,171 @@ test("computeCashbackAmount uses tiered path when rules.tiers present", () => {
     { user_id: "u1", stake: 10, total_odds: 5.175, created_at: new Date() },
     tieredBonus(),
     { selections: selections(3, 2.3, 96), now: new Date() },
+  );
+  assert.equal(amount, 10);
+});
+
+function v3Bonus(overrides = {}) {
+  return {
+    type: "CASHBACK",
+    status: true,
+    percentage: 0,
+    rules: {
+      maxHours: 48,
+      disqualifyFixtureStatuses: ["PST", "CANC", "ABD"],
+      disqualifyMatchStatuses: ["SUSPENDED"],
+      tracks: DEFAULT_CASHBACK_V3_TRACKS.map((t) => ({
+        ...t,
+        tiers: t.tiers.map((tier) => ({ ...tier })),
+      })),
+      ...overrides,
+    },
+  };
+}
+
+/** N selections with a single LOST leg; product of odds equals totalOdds. */
+function selectionsOneLoss(count, lostOdds, totalOdds) {
+  return selections(count, lostOdds, totalOdds);
+}
+
+/** Build selections with exactly `lostOddsList.length` LOST legs. */
+function selectionsMultiLoss(wonCount, lostOddsList, totalOdds) {
+  const lostProduct = lostOddsList.reduce((a, b) => a * b, 1);
+  const wonProduct = totalOdds / lostProduct;
+  const eachWon = wonCount > 0 ? Math.pow(wonProduct, 1 / wonCount) : 1;
+  const out = [];
+  for (let i = 0; i < wonCount; i++) {
+    out.push({ result: "WON", odds: eachWon });
+  }
+  for (const o of lostOddsList) {
+    out.push({ result: "LOST", odds: o });
+  }
+  return out;
+}
+
+test("pickCashbackTier halfOpen matches [min, max) and open-ended last", () => {
+  const tiers = [
+    { minResult: 19, maxResult: 40, stakeMultiplier: 1 },
+    { minResult: 40, maxResult: 60, stakeMultiplier: 2 },
+    { minResult: 3000, maxResult: null, stakeMultiplier: 100 },
+  ];
+  assert.equal(pickCashbackTier(18.99, tiers, "halfOpen"), null);
+  assert.equal(pickCashbackTier(19, tiers, "halfOpen").stakeMultiplier, 1);
+  assert.equal(pickCashbackTier(39.99, tiers, "halfOpen").stakeMultiplier, 1);
+  assert.equal(pickCashbackTier(40, tiers, "halfOpen").stakeMultiplier, 2);
+  assert.equal(pickCashbackTier(3000, tiers, "halfOpen").stakeMultiplier, 100);
+});
+
+test("sumLostOdds counts and sums LOST legs", () => {
+  const { count, sumOdds } = sumLostOdds([
+    { result: "WON", odds: 2 },
+    { result: "LOST", odds: 1.3 },
+    { result: "LOST", odds: 1.3 },
+    { result: "VOID", odds: 9 },
+  ]);
+  assert.equal(count, 2);
+  assert.equal(sumOdds, 2.6);
+});
+
+test("evaluateCashbackV3 worked example: 46/1.2 ≈ 38.33 → ×1 → 10", () => {
+  const ev = evaluateCashbackV3({
+    ticket: { user_id: "u1", stake: 10, total_odds: 46, created_at: new Date() },
+    selections: selectionsOneLoss(5, 1.2, 46),
+    bonus: v3Bonus(),
+    isOffline: false,
+  });
+  assert.equal(ev.eligible, true);
+  assert.equal(ev.track.lostLegs, 1);
+  assert.ok(Math.abs(ev.result - 46 / 1.2) < 1e-9);
+  assert.equal(ev.tier.stakeMultiplier, 1);
+  assert.equal(ev.amount, 10);
+});
+
+test("evaluateCashbackV3 worked example: 110/2.6 ≈ 42.3 → ×1 → 5 (sum divisor)", () => {
+  const lost = [1.3, 1.3];
+  const ev = evaluateCashbackV3({
+    ticket: { user_id: "u1", stake: 5, total_odds: 110, created_at: new Date() },
+    selections: selectionsMultiLoss(8, lost, 110),
+    bonus: v3Bonus(),
+  });
+  assert.equal(ev.eligible, true);
+  assert.equal(ev.track.lostLegs, 2);
+  assert.ok(Math.abs(ev.result - 110 / 2.6) < 1e-9);
+  assert.equal(ev.tier.stakeMultiplier, 1);
+  assert.equal(ev.amount, 5);
+});
+
+test("evaluateCashbackV3 rejects 4+ lost legs", () => {
+  const ev = evaluateCashbackV3({
+    ticket: { stake: 20, total_odds: 200, created_at: new Date() },
+    selections: selectionsMultiLoss(12, [1.2, 1.3, 1.4, 1.5], 200),
+    bonus: v3Bonus(),
+  });
+  assert.equal(ev.eligible, false);
+  assert.equal(ev.reason, "unsupported_lost_count");
+});
+
+test("evaluateCashbackV3 clamps to maxCashback", () => {
+  // Force a huge multiplier path: result >= 3000 on 1-loss track → ×100, capped at 250000.
+  const stake = 5000;
+  const ev = evaluateCashbackV3({
+    ticket: { stake, total_odds: 4000, created_at: new Date() },
+    selections: selectionsOneLoss(5, 1.2, 4000),
+    bonus: v3Bonus(),
+  });
+  assert.equal(ev.eligible, true);
+  assert.equal(ev.tier.stakeMultiplier, 100);
+  assert.equal(ev.amount, 250000);
+});
+
+test("evaluateCashbackV3 online vs offline min stake", () => {
+  const sels = selectionsOneLoss(5, 1.2, 46);
+  const onlineFail = evaluateCashbackV3({
+    ticket: { stake: 4, total_odds: 46, created_at: new Date() },
+    selections: sels,
+    bonus: v3Bonus(),
+    isOffline: false,
+  });
+  assert.equal(onlineFail.reason, "below_min_stake");
+
+  const offlineFail = evaluateCashbackV3({
+    ticket: { stake: 9, total_odds: 46, created_at: new Date() },
+    selections: sels,
+    bonus: v3Bonus(),
+    isOffline: true,
+  });
+  assert.equal(offlineFail.reason, "below_min_stake");
+
+  const offlineOk = evaluateCashbackV3({
+    ticket: { stake: 10, total_odds: 46, created_at: new Date() },
+    selections: sels,
+    bonus: v3Bonus(),
+    isOffline: true,
+  });
+  assert.equal(offlineOk.eligible, true);
+});
+
+test("evaluateCashbackV3 minSelections is inclusive (>=)", () => {
+  const tooFew = evaluateCashbackV3({
+    ticket: { stake: 10, total_odds: 46, created_at: new Date() },
+    selections: selectionsOneLoss(4, 1.2, 46),
+    bonus: v3Bonus(),
+  });
+  assert.equal(tooFew.reason, "too_few_selections");
+
+  const ok = evaluateCashbackV3({
+    ticket: { stake: 10, total_odds: 46, created_at: new Date() },
+    selections: selectionsOneLoss(5, 1.2, 46),
+    bonus: v3Bonus(),
+  });
+  assert.equal(ok.eligible, true);
+});
+
+test("computeCashbackAmount dispatches to v3 when rules.tracks present", () => {
+  const amount = computeCashbackAmount(
+    { stake: 10, total_odds: 46, created_at: new Date() },
+    v3Bonus(),
+    { selections: selectionsOneLoss(5, 1.2, 46), isOffline: false },
   );
   assert.equal(amount, 10);
 });

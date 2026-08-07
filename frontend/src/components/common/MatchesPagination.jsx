@@ -22,13 +22,25 @@ function MatchesPagination({ page, totalPages, onPageChange, className = "" }) {
         {t("pagination.prev")}
       </button>
 
-      {pages.map((pageNum) => {
-        const active = pageNum === page;
+      {pages.map((item, index) => {
+        if (item === "ellipsis") {
+          return (
+            <span
+              key={`ellipsis-${index}`}
+              className="flex h-9 w-9 items-center justify-center text-sm font-bold text-[rgba(255,255,255,0.45)]"
+              aria-hidden="true"
+            >
+              …
+            </span>
+          );
+        }
+
+        const active = item === page;
         return (
           <button
-            key={pageNum}
+            key={item}
             type="button"
-            onClick={() => onPageChange(pageNum)}
+            onClick={() => onPageChange(item)}
             aria-current={active ? "page" : undefined}
             className={`flex h-9 w-9 items-center justify-center rounded-full text-sm font-bold transition-colors ${
               active
@@ -36,7 +48,7 @@ function MatchesPagination({ page, totalPages, onPageChange, className = "" }) {
                 : "border border-white/12 bg-[#111111] text-[rgba(255,255,255,0.85)] hover:bg-[#1a1a1a]"
             }`}
           >
-            {pageNum}
+            {item}
           </button>
         );
       })}

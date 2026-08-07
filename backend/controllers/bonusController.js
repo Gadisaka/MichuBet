@@ -44,12 +44,14 @@ const ALLOWED_PATCH_KEYS = new Set([
   "maxHours",
   "minResult",
   "cashbackTiers",
+  "cashbackTracks",
   "disqualifyFixtureStatuses",
   "disqualifyMatchStatuses",
 ]);
 
 const MAX_ACCUMULATOR_TIERS = 5;
 const MAX_CASHBACK_TIERS = 10;
+const REQUIRED_CASHBACK_LOST_LEGS = [1, 2, 3];
 
 function validateTiers(raw) {
   if (!Array.isArray(raw)) return "tiers must be an array";
@@ -71,22 +73,20 @@ function validateTiers(raw) {
 }
 
 /**
- * Validate + normalize tiered cashback ranges. Returns `{ tiers }` on
- * success (sorted, normalized) or `{ error }`. Ranges are inclusive,
- * must not overlap, and only the last tier may be open-ended
- * (`maxResult: null`).
+ * Validate + normalize tiered cashback ranges (v2 inclusive). Returns
+ * `{ tiers }` on success or `{ error }`.
  */
-function validateCashbackTiers(raw) {
-  if (!Array.isArray(raw)) return { error: "cashbackTiers must be an array" };
-  if (raw.length === 0) return { error: "At least one cashback tier is required" };
+function validateCashbackTiers(raw, { halfOpen = false, label = "cashbackTiers" } = {}) {
+  if (!Array.isArray(raw)) return { error: `${label} must be an array` };
+  if (raw.length === 0) return { error: `At least one ${label} tier is required` };
   if (raw.length > MAX_CASHBACK_TIERS) {
-    return { error: `At most ${MAX_CASHBACK_TIERS} cashback tiers allowed` };
+    return { error: `At most ${MAX_CASHBACK_TIERS} ${label} tiers allowed` };
   }
 
   const tiers = [];
   for (const t of raw) {
     if (!t || typeof t !== "object") {
-      return { error: "Each cashback tier must be an object" };
+      return { error: `Each ${label} tier must be an object` };
     }
     const minResult = Number(t.minResult);
     const stakeMultiplier = Number(t.stakeMultiplier);
@@ -97,8 +97,16 @@ function validateCashbackTiers(raw) {
     if (!Number.isFinite(minResult) || minResult < 0) {
       return { error: "tier.minResult must be a number >= 0" };
     }
-    if (maxResult !== null && (!Number.isFinite(maxResult) || maxResult < minResult)) {
-      return { error: "tier.maxResult must be null or a number >= minResult" };
+    if (
+      maxResult !== null &&
+      (!Number.isFinite(maxResult) ||
+        (halfOpen ? maxResult <= minResult : maxResult < minResult))
+    ) {
+      return {
+        error: halfOpen
+          ? "tier.maxResult must be null or a number > minResult"
+          : "tier.maxResult must be null or a number >= minResult",
+      };
     }
     if (!Number.isFinite(stakeMultiplier) || stakeMultiplier < 0) {
       return { error: "tier.stakeMultiplier must be a number >= 0" };
@@ -117,12 +125,89 @@ function validateCashbackTiers(raw) {
       if (prev.maxResult === null) {
         return { error: "Open-ended cashback tier must be the last tier" };
       }
-      if (t.minResult <= prev.maxResult) {
+      if (halfOpen) {
+        // Contiguous half-open bands: next.min === prev.max (no gaps/overlaps).
+        if (t.minResult !== prev.maxResult) {
+          return {
+            error:
+              "Cashback tier ranges must be contiguous (next minResult equals previous maxResult)",
+          };
+        }
+      } else if (t.minResult <= prev.maxResult) {
         return { error: "Cashback tier ranges must not overlap" };
       }
     }
   }
   return { tiers };
+}
+
+/**
+ * Validate multi-track cashback (v3). Expects exactly tracks for lostLegs 1, 2, 3.
+ */
+function validateCashbackTracks(raw) {
+  if (!Array.isArray(raw)) return { error: "cashbackTracks must be an array" };
+  if (raw.length !== REQUIRED_CASHBACK_LOST_LEGS.length) {
+    return {
+      error: `cashbackTracks must contain exactly ${REQUIRED_CASHBACK_LOST_LEGS.length} tracks (lostLegs 1, 2, 3)`,
+    };
+  }
+
+  const tracks = [];
+  const seen = new Set();
+  for (const t of raw) {
+    if (!t || typeof t !== "object") {
+      return { error: "Each cashback track must be an object" };
+    }
+    const lostLegs = Number(t.lostLegs);
+    if (!Number.isInteger(lostLegs) || !REQUIRED_CASHBACK_LOST_LEGS.includes(lostLegs)) {
+      return { error: "track.lostLegs must be 1, 2, or 3" };
+    }
+    if (seen.has(lostLegs)) {
+      return { error: `Duplicate track for lostLegs ${lostLegs}` };
+    }
+    seen.add(lostLegs);
+
+    const minSelections = Number(t.minSelections);
+    if (!Number.isInteger(minSelections) || minSelections < 1) {
+      return { error: "track.minSelections must be an integer >= 1" };
+    }
+    const minStakeOnline = Number(t.minStakeOnline);
+    const minStakeOffline = Number(t.minStakeOffline);
+    if (!Number.isFinite(minStakeOnline) || minStakeOnline < 0) {
+      return { error: "track.minStakeOnline must be a number >= 0" };
+    }
+    if (!Number.isFinite(minStakeOffline) || minStakeOffline < 0) {
+      return { error: "track.minStakeOffline must be a number >= 0" };
+    }
+    const maxCashback = Number(t.maxCashback);
+    if (!Number.isFinite(maxCashback) || maxCashback < 0) {
+      return { error: "track.maxCashback must be a number >= 0" };
+    }
+
+    const { tiers, error } = validateCashbackTiers(t.tiers, {
+      halfOpen: true,
+      label: `track(${lostLegs}).tiers`,
+    });
+    if (error) return { error };
+
+    tracks.push({
+      lostLegs,
+      minSelections,
+      minStakeOnline,
+      minStakeOffline,
+      maxCashback,
+      tiers,
+    });
+  }
+
+  for (const required of REQUIRED_CASHBACK_LOST_LEGS) {
+    if (!seen.has(required)) {
+      return { error: `Missing track for lostLegs ${required}` };
+    }
+  }
+
+  tracks.sort((a, b) => a.lostLegs - b.lostLegs);
+  return { tracks };
 }
 
 /** Validate a list of uppercase status codes (e.g. ["PST","CANC"]). */
@@ -271,6 +356,17 @@ function buildSafeUpdateData(existing, body) {
       const { tiers, error } = validateCashbackTiers(body.cashbackTiers);
       if (error) return { error };
       base.tiers = tiers;
+      touched = true;
+    }
+    if (has("cashbackTracks")) {
+      const { tracks, error } = validateCashbackTracks(body.cashbackTracks);
+      if (error) return { error };
+      base.tracks = tracks;
+      // Prefer v3 evaluation; drop obsolete v2 single-table fields when migrating.
+      delete base.tiers;
+      delete base.minSelections;
+      delete base.minStake;
+      delete base.minResult;
       touched = true;
     }
     if (has("disqualifyFixtureStatuses")) {

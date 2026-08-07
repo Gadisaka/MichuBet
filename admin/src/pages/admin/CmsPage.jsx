@@ -28,6 +28,7 @@ const CMS_MAIN_TABS = [
 const INFO_PAGE_DEFS = [
   { id: "faq", label: "FAQ" },
   { id: "how-to-play", label: "How to play" },
+  { id: "cashback-rules", label: "Cashback Rules" },
   { id: "privacy-policy", label: "Privacy Policy" },
   { id: "terms-and-conditions", label: "Terms and conditions" },
   { id: "contact-us", label: "Contact Us" },
@@ -39,6 +40,7 @@ const CONTACT_PAGE_ID = "contact-us";
 /** Plain `{ body }` pages — must match backend `BODY_PAGE_IDS`. */
 const BODY_PAGE_IDS_PLAIN = [
   "how-to-play",
+  "cashback-rules",
   "privacy-policy",
   "terms-and-conditions",
 ];

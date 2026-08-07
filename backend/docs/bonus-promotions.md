@@ -36,30 +36,42 @@ Example:
 
 ---
 
-### Cashback
+### Cashback (multi-track v3)
 
-Players receive a **stake × multiplier** refund when a ticket loses. The
-multiplier comes from a configurable tier table keyed on the ratio
-`result = total_odds ÷ largest-lost-leg-odds`.
+Players and offline ticket holders receive a **stake × multiplier** refund
+when a ticket loses **exactly 1, 2, or 3** selections (4+ losses → no
+cashback). The multiplier comes from the track matching that lost-leg
+count, keyed on:
+
+`result = total_odds ÷ sum(lost-leg odds)`
+
 Cashback is evaluated only after **every leg is resolved** (no pending
-selections), so the ratio always uses the final lost-leg set. The combined
-odds are **recomputed from the graded legs** (VOID → 1.0) rather than read
-from `ticket.total_odds`, which is frozen when the ticket first turns LOST
-and still prices then-pending legs at full odds.
+selections). Combined odds are **recomputed from the graded legs**
+(VOID → 1.0, excluded from selection count) rather than from the frozen
+`ticket.total_odds` snapshot.
 
 Admin configures (Settings → **Cashback** tab):
 
-- Minimum selections (cashback only if leg count is **greater than** this)
-- Minimum stake
-- Maximum hours from placement to settlement
-- Minimum result (floor below which nothing pays)
-- Disqualifying fixture / match statuses (any such leg voids cashback)
-- Payout tiers: `result` range → stake multiplier
+- Global: max hours from placement (default 48), disqualifying fixture/match statuses
+- Per track (1 / 2 / 3 losses): min selections (≥ inclusive), min stake online,
+  min stake offline, max cashback cap, half-open payout tiers
+  (`minResult ≤ result < maxResult`; last tier may be open-ended)
 
-**Worked example:** ticket total odds 96, stake 10, one lost leg at odds 2.3 →
-`96 ÷ 2.3 = 41.73` → falls in the 20–44 tier (×1) → cashback `10 × 1 = 10`.
+**Worked examples:**
 
----
+- 1 loss: total odds 46, stake 10, lost leg 1.2 → `46 ÷ 1.2 ≈ 38.33` →
+  19–40 tier (×1) → **10 birr**.
+- 2 losses: total odds 110, stake 5, lost legs summing to 2.6 →
+  `110 ÷ 2.6 ≈ 42.3` → 20–45 tier (×1) → **5 birr**.
+
+**Payout paths:**
+
+- **Online** (player wallet ticket, not cashier-printed): credit
+  `BONUS` ref `bonus:cashback:<ticketId>` and persist `ticket.cashback_amount`.
+- **Offline** (cashier-printed or no `user_id`): persist
+  `ticket.cashback_amount` only; cashier redeems via
+  `PATCH /api/tickets/:id/cashback-payout` which credits the cashier wallet
+  with `BONUS` ref `cashback-payout:<ticketId>` and sets `cashback_paid_at`.
 
 ---
 
@@ -79,12 +91,14 @@ Admin can:
 - **Ledger:** Bonus credits use `Transaction.type = BONUS` with unique `reference`:
   - Welcome: `bonus:welcome:<userId>`
   - Deposit (first or repeat): `bonus:deposit-tx:<playerDepositTransactionId>`
-  - Cashback on loss: `bonus:cashback:<ticketId>`
+  - Cashback on loss (online): `bonus:cashback:<ticketId>`
+  - Cashback redemption (offline cashier): `cashback-payout:<ticketId>`
 - **Welcome:** `rules.fixedAmount` if set; otherwise `percentage` is treated as a **flat** currency amount.
 - **Deposits (online verify + cashier → player):** On the player’s **first** deposit only, the system credits **max(FIRST_DEPOSIT %, DEPOSIT %)** against the same deposit amount (does not stack both). Later deposits use **DEPOSIT** only. `User.first_deposit_at` is set on first successful deposit.
 - **Accumulator:** `rules.tiers[]` with `{ minLegs, bonusPercent }`; highest matching tier applies. Gross win = `stake × totalOdds × (1 + bonusPercent/100)`. Snapshotted on the ticket as `accumulator_bonus_percent`; settlement recomputes WON payout using this snapshot.
-- **Cashback (tiered v2):** `rules` holds `minSelections`, `minStake`, `maxHours`, `minResult`, `disqualifyFixtureStatuses[]`, `disqualifyMatchStatuses[]`, and `tiers[]` of `{ minResult, maxResult, stakeMultiplier }` (inclusive ranges; last tier may set `maxResult: null` for open-ended). When a ticket becomes **LOST**, eligible **online** tickets (`user_id` set, not cashier-printed) receive **once** `stake × multiplier`, where the multiplier is picked from the tier matching `result = total_odds / largest-lost-leg-odds` (combined odds recomputed from the final graded legs, VOID → 1.0). Evaluation waits until **every leg is resolved** (no `PENDING` selections) so the ratio uses the final lost-leg set; settlement retries cashback on later grading passes for already-`LOST` tickets. Gates: all legs graded, leg count must exceed `minSelections`, `stake ≥ minStake`, time from `created_at` to settlement `≤ maxHours` (0 = no limit), no leg on a disqualified fixture/match status, and `result ≥ minResult`. The engine (`lib/bonusEngine.js → evaluateCashback`) is pure and unit-tested; settlement (`creditCashbackOnLostTicketInTx`) loads the slip's selections + live fixture/match statuses. **Legacy fallback:** if no `tiers` are configured, the old flat `percentOfStake` model still applies for backward compatibility.
-- **Admin UI:** Settings → **Cashback** tab (dedicated `CashbackPanel`); other bonuses remain on the **Bonuses** tab (`/api/admin/bonuses`).
+- **Cashback (multi-track v3):** `rules` holds `maxHours`, `disqualifyFixtureStatuses[]`, `disqualifyMatchStatuses[]`, and `tracks[]` of `{ lostLegs, minSelections, minStakeOnline, minStakeOffline, maxCashback, tiers[] }`. Tier ranges are **half-open** (`minResult ≤ result < maxResult`). When a ticket becomes **LOST**, exact lost-leg count `1|2|3` selects the track; ratio = recomputed total odds ÷ **sum** of lost-leg odds; amount = `min(stake × multiplier, maxCashback)`. Online tickets credit the player wallet and set `ticket.cashback_amount`; offline/cashier-printed tickets only set `cashback_amount` for later `cashback-payout`. Settlement retries while legs are still `PENDING`. **Fallbacks:** if `tracks` is empty, v2 inclusive `tiers` + largest-lost-leg divisor still applies; if no tiers either, legacy flat `percentOfStake` applies. Existing DBs keep old rules until admin saves the Cashback tab or `node backend/scripts/backfillCashbackRules.js` is run.
+- **Admin UI:** Settings → **Cashback** tab (dedicated `CashbackPanel` with three track sections); other bonuses remain on the **Bonuses** tab (`/api/admin/bonuses`).
 - **Public config for slip:** `GET /api/bets/bonuses/active` — active bonuses (sanitized) for frontend preview.
+- **Coupon check:** exposes `cashbackAmount` from `ticket.cashback_amount` (legacy BONUS txn fallback) and `cashbackPaid`.
 
 **Future:** separate locked `bonus_balance` / wagering — v1 credits to main `Wallet.balance`.

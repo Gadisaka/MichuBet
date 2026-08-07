@@ -3,13 +3,53 @@ import PanelCard from "../ui/PanelCard";
 import PrimaryButton from "../ui/PrimaryButton";
 import { useBonusesQuery, useUpdateBonusMutation } from "../../hook/useSettingsQuery";
 
-const DEFAULT_TIERS = [
-  { minResult: "20", maxResult: "44", stakeMultiplier: "1" },
-  { minResult: "45", maxResult: "79", stakeMultiplier: "2" },
-  { minResult: "80", maxResult: "99", stakeMultiplier: "3" },
-  { minResult: "100", maxResult: "199", stakeMultiplier: "4" },
-  { minResult: "200", maxResult: "399", stakeMultiplier: "5" },
-  { minResult: "400", maxResult: "", stakeMultiplier: "10" },
+const DEFAULT_TRACKS = [
+  {
+    lostLegs: 1,
+    minSelections: "5",
+    minStakeOnline: "5",
+    minStakeOffline: "10",
+    maxCashback: "250000",
+    tiers: [
+      { minResult: "19", maxResult: "40", stakeMultiplier: "1" },
+      { minResult: "40", maxResult: "60", stakeMultiplier: "2" },
+      { minResult: "60", maxResult: "90", stakeMultiplier: "4" },
+      { minResult: "90", maxResult: "200", stakeMultiplier: "6" },
+      { minResult: "200", maxResult: "500", stakeMultiplier: "12" },
+      { minResult: "500", maxResult: "1000", stakeMultiplier: "20" },
+      { minResult: "1000", maxResult: "2000", stakeMultiplier: "30" },
+      { minResult: "2000", maxResult: "3000", stakeMultiplier: "50" },
+      { minResult: "3000", maxResult: "", stakeMultiplier: "100" },
+    ],
+  },
+  {
+    lostLegs: 2,
+    minSelections: "10",
+    minStakeOnline: "5",
+    minStakeOffline: "5",
+    maxCashback: "10000",
+    tiers: [
+      { minResult: "20", maxResult: "45", stakeMultiplier: "1" },
+      { minResult: "45", maxResult: "60", stakeMultiplier: "2.5" },
+      { minResult: "60", maxResult: "90", stakeMultiplier: "3.5" },
+      { minResult: "90", maxResult: "450", stakeMultiplier: "6" },
+      { minResult: "450", maxResult: "1000", stakeMultiplier: "12" },
+      { minResult: "1000", maxResult: "1800", stakeMultiplier: "21" },
+      { minResult: "1800", maxResult: "", stakeMultiplier: "50" },
+    ],
+  },
+  {
+    lostLegs: 3,
+    minSelections: "15",
+    minStakeOnline: "20",
+    minStakeOffline: "20",
+    maxCashback: "5000",
+    tiers: [
+      { minResult: "50", maxResult: "150", stakeMultiplier: "0.5" },
+      { minResult: "150", maxResult: "300", stakeMultiplier: "1" },
+      { minResult: "300", maxResult: "", stakeMultiplier: "2" },
+    ],
+  },
 ];
 
 const MAX_TIERS = 10;
@@ -26,29 +66,54 @@ function textToList(text) {
     .filter(Boolean);
 }
 
+function tiersToForm(tiers) {
+  return (Array.isArray(tiers) ? tiers : []).map((t) => ({
+    minResult: String(t.minResult ?? ""),
+    maxResult: t.maxResult == null ? "" : String(t.maxResult),
+    stakeMultiplier: String(t.stakeMultiplier ?? ""),
+  }));
+}
+
+function trackToForm(track, fallback) {
+  const base = fallback ?? DEFAULT_TRACKS.find((t) => t.lostLegs === track?.lostLegs);
+  return {
+    lostLegs: Number(track?.lostLegs ?? base.lostLegs),
+    minSelections:
+      track?.minSelections != null
+        ? String(track.minSelections)
+        : base.minSelections,
+    minStakeOnline:
+      track?.minStakeOnline != null
+        ? String(track.minStakeOnline)
+        : base.minStakeOnline,
+    minStakeOffline:
+      track?.minStakeOffline != null
+        ? String(track.minStakeOffline)
+        : base.minStakeOffline,
+    maxCashback:
+      track?.maxCashback != null ? String(track.maxCashback) : base.maxCashback,
+    tiers:
+      Array.isArray(track?.tiers) && track.tiers.length > 0
+        ? tiersToForm(track.tiers)
+        : base.tiers.map((t) => ({ ...t })),
+  };
+}
+
 function rowToForm(row) {
   const rules = row?.rules && typeof row.rules === "object" ? row.rules : {};
-  const tiers = Array.isArray(rules.tiers) ? rules.tiers : [];
+  const tracks = Array.isArray(rules.tracks) ? rules.tracks : [];
   return {
     status: Boolean(row?.status),
-    minSelections:
-      rules.minSelections != null ? String(rules.minSelections) : "2",
-    minStake: rules.minStake != null ? String(rules.minStake) : "10",
-    maxHours: rules.maxHours != null ? String(rules.maxHours) : "72",
-    minResult: rules.minResult != null ? String(rules.minResult) : "20",
+    maxHours: rules.maxHours != null ? String(rules.maxHours) : "48",
     fixtureStatuses: listToText(
       rules.disqualifyFixtureStatuses,
       "PST, CANC, ABD",
     ),
     matchStatuses: listToText(rules.disqualifyMatchStatuses, "SUSPENDED"),
-    tiers:
-      tiers.length > 0
-        ? tiers.map((t) => ({
-            minResult: String(t.minResult ?? ""),
-            maxResult: t.maxResult == null ? "" : String(t.maxResult),
-            stakeMultiplier: String(t.stakeMultiplier ?? ""),
-          }))
-        : DEFAULT_TIERS.map((t) => ({ ...t })),
+    tracks: DEFAULT_TRACKS.map((def) => {
+      const found = tracks.find((t) => Number(t.lostLegs) === def.lostLegs);
+      return trackToForm(found ?? def, def);
+    }),
   };
 }
 
@@ -59,6 +124,7 @@ export default function CashbackPanel() {
   const [syncedId, setSyncedId] = useState(null);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
+  const [openTracks, setOpenTracks] = useState({ 1: true, 2: true, 3: true });
 
   const cashbackRow = useMemo(() => {
     const list = query.data?.items;
@@ -66,10 +132,6 @@ export default function CashbackPanel() {
     return list.find((b) => b.type === "CASHBACK") ?? null;
   }, [query.data]);
 
-  // Reset the editable form when the underlying cashback row changes
-  // identity (initial load / different record). Setting state during
-  // render with an id guard is React's recommended pattern and avoids
-  // cascading renders from a setState-in-effect.
   if (cashbackRow && cashbackRow.id !== syncedId) {
     setSyncedId(cashbackRow.id);
     setForm(rowToForm(cashbackRow));
@@ -79,37 +141,58 @@ export default function CashbackPanel() {
     setForm((f) => ({ ...f, [key]: value }));
   }
 
-  function setTier(idx, key, value) {
+  function setTrackField(trackIdx, key, value) {
     setForm((f) => {
-      const tiers = f.tiers.map((t, i) =>
-        i === idx ? { ...t, [key]: value } : t,
+      const tracks = f.tracks.map((t, i) =>
+        i === trackIdx ? { ...t, [key]: value } : t,
       );
-      return { ...f, tiers };
+      return { ...f, tracks };
     });
   }
 
-  function addTier() {
-    setForm((f) =>
-      f.tiers.length >= MAX_TIERS
-        ? f
-        : {
-            ...f,
-            tiers: [
-              ...f.tiers,
-              { minResult: "", maxResult: "", stakeMultiplier: "" },
-            ],
-          },
-    );
+  function setTier(trackIdx, tierIdx, key, value) {
+    setForm((f) => {
+      const tracks = f.tracks.map((track, i) => {
+        if (i !== trackIdx) return track;
+        const tiers = track.tiers.map((t, j) =>
+          j === tierIdx ? { ...t, [key]: value } : t,
+        );
+        return { ...track, tiers };
+      });
+      return { ...f, tracks };
+    });
   }
 
-  function removeTier(idx) {
-    setForm((f) => ({
-      ...f,
-      tiers: f.tiers.filter((_, i) => i !== idx),
-    }));
+  function addTier(trackIdx) {
+    setForm((f) => {
+      const tracks = f.tracks.map((track, i) => {
+        if (i !== trackIdx || track.tiers.length >= MAX_TIERS) return track;
+        return {
+          ...track,
+          tiers: [
+            ...track.tiers,
+            { minResult: "", maxResult: "", stakeMultiplier: "" },
+          ],
+        };
+      });
+      return { ...f, tracks };
+    });
   }
 
-  function validateClient(tiers) {
+  function removeTier(trackIdx, tierIdx) {
+    setForm((f) => {
+      const tracks = f.tracks.map((track, i) => {
+        if (i !== trackIdx || track.tiers.length <= 1) return track;
+        return {
+          ...track,
+          tiers: track.tiers.filter((_, j) => j !== tierIdx),
+        };
+      });
+      return { ...f, tracks };
+    });
+  }
+
+  function validateTrackTiers(tiers, trackLabel) {
     const parsed = tiers.map((t) => ({
       minResult: Number(t.minResult),
       maxResult: t.maxResult.trim() === "" ? null : Number(t.maxResult),
@@ -117,27 +200,59 @@ export default function CashbackPanel() {
     }));
     for (const t of parsed) {
       if (!Number.isFinite(t.minResult) || t.minResult < 0) {
-        return "Each tier needs a min result >= 0.";
+        return `${trackLabel}: each tier needs a min result >= 0.`;
       }
-      if (t.maxResult !== null && (!Number.isFinite(t.maxResult) || t.maxResult < t.minResult)) {
-        return "Each tier max result must be blank or >= its min result.";
+      if (
+        t.maxResult !== null &&
+        (!Number.isFinite(t.maxResult) || t.maxResult <= t.minResult)
+      ) {
+        return `${trackLabel}: each tier max must be blank or > its min (half-open).`;
       }
       if (!Number.isFinite(t.stakeMultiplier) || t.stakeMultiplier < 0) {
-        return "Each tier needs a stake multiplier >= 0.";
+        return `${trackLabel}: each tier needs a stake multiplier >= 0.`;
       }
     }
     parsed.sort((a, b) => a.minResult - b.minResult);
     for (let i = 0; i < parsed.length; i++) {
       if (parsed[i].maxResult === null && i !== parsed.length - 1) {
-        return "Only the last tier may have a blank (open-ended) max result.";
+        return `${trackLabel}: only the last tier may have a blank (open-ended) max.`;
       }
       if (i > 0) {
         const prev = parsed[i - 1];
-        if (prev.maxResult === null) return "Open-ended tier must be last.";
-        if (parsed[i].minResult <= prev.maxResult) {
-          return "Tier ranges must not overlap.";
+        if (prev.maxResult === null) {
+          return `${trackLabel}: open-ended tier must be last.`;
+        }
+        if (parsed[i].minResult !== prev.maxResult) {
+          return `${trackLabel}: tiers must be contiguous (next min = previous max).`;
         }
       }
+    }
+    return null;
+  }
+
+  function validateClient(formState) {
+    for (const track of formState.tracks) {
+      const label = `${track.lostLegs}-loss track`;
+      const minSelections = Number(track.minSelections);
+      if (!Number.isInteger(minSelections) || minSelections < 1) {
+        return `${label}: min selections must be an integer >= 1.`;
+      }
+      for (const [key, labelKey] of [
+        ["minStakeOnline", "min stake (online)"],
+        ["minStakeOffline", "min stake (offline)"],
+        ["maxCashback", "max cashback"],
+      ]) {
+        const n = Number(track[key]);
+        if (!Number.isFinite(n) || n < 0) {
+          return `${label}: ${labelKey} must be >= 0.`;
+        }
+      }
+      const tierErr = validateTrackTiers(track.tiers, label);
+      if (tierErr) return tierErr;
+    }
+    const maxHours = Number(formState.maxHours);
+    if (!Number.isFinite(maxHours) || maxHours < 0) {
+      return "Max hours must be >= 0.";
     }
     return null;
   }
@@ -148,24 +263,28 @@ export default function CashbackPanel() {
     setError("");
     setSaved(false);
 
-    const tierErr = validateClient(form.tiers);
-    if (tierErr) {
-      setError(tierErr);
+    const clientErr = validateClient(form);
+    if (clientErr) {
+      setError(clientErr);
       return;
     }
 
     const body = {
       status: form.status,
-      minSelections: Number(form.minSelections),
-      minStake: Number(form.minStake),
       maxHours: Number(form.maxHours),
-      minResult: Number(form.minResult),
       disqualifyFixtureStatuses: textToList(form.fixtureStatuses),
       disqualifyMatchStatuses: textToList(form.matchStatuses),
-      cashbackTiers: form.tiers.map((t) => ({
-        minResult: Number(t.minResult),
-        maxResult: t.maxResult.trim() === "" ? null : Number(t.maxResult),
-        stakeMultiplier: Number(t.stakeMultiplier),
+      cashbackTracks: form.tracks.map((track) => ({
+        lostLegs: Number(track.lostLegs),
+        minSelections: Number(track.minSelections),
+        minStakeOnline: Number(track.minStakeOnline),
+        minStakeOffline: Number(track.minStakeOffline),
+        maxCashback: Number(track.maxCashback),
+        tiers: track.tiers.map((t) => ({
+          minResult: Number(t.minResult),
+          maxResult: t.maxResult.trim() === "" ? null : Number(t.maxResult),
+          stakeMultiplier: Number(t.stakeMultiplier),
+        })),
       })),
     };
 
@@ -215,11 +334,14 @@ export default function CashbackPanel() {
         Cashback on losses
       </h3>
       <p className="mt-1 text-xs text-[var(--muted)]">
-        When a ticket loses, players get <strong>stake × multiplier</strong>{" "}
-        back. The multiplier is chosen by{" "}
-        <code className="text-xs">result = total odds ÷ lost-leg odds</code>.
-        Example: 96 total odds, a lost leg at 2.3 → 96 ÷ 2.3 = 41.73 → the
-        20–44 tier → 100% of stake (×1).
+        Multi-track refund for tickets that lose exactly 1, 2, or 3 selections.
+        Amount = <strong>stake × multiplier</strong>, where{" "}
+        <code className="text-xs">
+          result = total odds ÷ sum of lost-leg odds
+        </code>
+        . Online credits the player wallet; offline stores a claimable amount
+        for cashier redemption. Example: total 46, lost leg 1.2, stake 10 → 46 ÷
+        1.2 ≈ 38.33 → 1-loss 19–40 tier → ×1 → 10 birr.
       </p>
 
       <form onSubmit={handleSave} className="mt-4 space-y-5">
@@ -235,30 +357,7 @@ export default function CashbackPanel() {
           </span>
         </label>
 
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <Field
-            label="Min selections (more than)"
-            hint="Cashback only if leg count is greater than this"
-          >
-            <input
-              type="number"
-              min="0"
-              step="1"
-              value={form.minSelections}
-              onChange={(e) => setField("minSelections", e.target.value)}
-              className={inputClass}
-            />
-          </Field>
-          <Field label="Min stake">
-            <input
-              type="number"
-              min="0"
-              step="any"
-              value={form.minStake}
-              onChange={(e) => setField("minStake", e.target.value)}
-              className={inputClass}
-            />
-          </Field>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           <Field label="Max hours (from placement)" hint="0 = no time limit">
             <input
               type="number"
@@ -269,19 +368,6 @@ export default function CashbackPanel() {
               className={inputClass}
             />
           </Field>
-          <Field label="Min result (floor)" hint="Below this ratio, no payout">
-            <input
-              type="number"
-              min="0"
-              step="any"
-              value={form.minResult}
-              onChange={(e) => setField("minResult", e.target.value)}
-              className={inputClass}
-            />
-          </Field>
-        </div>
-
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Field
             label="Disqualifying fixture statuses"
             hint="Any leg with these statuses voids cashback (system-managed)"
@@ -296,102 +382,223 @@ export default function CashbackPanel() {
           </Field>
         </div>
 
-        <div>
-          <div className="mb-2 flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
-              Payout tiers (result range → stake multiplier)
-            </span>
-            {form.tiers.length < MAX_TIERS && (
+        {form.tracks.map((track, trackIdx) => {
+          const open = openTracks[track.lostLegs];
+          return (
+            <div
+              key={track.lostLegs}
+              className="rounded-sm border border-[var(--border)] p-4"
+            >
               <button
                 type="button"
-                onClick={addTier}
-                className="text-xs font-semibold text-[var(--accent)]"
+                className="flex w-full items-center justify-between text-left"
+                onClick={() =>
+                  setOpenTracks((o) => ({
+                    ...o,
+                    [track.lostLegs]: !o[track.lostLegs],
+                  }))
+                }
               >
-                + Add tier
+                <span className="text-sm font-semibold text-[var(--text)]">
+                  {track.lostLegs}-loss track
+                </span>
+                <span className="text-xs text-[var(--muted)]">
+                  {open ? "Hide" : "Show"}
+                </span>
               </button>
-            )}
-          </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[480px] text-left text-sm">
-              <thead>
-                <tr className="text-[var(--muted)]">
-                  <th className="pb-2 pr-3 text-xs font-semibold uppercase">
-                    Min result
-                  </th>
-                  <th className="pb-2 pr-3 text-xs font-semibold uppercase">
-                    Max result (blank = no cap)
-                  </th>
-                  <th className="pb-2 pr-3 text-xs font-semibold uppercase">
-                    Stake ×
-                  </th>
-                  <th className="pb-2" />
-                </tr>
-              </thead>
-              <tbody>
-                {form.tiers.map((tier, idx) => (
-                  <tr key={idx} className="align-middle">
-                    <td className="py-1 pr-3">
+              {open && (
+                <div className="mt-4 space-y-4">
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                    <Field
+                      label="Min selections"
+                      hint="Inclusive (≥ this many non-VOID legs)"
+                    >
+                      <input
+                        type="number"
+                        min="1"
+                        step="1"
+                        value={track.minSelections}
+                        onChange={(e) =>
+                          setTrackField(
+                            trackIdx,
+                            "minSelections",
+                            e.target.value,
+                          )
+                        }
+                        className={inputClass}
+                      />
+                    </Field>
+                    <Field label="Min stake (online)">
                       <input
                         type="number"
                         min="0"
                         step="any"
-                        value={tier.minResult}
+                        value={track.minStakeOnline}
                         onChange={(e) =>
-                          setTier(idx, "minResult", e.target.value)
+                          setTrackField(
+                            trackIdx,
+                            "minStakeOnline",
+                            e.target.value,
+                          )
                         }
                         className={inputClass}
                       />
-                    </td>
-                    <td className="py-1 pr-3">
+                    </Field>
+                    <Field label="Min stake (offline)">
                       <input
                         type="number"
                         min="0"
                         step="any"
-                        value={tier.maxResult}
+                        value={track.minStakeOffline}
                         onChange={(e) =>
-                          setTier(idx, "maxResult", e.target.value)
+                          setTrackField(
+                            trackIdx,
+                            "minStakeOffline",
+                            e.target.value,
+                          )
                         }
-                        placeholder="∞"
                         className={inputClass}
                       />
-                    </td>
-                    <td className="py-1 pr-3">
+                    </Field>
+                    <Field label="Max cashback">
                       <input
                         type="number"
                         min="0"
                         step="any"
-                        value={tier.stakeMultiplier}
+                        value={track.maxCashback}
                         onChange={(e) =>
-                          setTier(idx, "stakeMultiplier", e.target.value)
+                          setTrackField(trackIdx, "maxCashback", e.target.value)
                         }
                         className={inputClass}
                       />
-                    </td>
-                    <td className="py-1">
-                      {form.tiers.length > 1 && (
+                    </Field>
+                  </div>
+
+                  <div>
+                    <div className="mb-2 flex items-center justify-between">
+                      <span className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
+                        Payout tiers (half-open: min ≤ result &lt; max)
+                      </span>
+                      {track.tiers.length < MAX_TIERS && (
                         <button
                           type="button"
-                          onClick={() => removeTier(idx)}
-                          className="text-xs text-[var(--danger)]"
+                          onClick={() => addTier(trackIdx)}
+                          className="text-xs font-semibold text-[var(--accent)]"
                         >
-                          Remove
+                          + Add tier
                         </button>
                       )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
+                    </div>
 
-        <PrimaryButton type="submit" disabled={updateMut.isPending} className="w-auto">
+                    <div className="overflow-x-auto">
+                      <table className="w-full min-w-[480px] text-left text-sm">
+                        <thead>
+                          <tr className="text-[var(--muted)]">
+                            <th className="pb-2 pr-3 text-xs font-semibold uppercase">
+                              Min result
+                            </th>
+                            <th className="pb-2 pr-3 text-xs font-semibold uppercase">
+                              Max result (blank = ∞)
+                            </th>
+                            <th className="pb-2 pr-3 text-xs font-semibold uppercase">
+                              Stake ×
+                            </th>
+                            <th className="pb-2" />
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {track.tiers.map((tier, tierIdx) => (
+                            <tr key={tierIdx} className="align-middle">
+                              <td className="py-1 pr-3">
+                                <input
+                                  type="number"
+                                  min="0"
+                                  step="any"
+                                  value={tier.minResult}
+                                  onChange={(e) =>
+                                    setTier(
+                                      trackIdx,
+                                      tierIdx,
+                                      "minResult",
+                                      e.target.value,
+                                    )
+                                  }
+                                  className={inputClass}
+                                />
+                              </td>
+                              <td className="py-1 pr-3">
+                                <input
+                                  type="number"
+                                  min="0"
+                                  step="any"
+                                  value={tier.maxResult}
+                                  onChange={(e) =>
+                                    setTier(
+                                      trackIdx,
+                                      tierIdx,
+                                      "maxResult",
+                                      e.target.value,
+                                    )
+                                  }
+                                  placeholder="∞"
+                                  className={inputClass}
+                                />
+                              </td>
+                              <td className="py-1 pr-3">
+                                <input
+                                  type="number"
+                                  min="0"
+                                  step="any"
+                                  value={tier.stakeMultiplier}
+                                  onChange={(e) =>
+                                    setTier(
+                                      trackIdx,
+                                      tierIdx,
+                                      "stakeMultiplier",
+                                      e.target.value,
+                                    )
+                                  }
+                                  className={inputClass}
+                                />
+                              </td>
+                              <td className="py-1">
+                                {track.tiers.length > 1 && (
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      removeTier(trackIdx, tierIdx)
+                                    }
+                                    className="text-xs text-[var(--danger)]"
+                                  >
+                                    Remove
+                                  </button>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
+
+        <PrimaryButton
+          type="submit"
+          disabled={updateMut.isPending}
+          className="w-auto"
+        >
           {updateMut.isPending ? "Saving…" : "Save cashback settings"}
         </PrimaryButton>
 
         {saved && (
-          <p className="text-xs font-medium text-green-600">Saved successfully.</p>
+          <p className="text-xs font-medium text-green-600">
+            Saved successfully.
+          </p>
         )}
         {error && (
           <p className="text-xs font-medium text-[var(--danger)]">{error}</p>
@@ -414,7 +621,9 @@ function Field({ label, hint, children }) {
         {label}
       </span>
       {children}
-      {hint && <span className="mt-1 block text-[10px] text-[var(--muted)]">{hint}</span>}
+      {hint && (
+        <span className="mt-1 block text-[10px] text-[var(--muted)]">{hint}</span>
+      )}
     </label>
   );
 }

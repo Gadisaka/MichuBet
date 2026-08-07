@@ -4,6 +4,12 @@
  *
  * @param {import("@prisma/client").PrismaClient} prisma
  */
+import {
+  DEFAULT_CASHBACK_V3_TRACKS,
+  DEFAULT_DISQUALIFY_FIXTURE_STATUSES,
+  DEFAULT_DISQUALIFY_MATCH_STATUSES,
+} from "./bonusEngine.js";
+
 export const PRESET_BONUSES = [
   {
     type: "WELCOME",
@@ -39,25 +45,18 @@ export const PRESET_BONUSES = [
     type: "CASHBACK",
     name: "Cashback on losses",
     percentage: 0,
-    // Tiered (v2): payout = stake x multiplier where the multiplier is
-    // chosen by `result = total_odds / largest-lost-leg-odds`. Eligibility
-    // gates: count > minSelections, stake >= minStake, settled within
-    // maxHours of placement, and no leg on a disqualified fixture/match.
+    // Multi-track (v3): payout = stake × multiplier where multiplier comes
+    // from the track matching exact lost-leg count (1|2|3). Ratio =
+    // total_odds / sum(lost-leg odds). Offline tickets store amount for
+    // cashier redemption.
     rules: {
-      minSelections: 2,
-      minStake: 0,
-      maxHours: 72,
-      minResult: 20,
-      disqualifyFixtureStatuses: ["PST", "CANC", "ABD"],
-      disqualifyMatchStatuses: ["SUSPENDED"],
-      tiers: [
-        { minResult: 20, maxResult: 44, stakeMultiplier: 1 },
-        { minResult: 45, maxResult: 79, stakeMultiplier: 2 },
-        { minResult: 80, maxResult: 99, stakeMultiplier: 3 },
-        { minResult: 100, maxResult: 199, stakeMultiplier: 4 },
-        { minResult: 200, maxResult: 399, stakeMultiplier: 5 },
-        { minResult: 400, maxResult: null, stakeMultiplier: 10 },
-      ],
+      maxHours: 48,
+      disqualifyFixtureStatuses: [...DEFAULT_DISQUALIFY_FIXTURE_STATUSES],
+      disqualifyMatchStatuses: [...DEFAULT_DISQUALIFY_MATCH_STATUSES],
+      tracks: DEFAULT_CASHBACK_V3_TRACKS.map((t) => ({
+        ...t,
+        tiers: t.tiers.map((tier) => ({ ...tier })),
+      })),
     },
     status: false,
   },

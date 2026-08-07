@@ -114,6 +114,7 @@ export const translations = Object.freeze({
       sports: "Sports",
       games: "Games",
       promotions: "Promotions",
+      cashbackRules: "Cashback Rules",
       deposit: "Deposit",
       rightsReserved: "All rights reserved.",
       ageNotice: "Must be 21+ to play.",
@@ -157,6 +158,7 @@ export const translations = Object.freeze({
     infoPage: Object.freeze({
       faq: "FAQ",
       "how-to-play": "How to play",
+      "cashback-rules": "Cashback Rules",
       "privacy-policy": "Privacy Policy",
       "terms-and-conditions": "Terms and conditions",
       "contact-us": "Contact Us",
@@ -264,6 +266,7 @@ export const translations = Object.freeze({
       sports: "ስፖርት",
       games: "ጨዋታዎች",
       promotions: "ማስተዋወቂያዎች",
+      cashbackRules: "የካሽባክ ደንቦች",
       deposit: "ዲፖዚት",
       rightsReserved: "ሁሉም መብቶች የተጠበቁ ናቸው።",
       ageNotice: "ለመጫወት 21+ መሆን አለቦት።",
@@ -307,6 +310,7 @@ export const translations = Object.freeze({
     infoPage: Object.freeze({
       faq: "ተደጋጋሚ ጥያቄዎች",
       "how-to-play": "እንዴት ይጫወታል",
+      "cashback-rules": "የካሽባክ ደንቦች",
       "privacy-policy": "የግላዊነት ፖሊሲ",
       "terms-and-conditions": "ውሎች እና ሁኔታዎች",
       "contact-us": "እኛን ያግኙ",

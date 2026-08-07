@@ -433,6 +433,10 @@ model Ticket {
   selection_snapshot  Json?
   status              TicketStatus @default(OPEN)
   created_at          DateTime     @default(now())
+  /** Computed cashback on LOST (online credited immediately; offline claimable). */
+  cashback_amount          Float     @default(0)
+  cashback_paid_at         DateTime?
+  cashback_receipt_number  String?
 
   user    User?    @relation(fields: [user_id], references: [id], onDelete: SetNull)
   cashier Cashier? @relation(fields: [cashier_id], references: [id], onDelete: Restrict)
@@ -445,6 +449,7 @@ model Ticket {
   @@index([receipt_number])
   @@index([payment_receipt_number])
   @@index([idempotency_key])
+  @@index([cashback_receipt_number])
   @@map("tickets")
 }
 

@@ -1,10 +1,11 @@
 /**
  * Player site sidebar /info/:slug entries — must match backend `PLAYER_INFO_PAGE_IDS`
- * order: FAQ → How to play → Privacy Policy → Terms and conditions → Contact Us.
+ * order: FAQ → How to play → Cashback Rules → Privacy Policy → Terms → Contact Us.
  */
 export const INFO_PAGE_SLUG_ORDER = [
   "faq",
   "how-to-play",
+  "cashback-rules",
   "privacy-policy",
   "terms-and-conditions",
   "contact-us",
@@ -13,6 +14,7 @@ export const INFO_PAGE_SLUG_ORDER = [
 const LABEL_BY_SLUG = Object.freeze({
   faq: "FAQ",
   "how-to-play": "How to play",
+  "cashback-rules": "Cashback Rules",
   "privacy-policy": "Privacy Policy",
   "terms-and-conditions": "Terms and conditions",
   "contact-us": "Contact Us",

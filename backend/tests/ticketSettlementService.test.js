@@ -59,10 +59,13 @@ function seedFixture({ id, status, homeScore, awayScore, postponedAt = null }) {
 function seedTicket({
   id,
   userId = null,
+  cashierId = null,
   stake,
   totalOdds,
   status = "OPEN",
   receiptNumber = `${id}-receipt`,
+  createdAt = new Date(),
+  cashbackAmount = 0,
 }) {
   const store = getStore();
   store.ticket.set(id, {
@@ -70,13 +73,17 @@ function seedTicket({
     coupon_number: id,
     receipt_number: receiptNumber,
     user_id: userId,
-    cashier_id: null,
+    cashier_id: cashierId,
     branch_name: "",
     branch_location: "",
     stake,
     total_odds: totalOdds,
     potential_win: stake * totalOdds,
     status,
+    created_at: createdAt,
+    cashback_amount: cashbackAmount,
+    cashback_paid_at: null,
+    cashback_receipt_number: null,
   });
 }
 
@@ -977,4 +984,170 @@ test("settleFixture force bypasses postponed wait", async () => {
     store.ticketSelection.get("sel-pst-force").result,
     SELECTION_RESULT.VOID,
   );
+});
+
+const V3_CASHBACK_RULES = {
+  maxHours: 0,
+  disqualifyFixtureStatuses: ["PST", "CANC", "ABD"],
+  disqualifyMatchStatuses: ["SUSPENDED"],
+  tracks: [
+    {
+      lostLegs: 1,
+      minSelections: 3,
+      minStakeOnline: 5,
+      minStakeOffline: 10,
+      maxCashback: 250000,
+      tiers: [
+        { minResult: 19, maxResult: 40, stakeMultiplier: 1 },
+        { minResult: 40, maxResult: null, stakeMultiplier: 2 },
+      ],
+    },
+    {
+      lostLegs: 2,
+      minSelections: 3,
+      minStakeOnline: 5,
+      minStakeOffline: 5,
+      maxCashback: 10000,
+      tiers: [{ minResult: 20, maxResult: null, stakeMultiplier: 1 }],
+    },
+    {
+      lostLegs: 3,
+      minSelections: 3,
+      minStakeOnline: 5,
+      minStakeOffline: 5,
+      maxCashback: 5000,
+      tiers: [{ minResult: 20, maxResult: null, stakeMultiplier: 0.5 }],
+    },
+  ],
+};
+
+function seedV3CashbackBonus() {
+  getStore().bonus.set("cash-v3", {
+    id: "cash-v3",
+    type: "CASHBACK",
+    name: "V3 cashback",
+    percentage: 0,
+    min_deposit: null,
+    status: true,
+    rules: V3_CASHBACK_RULES,
+  });
+}
+
+test("v3 offline LOST ticket stores cashback_amount without wallet credit", async () => {
+  resetStore();
+  const store = getStore();
+  seedV3CashbackBonus();
+  // 4*10*2 = 80; lost @2 → result 40 → ×2; stake 10 → 20
+  seedFixture({ id: "fx-ow1", status: "FT", homeScore: 2, awayScore: 0 });
+  seedFixture({ id: "fx-ow2", status: "FT", homeScore: 1, awayScore: 0 });
+  seedFixture({ id: "fx-ol", status: "FT", homeScore: 0, awayScore: 2 });
+  seedTicket({
+    id: "tk-off",
+    userId: null,
+    cashierId: "c-off",
+    stake: 10,
+    totalOdds: 80,
+  });
+  seedSelection({
+    id: "off-w1",
+    ticketId: "tk-off",
+    fixtureId: "fx-ow1",
+    selection: "1",
+    marketCode: "MATCH_WINNER",
+    odds: 4,
+  });
+  seedSelection({
+    id: "off-w2",
+    ticketId: "tk-off",
+    fixtureId: "fx-ow2",
+    selection: "1",
+    marketCode: "MATCH_WINNER",
+    odds: 10,
+  });
+  seedSelection({
+    id: "off-l",
+    ticketId: "tk-off",
+    fixtureId: "fx-ol",
+    selection: "1",
+    marketCode: "MATCH_WINNER",
+    odds: 2,
+  });
+  // Cashier print marker — defines offline path.
+  store.transaction.set("print-off", {
+    id: "print-off",
+    wallet_id: "cw-off",
+    type: "BET",
+    amount: 10,
+    reference: "ticket-print:tk-off",
+  });
+  store.wallet.set("cw-off", {
+    id: "cw-off",
+    user_id: null,
+    wallet_type: "CASHIER",
+    balance: 100,
+    withdrawable: 0,
+  });
+
+  await settlement.settleFixture("fx-ow1");
+  await settlement.settleFixture("fx-ow2");
+  await settlement.settleFixture("fx-ol");
+
+  const ticket = store.ticket.get("tk-off");
+  assert.equal(ticket.status, "LOST");
+  assert.equal(ticket.cashback_amount, 20);
+  assert.equal(
+    [...store.transaction.values()].find(
+      (t) => t.type === "BONUS" && String(t.reference).startsWith("bonus:cashback:"),
+    ),
+    undefined,
+    "offline must not auto-credit player BONUS",
+  );
+  assert.equal(store.wallet.get("cw-off").balance, 100);
+});
+
+test("v3 online LOST ticket credits wallet and persists cashback_amount", async () => {
+  resetStore();
+  const store = getStore();
+  seedV3CashbackBonus();
+  seedFixture({ id: "fx-nw1", status: "FT", homeScore: 2, awayScore: 0 });
+  seedFixture({ id: "fx-nw2", status: "FT", homeScore: 1, awayScore: 0 });
+  seedFixture({ id: "fx-nl", status: "FT", homeScore: 0, awayScore: 2 });
+  seedTicket({ id: "tk-on", userId: "u-on", stake: 10, totalOdds: 80 });
+  seedSelection({
+    id: "on-w1",
+    ticketId: "tk-on",
+    fixtureId: "fx-nw1",
+    selection: "1",
+    marketCode: "MATCH_WINNER",
+    odds: 4,
+  });
+  seedSelection({
+    id: "on-w2",
+    ticketId: "tk-on",
+    fixtureId: "fx-nw2",
+    selection: "1",
+    marketCode: "MATCH_WINNER",
+    odds: 10,
+  });
+  seedSelection({
+    id: "on-l",
+    ticketId: "tk-on",
+    fixtureId: "fx-nl",
+    selection: "1",
+    marketCode: "MATCH_WINNER",
+    odds: 2,
+  });
+  seedWallet({ id: "w-on", userId: "u-on", balance: 0 });
+
+  await settlement.settleFixture("fx-nw1");
+  await settlement.settleFixture("fx-nw2");
+  await settlement.settleFixture("fx-nl");
+
+  const ticket = store.ticket.get("tk-on");
+  assert.equal(ticket.cashback_amount, 20);
+  const bonusTx = [...store.transaction.values()].find((t) => t.type === "BONUS");
+  assert.ok(bonusTx);
+  assert.equal(bonusTx.reference, "bonus:cashback:tk-on");
+  assert.equal(bonusTx.amount, 20);
+  assert.equal(store.wallet.get("w-on").balance, 20);
 });

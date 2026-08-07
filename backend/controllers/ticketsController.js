@@ -28,6 +28,7 @@ import { notifyUserSafe } from "../lib/createNotification.js";
 import { betPlacedNotification } from "../lib/notificationMessages.js";
 import {
   cashbackBonusRef,
+  cashbackPayoutRef,
   resolveAccumulatorForNewTicket,
 } from "../lib/bonusEngine.js";
 import { classifySelectionSupport } from "../services/markets/marketSupport.js";
@@ -187,6 +188,22 @@ async function reserveUniquePaymentReceiptNumber(client) {
     if (!clash) return candidate;
   }
   throw new Error("PAYMENT_RECEIPT_NUMBER_EXHAUSTED");
+}
+
+/**
+ * @param {import("@prisma/client").PrismaClient | import("@prisma/client").Prisma.TransactionClient} client
+ * @returns {Promise<string>}
+ */
+async function reserveUniqueCashbackReceiptNumber(client) {
+  for (let i = 0; i < RECEIPT_ASSIGN_MAX_ATTEMPTS; i++) {
+    const candidate = buildReceiptNumber();
+    const clash = await client.ticket.findFirst({
+      where: { cashback_receipt_number: candidate },
+      select: { id: true },
+    });
+    if (!clash) return candidate;
+  }
+  throw new Error("CASHBACK_RECEIPT_NUMBER_EXHAUSTED");
 }
 
 function buildPayoutSummary(selections) {
@@ -935,10 +952,13 @@ function mapPublicCouponCheckPayload(ticket, cashbackAmount = null) {
           };
         });
 
+  const fromTicket = Number(ticket.cashback_amount);
   const credited =
-    cashbackAmount != null && Number(cashbackAmount) > 0
-      ? Number(cashbackAmount)
-      : null;
+    Number.isFinite(fromTicket) && fromTicket > 0
+      ? fromTicket
+      : cashbackAmount != null && Number(cashbackAmount) > 0
+        ? Number(cashbackAmount)
+        : null;
   const taxBreakdown = ticketWinningsTaxBreakdown(ticket);
 
   return {
@@ -952,6 +972,7 @@ function mapPublicCouponCheckPayload(ticket, cashbackAmount = null) {
     netPayout: taxBreakdown.netPayout,
     selections: selectionLegs,
     cashbackAmount: credited,
+    cashbackPaid: Boolean(ticket.cashback_paid_at),
   };
 }
 
@@ -960,7 +981,8 @@ function mapPublicCouponCheckPayload(ticket, cashbackAmount = null) {
  * Public coupon check — returns list of paid tickets (those with receipt_number).
  * Unpaid tickets (no receipt_number) are filtered out.
  * Returns couponNumber, receiptNumber, status, stake, odds, payout fields,
- * selections, and cashbackAmount when a BONUS cashback credit exists.
+ * selections, cashbackAmount (from ticket.cashback_amount or legacy BONUS txn),
+ * and cashbackPaid.
  */
 export async function getPublicCouponCheck(req, res) {
   try {
@@ -993,7 +1015,11 @@ export async function getPublicCouponCheck(req, res) {
       });
     }
 
-    const refs = paidTickets.map((t) => cashbackBonusRef(t.id));
+    // Legacy fallback for tickets credited before cashback_amount existed.
+    const needLegacy = paidTickets.filter(
+      (t) => !(Number(t.cashback_amount) > 0),
+    );
+    const refs = needLegacy.map((t) => cashbackBonusRef(t.id));
     const cashbackTxns =
       refs.length > 0
         ? await prisma.transaction.findMany({
@@ -2875,6 +2901,221 @@ export async function payoutTicket(req, res) {
   } catch (error) {
     console.error("payoutTicket error:", error);
     return res.status(500).json({ message: "Failed to payout ticket" });
+  }
+}
+
+/**
+ * PATCH /api/tickets/:id/cashback-payout
+ * Body: { cashierId?: string } — required for non-cashier roles; cashiers use their profile.
+ * Redeems stored offline cashback on a LOST ticket. Credits the selling cashier's
+ * wallet (reimbursement) and records BONUS ref `cashback-payout:<ticketId>`.
+ * Ticket status stays LOST.
+ */
+export async function cashbackPayoutTicket(req, res) {
+  try {
+    const { cashierId } = req.body ?? {};
+    let effectiveCashierId = cashierId;
+
+    if (req.user.role === "CASHIER") {
+      const cashier = await resolveCashierByUserId(req.user.sub);
+      if (!cashier) {
+        return res
+          .status(404)
+          .json({ message: CASHIER_PROFILE_MISSING_MESSAGE });
+      }
+      effectiveCashierId = cashier.id;
+    } else if (!effectiveCashierId) {
+      return res.status(400).json({ message: "cashierId is required" });
+    }
+
+    const ticket = await prisma.ticket.findUnique({
+      where: { id: req.params.id },
+    });
+
+    if (!ticket) {
+      return res.status(404).json({ message: "Ticket not found" });
+    }
+
+    if (ticket.status !== "LOST") {
+      return res.status(400).json({
+        message: "Only LOST tickets can redeem cashback",
+      });
+    }
+
+    if (ticket.cashier_id !== effectiveCashierId) {
+      return res.status(403).json({
+        message:
+          "Cashback payout rejected: ticket must be paid by the selling cashier",
+      });
+    }
+
+    if (!ticket.receipt_number) {
+      return res.status(400).json({
+        message:
+          "Ticket has no receipt number; complete pay-in or print before cashback payout",
+      });
+    }
+
+    const cashbackAmount = Number(ticket.cashback_amount);
+    if (!Number.isFinite(cashbackAmount) || cashbackAmount <= 0) {
+      return res.status(400).json({
+        message: "Ticket has no claimable cashback",
+        code: "no_cashback",
+      });
+    }
+
+    if (ticket.cashback_paid_at) {
+      const existingTicket = await loadMappedTicketForResponse(
+        ticket.id,
+        effectiveCashierId,
+      );
+      return res.status(409).json({
+        message: "Cashback has already been paid out",
+        code: "already_paid",
+        ticket: existingTicket,
+      });
+    }
+
+    const cashier = await prisma.cashier.findUnique({
+      where: { id: effectiveCashierId },
+    });
+
+    if (!cashier) {
+      return res.status(400).json({ message: "Invalid cashierId" });
+    }
+
+    const payoutRef = cashbackPayoutRef(ticket.id);
+    const alreadyPaid = await prisma.transaction.findFirst({
+      where: { reference: payoutRef },
+      select: { id: true },
+    });
+    if (alreadyPaid) {
+      const existingTicket = await loadMappedTicketForResponse(
+        ticket.id,
+        effectiveCashierId,
+      );
+      return res.status(409).json({
+        message: "Cashback has already been paid out",
+        code: "already_paid",
+        ticket: existingTicket,
+      });
+    }
+
+    let result;
+    try {
+      result = await prisma.$transaction(async (tx) => {
+        const wallet = await tx.wallet.findUnique({
+          where: { id: cashier.wallet_id },
+        });
+
+        if (!wallet) {
+          throw new Error("Cashier wallet not found");
+        }
+
+        const balanceBefore = Number(wallet.balance);
+        const balanceAfter = balanceBefore + cashbackAmount;
+
+        await tx.wallet.update({
+          where: { id: wallet.id },
+          data: { balance: balanceAfter },
+        });
+
+        await tx.transaction.create({
+          data: {
+            wallet_id: wallet.id,
+            type: "BONUS",
+            amount: cashbackAmount,
+            balance_before: balanceBefore,
+            balance_after: balanceAfter,
+            reference: payoutRef,
+          },
+        });
+
+        const cashbackReceiptNumber =
+          ticket.cashback_receipt_number ??
+          (await reserveUniqueCashbackReceiptNumber(tx));
+        const paidAt = new Date();
+
+        const { count } = await tx.ticket.updateMany({
+          where: {
+            id: ticket.id,
+            status: "LOST",
+            cashback_paid_at: null,
+          },
+          data: {
+            cashback_paid_at: paidAt,
+            cashback_receipt_number: cashbackReceiptNumber,
+          },
+        });
+        if (count === 0) {
+          throw Object.assign(new Error("STATUS_CONFLICT"), {
+            statusCode: 409,
+          });
+        }
+
+        return {
+          ticketId: ticket.id,
+          walletBalance: balanceAfter,
+          cashbackAmount,
+          cashbackReceiptNumber,
+        };
+      });
+    } catch (err) {
+      if (err?.code === "P2002") {
+        const existingTicket = await loadMappedTicketForResponse(
+          ticket.id,
+          effectiveCashierId,
+        );
+        return res.status(409).json({
+          message: "Cashback has already been paid out",
+          code: "already_paid",
+          ticket: existingTicket,
+        });
+      }
+      if (err?.statusCode === 409) {
+        return res.status(409).json({
+          message:
+            "Ticket status changed concurrently; cashback payout rejected",
+          code: "status_conflict",
+        });
+      }
+      throw err;
+    }
+
+    await logAuditEvent({
+      req,
+      action: "TICKET_CASHBACK_PAID",
+      module: "TICKETS",
+      entityType: "TICKET",
+      entityId: ticket.id,
+      before: {
+        status: ticket.status,
+        cashback_amount: ticket.cashback_amount,
+        cashback_paid_at: null,
+      },
+      after: {
+        status: "LOST",
+        cashback_amount: result.cashbackAmount,
+        cashback_paid_at: true,
+        cashierWalletBalance: result.walletBalance,
+      },
+      meta: { cashierId: effectiveCashierId },
+    });
+
+    const mappedTicket = await loadMappedTicketForResponse(
+      result.ticketId,
+      effectiveCashierId,
+    );
+
+    return res.json({
+      message: "Cashback paid successfully",
+      ticket: mappedTicket,
+      cashbackAmount: result.cashbackAmount,
+      cashierWalletBalance: result.walletBalance,
+    });
+  } catch (error) {
+    console.error("cashbackPayoutTicket error:", error);
+    return res.status(500).json({ message: "Failed to payout cashback" });
   }
 }
 

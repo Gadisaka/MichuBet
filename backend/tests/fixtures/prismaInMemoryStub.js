@@ -22,6 +22,7 @@ const store = {
   auditLog: new Map(),
   bonus: new Map(),
   setting: new Map(),
+  cashier: new Map(),
 };
 
 // Tracks which references have been written already. Simulates the
@@ -131,6 +132,16 @@ function model(name) {
       map.set(where.id, next);
       return clone(next);
     },
+    async updateMany({ where, data }) {
+      let count = 0;
+      for (const [id, row] of map.entries()) {
+        if (!matchesWhere(row, where)) continue;
+        const next = { ...row, ...data };
+        map.set(id, next);
+        count += 1;
+      }
+      return { count };
+    },
     async create({ data }) {
       // Simulate `@unique` reference constraint on the transaction
       // model. Any duplicate write throws a Prisma-shaped P2002.
@@ -163,6 +174,7 @@ export const prisma = {
   auditLog: model("auditLog"),
   bonus: model("bonus"),
   setting: model("setting"),
+  cashier: model("cashier"),
   async $transaction(callback) {
     // The in-memory stub doesn't snapshot/rollback; it's only used by
     // happy-path settlement tests where the service runs to completion.

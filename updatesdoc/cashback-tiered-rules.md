@@ -1,7 +1,11 @@
 # Cashback tiered rules — gap analysis & implementation plan
 
-**Status:** Implemented (2026-05-30)  
-**Last reviewed:** 2026-05-30
+**Status:** Superseded by multi-track v3 (see `backend/docs/bonus-promotions.md`)  
+**Last reviewed:** 2026-08-07
+
+> This document describes the earlier single-track v2 plan. Live rules are now
+> three lost-leg tracks with sum divisor, caps, 48h window, and offline
+> cashier redemption. Do not implement from this file.
 
 ---
 

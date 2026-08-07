@@ -11,6 +11,7 @@ export const PLAYER_INFO_PAGES_SETTING_KEY = "PLAYER_INFO_PAGES";
 export const PLAYER_INFO_PAGE_IDS = Object.freeze([
   "faq",
   "how-to-play",
+  "cashback-rules",
   "privacy-policy",
   "terms-and-conditions",
   "contact-us",
@@ -19,6 +20,7 @@ export const PLAYER_INFO_PAGE_IDS = Object.freeze([
 export const PLAYER_INFO_PAGE_LABEL_BY_ID = Object.freeze({
   faq: "FAQ",
   "how-to-play": "How to play",
+  "cashback-rules": "Cashback Rules",
   "privacy-policy": "Privacy Policy",
   "terms-and-conditions": "Terms and conditions",
   "contact-us": "Contact Us",
@@ -27,6 +29,7 @@ export const PLAYER_INFO_PAGE_LABEL_BY_ID = Object.freeze({
 /** Pages that use `{ body: string }` only. */
 export const BODY_PAGE_IDS = Object.freeze([
   "how-to-play",
+  "cashback-rules",
   "privacy-policy",
   "terms-and-conditions",
 ]);

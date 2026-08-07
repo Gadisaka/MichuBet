@@ -210,14 +210,21 @@ function Casino() {
       return;
     }
 
-    if (loading) return;
+    // Wait until casino status (and catalog, when enabled) have settled —
+    // otherwise we clear ?launch= against an empty games list and never retry.
+    if (casinoEnabled === null) return;
+    if (casinoEnabled === true && loading) return;
 
-    const inoutGame = games.find((g) => g.gameMode === launchId);
+    const inoutGame =
+      casinoEnabled === true
+        ? games.find((g) => g.gameMode === launchId)
+        : null;
     handledLaunchRef.current = launchId;
     clearLaunchParam();
     if (inoutGame) handlePlay(inoutGame);
   }, [
     launchId,
+    casinoEnabled,
     loading,
     games,
     clearLaunchParam,

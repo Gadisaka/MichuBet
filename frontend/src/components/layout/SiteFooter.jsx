@@ -11,6 +11,7 @@ const footerNav = [
   { key: "sports", to: "/" },
   { key: "games", to: "/live" },
   { key: "promotions", to: "/info/how-to-play" },
+  { key: "cashbackRules", to: "/info/cashback-rules" },
   { key: "deposit", to: "/deposit" },
 ];
 

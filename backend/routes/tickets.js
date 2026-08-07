@@ -9,6 +9,7 @@ import {
   getTicketByCoupon,
   listTickets,
   payoutTicket,
+  cashbackPayoutTicket,
   preparePrintTicket,
   removeTicketSelection,
   repeatTicket,
@@ -79,6 +80,11 @@ router.patch(
   "/:id/payout",
   authorizePermission("tickets:payout"),
   payoutTicket,
+);
+router.patch(
+  "/:id/cashback-payout",
+  authorizePermission("tickets:payout"),
+  cashbackPayoutTicket,
 );
 router.get(
   "/:id/cashout-quote",
