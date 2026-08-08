@@ -47,6 +47,13 @@ const MRX_GAMES = [
   },
 ];
 
+/** InOut gameModes launched from the top nav / home tiles (no catalog wait). */
+const NAV_INOUT_LAUNCHES = {
+  "chicken-road-two-bonus": { title: "Chicken Road 2" },
+  "chicken-coin": { title: "Chicken Coin" },
+  megablock: { title: "Mega Block" },
+};
+
 function GameCard({ game, onPlay, launching = false, size = "lg" }) {
   const aspect = size === "sm" ? "aspect-square" : "aspect-[3/4]";
   return (
@@ -210,6 +217,16 @@ function Casino() {
       return;
     }
 
+    // Promoted InOut tiles/nav items launch immediately — same gameMode the
+    // provider expects, without waiting on catalog reconciliation.
+    const navInout = NAV_INOUT_LAUNCHES[launchId];
+    if (navInout) {
+      handledLaunchRef.current = launchId;
+      clearLaunchParam();
+      handlePlay({ gameMode: launchId, title: navInout.title });
+      return;
+    }
+
     // Wait until casino status (and catalog, when enabled) have settled —
     // otherwise we clear ?launch= against an empty games list and never retry.
     if (casinoEnabled === null) return;
@@ -246,9 +263,30 @@ function Casino() {
           </div>
         ) : null}
 
+        <div className="animate-deposit-panel px-1 pt-1">
+          <p className="m-0 text-[11px] font-extrabold uppercase tracking-[0.2em] text-[rgba(255,255,255,0.72)]">
+            {t("casino.instantEyebrow")}
+          </p>
+          <h1 className="m-0 bg-gradient-to-r from-[#ffffff] via-[#ffe8a3] to-[#ffffff] bg-clip-text text-xl font-black tracking-tight text-transparent sm:text-2xl">
+            {t("casino.instantTitle")}
+          </h1>
+        </div>
+
+        <div className="mt-3 grid grid-cols-3 gap-2 pb-4 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6">
+          {MRX_GAMES.map((game) => (
+            <GameCard
+              key={game.id}
+              game={{ ...game, title: t(game.nameKey) }}
+              launching={mrxLaunching === game.id}
+              onPlay={handleMrxPlay}
+              size="sm"
+            />
+          ))}
+        </div>
+
         {casinoEnabled === true ? (
           <>
-            <div className="animate-deposit-panel px-1 pt-1">
+            <div className="animate-deposit-panel px-1 pt-2">
               <div className="flex items-center gap-2">
                 <p className="m-0 text-[11px] font-extrabold uppercase tracking-[0.2em] text-[rgba(255,255,255,0.72)]">
                   {t("casino.inoutEyebrow")}
@@ -258,9 +296,9 @@ function Casino() {
                   {t("categories.pinned")}
                 </span>
               </div>
-              <h1 className="m-0 bg-gradient-to-r from-[#ffffff] via-[#ffe8a3] to-[#ffffff] bg-clip-text text-xl font-black tracking-tight text-transparent sm:text-2xl">
+              <h2 className="m-0 bg-gradient-to-r from-[#ffffff] via-[#ffe8a3] to-[#ffffff] bg-clip-text text-lg font-black tracking-tight text-transparent sm:text-xl">
                 {t("casino.inoutTitle")}
-              </h1>
+              </h2>
             </div>
 
             {loading ? (
@@ -277,7 +315,7 @@ function Casino() {
                 </p>
               </div>
             ) : (
-              <div className="mt-3 grid grid-cols-2 gap-3 pb-4 md:grid-cols-3 lg:grid-cols-4">
+              <div className="mt-3 grid grid-cols-2 gap-3 pb-6 md:grid-cols-3 lg:grid-cols-4">
                 {games.map((game) => (
                   <GameCard
                     key={game.gameMode}
@@ -289,27 +327,6 @@ function Casino() {
             )}
           </>
         ) : null}
-
-        <div className="animate-deposit-panel px-1 pt-2">
-          <p className="m-0 text-[11px] font-extrabold uppercase tracking-[0.2em] text-[rgba(255,255,255,0.72)]">
-            {t("casino.instantEyebrow")}
-          </p>
-          <h2 className="m-0 bg-gradient-to-r from-[#ffffff] via-[#ffe8a3] to-[#ffffff] bg-clip-text text-lg font-black tracking-tight text-transparent sm:text-xl">
-            {t("casino.instantTitle")}
-          </h2>
-        </div>
-
-        <div className="mt-3 grid grid-cols-3 gap-2 pb-6 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6">
-          {MRX_GAMES.map((game) => (
-            <GameCard
-              key={game.id}
-              game={{ ...game, title: t(game.nameKey) }}
-              launching={mrxLaunching === game.id}
-              onPlay={handleMrxPlay}
-              size="sm"
-            />
-          ))}
-        </div>
       </div>
 
       <SiteFooter />

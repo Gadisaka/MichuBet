@@ -16,8 +16,8 @@ export const topNavItems = [
   {
     id: "chickenRoad",
     icon: "bird",
-    path: "/casino?launch=chicken-road-two",
-    launch: "chicken-road-two",
+    path: "/casino?launch=chicken-road-two-bonus",
+    launch: "chicken-road-two-bonus",
   },
   {
     id: "chickenCoin",
@@ -61,7 +61,7 @@ export const homeCategoryTiles = [
   {
     id: "chickenRoad",
     kind: "inout",
-    gameMode: "chicken-road-two",
+    gameMode: "chicken-road-two-bonus",
     iconUrl: "https://icons.inout.games/io_chiken-road-2.png",
   },
   {
