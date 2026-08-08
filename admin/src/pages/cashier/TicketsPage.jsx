@@ -1316,40 +1316,41 @@ export default function CashierTicketsPage() {
                   </button>
                 </form>
 
-                <div className="mt-3 flex flex-wrap items-end gap-2">
-                  <div className="flex flex-wrap items-end gap-2">
-                    {sellTicket && isFirstSaleTicket(sellTicket) ? (
-                      <button
-                        type="button"
-                        onClick={handleSellConfirm}
-                        disabled={!sellTicket || isBusy || sellConfirmed}
-                        className="rounded-sm bg-[var(--accent)] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
-                      >
-                        {updateStake.isPending ? "Saving..." : "Confirm"}
-                      </button>
-                    ) : sellTicket ? (
-                      <button
-                        type="button"
-                        onClick={handleSellRepeat}
-                        disabled={!sellTicket || isBusy || sellConfirmed}
-                        className="rounded-sm bg-[var(--accent)] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
-                      >
-                        {repeatTicket.isPending
-                          ? "Repeating..."
-                          : updateStake.isPending
-                            ? "Saving..."
-                            : "Repeat"}
-                      </button>
-                    ) : null}
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  {sellTicket && isFirstSaleTicket(sellTicket) ? (
                     <button
                       type="button"
-                      onClick={handlePrint}
-                      disabled={!sellTicket || !sellConfirmed || isBusy}
-                      className="rounded-sm bg-[var(--accent)] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60 disabled:cursor-not-allowed"
+                      onClick={handleSellConfirm}
+                      disabled={!sellTicket || isBusy || sellConfirmed}
+                      className="rounded-sm bg-[var(--accent)] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
                     >
-                      Print Ticket
+                      {updateStake.isPending ? "Saving..." : "Confirm"}
                     </button>
-                  </div>
+                  ) : sellTicket ? (
+                    <button
+                      type="button"
+                      onClick={handleSellRepeat}
+                      disabled={!sellTicket || isBusy || sellConfirmed}
+                      className="rounded-sm bg-[var(--accent)] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+                    >
+                      {repeatTicket.isPending
+                        ? "Repeating..."
+                        : updateStake.isPending
+                          ? "Saving..."
+                          : "Repeat"}
+                    </button>
+                  ) : null}
+                  <button
+                    type="button"
+                    onClick={handlePrint}
+                    disabled={!sellTicket || !sellConfirmed || isBusy}
+                    className="rounded-sm bg-[var(--accent)] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60 disabled:cursor-not-allowed"
+                  >
+                    Print Ticket
+                  </button>
+                </div>
+
+                <div className="mt-3 flex flex-wrap items-end gap-2">
                   <div className="flex min-w-0 flex-col gap-1">
                     <label className="text-[11px] font-semibold uppercase tracking-wide text-[var(--muted)]">
                       Edit Stake (ETB)
