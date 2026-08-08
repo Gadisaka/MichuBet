@@ -1174,88 +1174,94 @@ export default function CashierTicketsPage() {
 
   return (
     <AdminShell user={user} onLogout={logout}>
-      <div className="mb-6">
-        <h2 className="text-xl font-semibold">Cashier Tickets</h2>
-        <p className="mt-1 text-sm text-[var(--muted)]">
-          Sell tickets, process payout/cancel, and monitor today slips.
-        </p>
-      </div>
+      <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div>
+          <h2 className="text-xl font-semibold">Cashier Tickets</h2>
+          <p className="mt-1 text-sm text-[var(--muted)]">
+            Sell tickets, process payout/cancel, and monitor today slips.
+          </p>
+        </div>
 
-      <PanelCard className="mb-4 px-4 py-3">
-        <p className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
-          Current Cashier Balance
-        </p>
-        <p className="mt-1 text-2xl font-bold">
-          {cashierBalance == null ? (
-            <span className="text-sm font-normal text-[var(--muted)]">
-              Loading balance...
-            </span>
-          ) : (
-            <>
-              {toNumber(cashierBalance).toLocaleString()}{" "}
-              <span className="text-sm font-normal text-[var(--muted)]">
-                ETB
-              </span>
-            </>
-          )}
-        </p>
-      </PanelCard>
-
-      <div className="mb-4 flex flex-wrap items-center gap-3 rounded-sm border border-[var(--border)] bg-[var(--surfaceMuted)] px-3 py-2 text-sm">
-        <span className="font-semibold text-[var(--muted)]">Printer:</span>
-        {printerConnected ? (
-          <>
-            <span className="flex items-center gap-1.5">
-              <span className="inline-block h-2 w-2 rounded-full bg-green-500" />
-              Printer Connected
-              {printerPort ? (
-                <span className="text-xs text-[var(--muted)]">
-                  ({printerPort || "POS80"})
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-stretch">
+          <PanelCard className="min-w-[12rem] shrink-0 px-4 py-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
+              Current Cashier Balance
+            </p>
+            <p className="mt-1 text-2xl font-bold">
+              {cashierBalance == null ? (
+                <span className="text-sm font-normal text-[var(--muted)]">
+                  Loading balance...
                 </span>
               ) : (
-                <span className="text-xs text-[var(--muted)]">(POS80)</span>
+                <>
+                  {toNumber(cashierBalance).toLocaleString()}{" "}
+                  <span className="text-sm font-normal text-[var(--muted)]">
+                    ETB
+                  </span>
+                </>
               )}
-            </span>
-            {printerQueueActive ? (
-              <span className="text-xs text-[var(--muted)]">
-                Printing…
-                {printerQueueLength > 0
-                  ? ` (${printerQueueLength} queued)`
-                  : ""}
-              </span>
-            ) : null}
+            </p>
+          </PanelCard>
+
+          <div className="flex flex-wrap items-center gap-3 rounded-sm border border-[var(--border)] bg-[var(--surfaceMuted)] px-3 py-2 text-sm">
+            <span className="font-semibold text-[var(--muted)]">Printer:</span>
+            {printerConnected ? (
+              <>
+                <span className="flex items-center gap-1.5">
+                  <span className="inline-block h-2 w-2 rounded-full bg-green-500" />
+                  Printer Connected
+                  {printerPort ? (
+                    <span className="text-xs text-[var(--muted)]">
+                      ({printerPort || "POS80"})
+                    </span>
+                  ) : (
+                    <span className="text-xs text-[var(--muted)]">(POS80)</span>
+                  )}
+                </span>
+                {printerQueueActive ? (
+                  <span className="text-xs text-[var(--muted)]">
+                    Printing…
+                    {printerQueueLength > 0
+                      ? ` (${printerQueueLength} queued)`
+                      : ""}
+                  </span>
+                ) : null}
+                <button
+                  type="button"
+                  onClick={() => void testPrint()}
+                  className="rounded-sm border border-[var(--border)] px-2 py-1 text-xs font-semibold hover:bg-[var(--surface)]"
+                >
+                  Test Print
+                </button>
+              </>
+            ) : (
+              <>
+                <span className="flex items-center gap-1.5 text-[var(--muted)]">
+                  <span className="inline-block h-2 w-2 rounded-full bg-red-500" />
+                  Printer Offline
+                  {printerPort ? (
+                    <span className="text-xs">({printerPort})</span>
+                  ) : null}
+                </span>
+                {printerLastError ? (
+                  <span className="text-xs text-[var(--muted)]">
+                    {printerLastError}
+                  </span>
+                ) : null}
+              </>
+            )}
             <button
               type="button"
-              onClick={() => void testPrint()}
-              className="rounded-sm border border-[var(--border)] px-2 py-1 text-xs font-semibold hover:bg-[var(--surface)]"
+              onClick={() => void refreshPrinterStatus()}
+              className="rounded-sm border border-[var(--border)] px-2 py-1 text-xs text-[var(--muted)] hover:bg-[var(--surface)]"
             >
-              Test Print
+              Refresh
             </button>
-          </>
-        ) : (
-          <>
-            <span className="flex items-center gap-1.5 text-[var(--muted)]">
-              <span className="inline-block h-2 w-2 rounded-full bg-red-500" />
-              Printer Offline
-              {printerPort ? (
-                <span className="text-xs">({printerPort})</span>
-              ) : null}
-            </span>
-            {printerLastError ? (
-              <span className="text-xs text-[var(--muted)]">{printerLastError}</span>
-            ) : null}
-          </>
-        )}
-        <button
-          type="button"
-          onClick={() => void refreshPrinterStatus()}
-          className="rounded-sm border border-[var(--border)] px-2 py-1 text-xs text-[var(--muted)] hover:bg-[var(--surface)]"
-        >
-          Refresh
-        </button>
-        {printError && (
-          <span className="text-xs text-[var(--danger)]">{printError}</span>
-        )}
+            {printError && (
+              <span className="text-xs text-[var(--danger)]">{printError}</span>
+            )}
+          </div>
+        </div>
       </div>
 
       {actionSuccess && (
@@ -1336,7 +1342,7 @@ export default function CashierTicketsPage() {
                     </button>
                   ) : null}
                   <PrimaryButton
-                    className="max-w-none px-4 py-2 text-sm"
+                    className="w-auto max-w-none px-4 py-2 text-sm"
                     onClick={handlePrint}
                     disabled={!sellTicket || !sellConfirmed || isBusy}
                   >
