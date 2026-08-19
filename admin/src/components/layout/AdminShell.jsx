@@ -76,6 +76,12 @@ const NAV_SECTIONS = [
         icon: WalletsIcon,
         permission: "wallets:read",
       },
+      {
+        to: "/online-withdraw",
+        label: "Online Withdraw",
+        icon: WalletsIcon,
+        permission: "online-withdraw:read",
+      },
     ],
   },
   {
@@ -192,6 +198,11 @@ export default function AdminShell({ user, onLogout, children }) {
           {
             to: "/withdraw-deposit",
             label: "Withdraw/Deposit",
+            icon: WalletsIcon,
+          },
+          {
+            to: "/online-withdraw",
+            label: "Online Withdraw",
             icon: WalletsIcon,
           },
           { to: "/", label: "Dashboard", icon: DashboardIcon },

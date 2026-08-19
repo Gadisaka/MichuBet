@@ -27,6 +27,7 @@ export const ROLE_PERMISSIONS = {
     "wallet:deduct",
     "wallet:history",
     "reports:read",
+    "online-withdraw:read",
   ]),
 
   AGENT: new Set([
@@ -47,6 +48,7 @@ export const ROLE_PERMISSIONS = {
     "wallet:withdraw",
     "wallet:history",
     "games:read",
+    "online-withdraw:process",
   ]),
 
   PLAYER: new Set([

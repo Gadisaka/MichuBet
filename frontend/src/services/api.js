@@ -431,6 +431,84 @@ export async function createPlayerShopWithdraw(amount) {
 }
 
 /**
+ * GET /api/player/online-withdraw/config
+ */
+export async function fetchOnlineWithdrawConfig() {
+  const token = getToken();
+  if (!token) throw new Error("NOT_LOGGED_IN");
+  const res = await fetch(`${API_URL}/api/player/online-withdraw/config`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(
+      data.message || data.error || "Failed to load withdraw settings",
+    );
+  }
+  return data;
+}
+
+/**
+ * GET /api/player/online-withdraw/cashiers
+ */
+export async function fetchOnlineWithdrawCashiers() {
+  const token = getToken();
+  if (!token) throw new Error("NOT_LOGGED_IN");
+  const res = await fetch(`${API_URL}/api/player/online-withdraw/cashiers`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data.message || data.error || "Failed to load cashiers");
+  }
+  return data;
+}
+
+/**
+ * POST /api/player/online-withdraw
+ */
+export async function createOnlineWithdraw(payload) {
+  const token = getToken();
+  if (!token) throw new Error("NOT_LOGGED_IN");
+  const res = await fetch(`${API_URL}/api/player/online-withdraw`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(payload),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(
+      data.message || data.error || "Failed to create withdrawal",
+    );
+  }
+  return data;
+}
+
+/**
+ * GET /api/player/online-withdraw
+ */
+export async function fetchOnlineWithdrawRequests({ page = 1, limit = 10 } = {}) {
+  const token = getToken();
+  if (!token) throw new Error("NOT_LOGGED_IN");
+  const params = new URLSearchParams({
+    page: String(page),
+    limit: String(limit),
+  });
+  const res = await fetch(
+    `${API_URL}/api/player/online-withdraw?${params.toString()}`,
+    { headers: { Authorization: `Bearer ${token}` } },
+  );
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data.message || data.error || "Failed to load withdrawals");
+  }
+  return data;
+}
+
+/**
  * POST /api/player/wallet/online-deposit — verify bank/mobile payment and credit wallet.
  * @param {{ method: "cbe"|"cbebirr"|"telebirr", amount: number, reference?: string, accountSuffix?: string, receiptNumber?: string, phoneNumber?: string }} payload
  */

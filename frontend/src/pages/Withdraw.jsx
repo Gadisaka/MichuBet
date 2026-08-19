@@ -18,9 +18,11 @@ import {
 } from "../services/api";
 import { usePlatformSettings } from "../hooks/usePlatformSettings";
 import { withdrawAmountViolation } from "../utils/stakeLimits";
+import { useTranslation } from "../i18n/LanguageContext.jsx";
 
 function Withdraw() {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const { limits } = usePlatformSettings();
   const minW =
     limits?.MIN_WITHDRAW != null && Number.isFinite(limits.MIN_WITHDRAW)
@@ -151,10 +153,10 @@ function Withdraw() {
           </button>
           <div>
             <p className="m-0 text-[11px] font-extrabold uppercase tracking-[0.2em] text-[rgba(255,255,255,0.72)]">
-              Shop withdrawal
+              {t("withdraw.shopEyebrow")}
             </p>
             <h1 className="m-0 text-2xl font-black tracking-tight text-[#ffffff] sm:text-3xl">
-              Withdraw
+              {t("withdraw.title")}
             </h1>
           </div>
         </header>
@@ -177,6 +179,33 @@ function Withdraw() {
           </SoftPanel>
         ) : (
           <div className="flex flex-col gap-4">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <SoftPanel className="animate-deposit-panel ring-(--sb-accent-fill)/35">
+                <p className="m-0 text-xs font-extrabold uppercase tracking-[0.18em] text-(--sb-accent-fill)">
+                  {t("withdraw.shopTitle")}
+                </p>
+                <p className="mt-2 m-0 text-sm text-[rgba(255,255,255,0.72)]">
+                  {t("withdraw.shopHint")}
+                </p>
+              </SoftPanel>
+              <button
+                type="button"
+                onClick={() => navigate("/withdraw/online")}
+                className="text-left"
+              >
+                <SoftPanel className="animate-deposit-panel h-full transition hover:ring-(--sb-accent-fill)/40">
+                  <p className="m-0 text-xs font-extrabold uppercase tracking-[0.18em] text-[rgba(255,255,255,0.72)]">
+                    {t("withdraw.onlineTitle")}
+                  </p>
+                  <p className="mt-2 m-0 text-sm text-[rgba(255,255,255,0.72)]">
+                    {t("withdraw.onlineHint")}
+                  </p>
+                  <p className="mt-3 m-0 text-xs font-bold text-(--sb-accent-fill)">
+                    {t("withdraw.continueOnline")} →
+                  </p>
+                </SoftPanel>
+              </button>
+            </div>
             <SoftPanel className="animate-deposit-panel">
               <p className="m-0 text-center text-sm leading-relaxed text-[rgba(255,255,255,0.72)]">
                 Enter how much you want to take out. We&apos;ll give you a

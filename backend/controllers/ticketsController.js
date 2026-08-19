@@ -2431,8 +2431,8 @@ export async function getTicketByReceipt(req, res) {
 /**
  * GET /api/tickets/by-coupon?couponNumber=...&status=...
  * Single-call coupon lookup for cashier/agent flows — returns full ticket detail
- * for the most recent ticket matching the coupon (repeat flow can share a coupon,
- * so this mirrors the list endpoint's "first" pick: order by created_at desc).
+ * for the most recent accessible ticket matching the coupon (legacy repeats may
+ * share a coupon; cashiers only see own sold + unclaimed, ordered newest first).
  */
 export async function getTicketByCoupon(req, res) {
   try {
@@ -2444,19 +2444,12 @@ export async function getTicketByCoupon(req, res) {
     }
 
     const candidates = couponLookupCandidates(compact, compactLower);
-    const where = { coupon_number: { in: candidates } };
     const status = String(req.query.status || "").trim().toUpperCase();
-    if (status) where.status = status;
-
-    const ticket = await prisma.ticket.findFirst({
-      where,
-      include: ticketDetailInclude,
-      orderBy: { created_at: "desc" },
-    });
-
-    if (!ticket) {
-      return res.status(404).json({ message: "Ticket not found" });
-    }
+    const baseWhere = {
+      coupon_number: { in: candidates },
+      ...(status ? { status } : {}),
+    };
+    const where = { ...baseWhere };
 
     if (req.user.role === "CASHIER") {
       const cashier = await resolveCashierByUserId(req.user.sub);
@@ -2465,22 +2458,42 @@ export async function getTicketByCoupon(req, res) {
           .status(404)
           .json({ message: CASHIER_PROFILE_MISSING_MESSAGE });
       }
-      if (ticket.cashier_id && ticket.cashier_id !== cashier.id) {
-        return res.status(403).json({ message: "Access denied" });
-      }
+      // Match listTickets coupon lookup: own sold + unclaimed prebook slips.
+      where.OR = [
+        { cashier_id: cashier.id },
+        { cashier_id: null },
+        { cashier_id: { isSet: false } },
+      ];
     }
 
     if (req.user.role === "AGENT") {
-      if (!ticket.cashier_id) {
-        return res.status(403).json({ message: "Access denied" });
-      }
-      const allowed = await prisma.agentCashier.findFirst({
-        where: { agent_id: req.user.sub, cashier_id: ticket.cashier_id },
-        select: { id: true },
+      const agentCashiers = await prisma.agentCashier.findMany({
+        where: { agent_id: req.user.sub },
+        select: { cashier_id: true },
       });
-      if (!allowed) {
-        return res.status(403).json({ message: "Access denied" });
+      where.cashier_id = {
+        in: agentCashiers.map((row) => row.cashier_id),
+      };
+    }
+
+    const ticket = await prisma.ticket.findFirst({
+      where,
+      include: ticketDetailInclude,
+      orderBy: { created_at: "desc" },
+    });
+
+    if (!ticket) {
+      // Ticket exists under another owner → keep the familiar Access denied.
+      if (req.user.role === "CASHIER" || req.user.role === "AGENT") {
+        const foreign = await prisma.ticket.findFirst({
+          where: baseWhere,
+          select: { id: true },
+        });
+        if (foreign) {
+          return res.status(403).json({ message: "Access denied" });
+        }
       }
+      return res.status(404).json({ message: "Ticket not found" });
     }
 
     const printed = ticket.cashier_id

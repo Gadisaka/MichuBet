@@ -186,6 +186,17 @@ function buildRepeatables() {
         jobId: toJobId(REPEATABLE_JOB_NAMES.HOLD_REAPER_TICK),
       },
     },
+    {
+      queue: QUEUE_NAMES.EXPIRE_ONLINE_WITHDRAWALS,
+      name: REPEATABLE_JOB_NAMES.EXPIRE_ONLINE_WITHDRAWALS,
+      data: {},
+      opts: {
+        repeat: {
+          every: envMinutes("ONLINE_WITHDRAW_EXPIRE_MINUTES", 5 * MINUTES),
+        },
+        jobId: toJobId(REPEATABLE_JOB_NAMES.EXPIRE_ONLINE_WITHDRAWALS),
+      },
+    },
   ];
 }
 

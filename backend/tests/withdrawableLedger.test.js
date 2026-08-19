@@ -68,6 +68,33 @@ test("sportsbook settlement + cashout are withdrawable", () => {
   assert.equal(isWithdrawableLedgerCredit("CASHOUT", "cashout:t1"), true);
 });
 
+test("online-withdraw refund DEPOSIT is a withdrawable credit", () => {
+  assert.equal(
+    isWithdrawableLedgerCredit("DEPOSIT", "online-withdraw-refund:abc"),
+    true,
+  );
+  assert.equal(isWithdrawableLedgerCredit("DEPOSIT", "online:dep:1"), false);
+});
+
+test("replay: win, online withdraw, refund restores withdrawable", () => {
+  const result = replayWithdrawableLedger([
+    { type: "PAYOUT", amount: 200, reference: "win-settlement:t1" },
+    {
+      type: "WITHDRAW",
+      amount: 100,
+      reference: "online-withdraw:req1",
+      balance_before: 200,
+      balance_after: 100,
+    },
+    {
+      type: "DEPOSIT",
+      amount: 100,
+      reference: "online-withdraw-refund:req1",
+    },
+  ]);
+  assert.deepEqual(result, { balance: 200, withdrawable: 200 });
+});
+
 test("pending shop withdraw ledger rows are skipped", () => {
   assert.equal(
     isPendingWithdrawLedger({

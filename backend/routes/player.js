@@ -12,6 +12,12 @@ import {
   cancelOwnPlayerTicket,
   listOwnTickets,
 } from "../controllers/playerController.js";
+import {
+  createPlayerRequest,
+  getPlayerConfig,
+  listPlayerCashiers,
+  listPlayerRequests,
+} from "../controllers/onlineWithdrawController.js";
 import { generateSsoToken } from "../controllers/playerSsoController.js";
 import { authorizePermission } from "../middleware/auth.js";
 
@@ -24,6 +30,11 @@ router.get("/wallet", authorizePermission("wallet:history"), getWallet);
 router.get("/wallet/history", authorizePermission("wallet:history"), getWalletHistory);
 router.post("/wallet/online-deposit", authorizePermission("wallet:deposit"), verifyOnlineDeposit);
 router.post("/wallet/shop-withdraw", authorizePermission("wallet:withdraw"), createShopWithdraw);
+
+router.get("/online-withdraw/config", authorizePermission("wallet:withdraw"), getPlayerConfig);
+router.get("/online-withdraw/cashiers", authorizePermission("wallet:withdraw"), listPlayerCashiers);
+router.get("/online-withdraw", authorizePermission("wallet:withdraw"), listPlayerRequests);
+router.post("/online-withdraw", authorizePermission("wallet:withdraw"), createPlayerRequest);
 
 router.get("/tickets", authorizePermission("tickets:read_own"), listOwnTickets);
 router.get("/tickets/:id", authorizePermission("tickets:read_own"), getOwnPlayerTicket);

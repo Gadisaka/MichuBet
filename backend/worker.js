@@ -17,6 +17,7 @@ import { processLeaguesMeta } from "./queues/processors/leaguesMeta.js";
 import { processSettlementRetry } from "./queues/processors/settlementRetry.js";
 import { processExpireUnpaidTickets } from "./queues/processors/expireUnpaidTickets.js";
 import { processHoldReaper } from "./queues/processors/holdReaper.js";
+import { processExpireOnlineWithdrawals } from "./queues/processors/expireOnlineWithdrawals.js";
 
 /**
  * Worker process entry point.
@@ -39,6 +40,7 @@ const PROCESSOR_REGISTRY = {
   [QUEUE_NAMES.SETTLEMENT_RETRY]: processSettlementRetry,
   [QUEUE_NAMES.EXPIRE_UNPAID_TICKETS]: processExpireUnpaidTickets,
   [QUEUE_NAMES.HOLD_REAPER]: processHoldReaper,
+  [QUEUE_NAMES.EXPIRE_ONLINE_WITHDRAWALS]: processExpireOnlineWithdrawals,
 };
 
 const workers = [];

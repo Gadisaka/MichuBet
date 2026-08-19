@@ -32,6 +32,8 @@ const ROLE_PERMISSIONS = {
     "devices:approve",
     "devices:reject",
     "devices:revoke",
+    "online-withdraw:read",
+    "online-withdraw:manage",
   ]),
 
   FINANCIAL_SUPPORT: new Set([
@@ -39,6 +41,7 @@ const ROLE_PERMISSIONS = {
     "wallets:read",
     "wallets:approve",
     "reports:read",
+    "online-withdraw:read",
   ]),
 
   AGENT: new Set([
@@ -56,6 +59,7 @@ const ROLE_PERMISSIONS = {
     "games:read",
     "wallets:read",
     "settings:read",
+    "online-withdraw:process",
   ]),
 };
 

@@ -48,6 +48,63 @@ export function withdrawCompletedNotification({ amount }) {
   };
 }
 
+export function onlineWithdrawPendingNotification({ amount, netAmount }) {
+  return {
+    kind: "WITHDRAW_PENDING",
+    title: "Online withdrawal requested",
+    body: `Your withdrawal of ${formatEtb(amount)} ETB has been deducted. You will receive ${formatEtb(netAmount)} ETB in 24–48 hours.`,
+    metadata: {
+      amount: Number(amount),
+      netAmount: Number(netAmount),
+      channel: "online",
+    },
+  };
+}
+
+export function onlineWithdrawRequestNotification({
+  amount,
+  netAmount,
+  playerName,
+}) {
+  const who = playerName ? ` from ${playerName}` : "";
+  return {
+    kind: "WITHDRAW_REQUEST",
+    title: "New online withdrawal",
+    body: `A player requested ${formatEtb(amount)} ETB${who}. Send ${formatEtb(netAmount)} ETB (90% after fee) to their account.`,
+    metadata: {
+      amount: Number(amount),
+      netAmount: Number(netAmount),
+    },
+  };
+}
+
+export function onlineWithdrawCompletedNotification({ amount, netAmount }) {
+  return {
+    kind: "WITHDRAW_COMPLETED",
+    title: "Online withdrawal completed",
+    body: `Your online withdrawal of ${formatEtb(amount)} ETB is complete. ${formatEtb(netAmount)} ETB has been sent to your account.`,
+    metadata: {
+      amount: Number(amount),
+      netAmount: Number(netAmount),
+      channel: "online",
+    },
+  };
+}
+
+export function onlineWithdrawRejectedNotification({ amount, reason }) {
+  const extra = reason ? ` Reason: ${reason}` : "";
+  return {
+    kind: "WITHDRAW_REJECTED",
+    title: "Online withdrawal refunded",
+    body: `${formatEtb(amount)} ETB has been returned to your withdrawable balance.${extra}`,
+    metadata: {
+      amount: Number(amount),
+      reason: reason ?? null,
+      channel: "online",
+    },
+  };
+}
+
 export function adminMessageNotification({ title, body, batchId }) {
   return {
     kind: "ADMIN_MESSAGE",

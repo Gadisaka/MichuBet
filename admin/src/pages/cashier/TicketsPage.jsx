@@ -818,8 +818,9 @@ export default function CashierTicketsPage() {
       }
       setSellTicket(newTicket);
       setSellCouponInput(formatCouponNumberInput(newTicket.couponNumber || ""));
-      setSellConfirmed(true);
-      setActionSuccess("New ticket ready. You can print now.");
+      setSellConfirmed(false);
+      setActionSuccess("New ticket ready. Review selections and confirm.");
+      await pruneStartedSellSelections(newTicket);
     } catch (error) {
       setSellError(error?.message || "Failed to repeat ticket");
     }
@@ -1087,7 +1088,7 @@ export default function CashierTicketsPage() {
   };
 
   const handleRepeat = (ticket) => {
-    if (!ticket?.couponNumber) return;
+    if (!ticket?.id) return;
     setLeftTab("sell");
     setSellCouponInput(formatCouponNumberInput(ticket.couponNumber || ""));
     setSellTicket(null);
@@ -1095,7 +1096,25 @@ export default function CashierTicketsPage() {
     setSellConfirmed(false);
     setTicketPreviewOpen(false);
     setSellError("");
-    setActionSuccess("Coupon loaded. Search to continue.");
+    setActionSuccess("");
+    void (async () => {
+      try {
+        const newTicket = await repeatTicket.mutateAsync(ticket.id);
+        setSellTicket(newTicket);
+        setSellCouponInput(
+          formatCouponNumberInput(newTicket.couponNumber || ""),
+        );
+        setSellStakeInput(String(toNumber(newTicket.stake)));
+        setSellConfirmed(false);
+        setActionSuccess("New ticket ready. Review selections and confirm.");
+        await pruneStartedSellSelections(newTicket);
+      } catch (error) {
+        setSellTicket(null);
+        setSellStakeInput("");
+        setSellConfirmed(false);
+        setSellError(error?.message || "Failed to repeat ticket");
+      }
+    })();
   };
 
   const handleRemoveSelection = async (selectionId) => {

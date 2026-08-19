@@ -53,6 +53,17 @@ import {
   WINNINGS_TAX_RATE_SETTING_KEY,
   resolveWinningsTax,
 } from "../lib/winningsTax.js";
+import {
+  DEFAULT_ONLINE_WITHDRAW_EXPIRY_HOURS,
+  DEFAULT_ONLINE_WITHDRAW_FEE_PERCENT,
+  MAX_ONLINE_WITHDRAW_EXPIRY_HOURS,
+  MAX_ONLINE_WITHDRAW_FEE_PERCENT,
+  MIN_ONLINE_WITHDRAW_EXPIRY_HOURS,
+  MIN_ONLINE_WITHDRAW_FEE_PERCENT,
+  ONLINE_WITHDRAW_EXPIRY_HOURS_KEY,
+  ONLINE_WITHDRAW_FEE_PERCENT_KEY,
+  resolveOnlineWithdrawSettings,
+} from "../lib/onlineWithdrawSettings.js";
 
 // ─── Ticket cancel window ────────────────────────────────────────────────────
 
@@ -668,5 +679,94 @@ export async function listAllSettings(_req, res) {
   } catch (error) {
     console.error("listAllSettings error:", error);
     return res.status(500).json({ message: "Failed to list settings" });
+  }
+}
+
+/**
+ * GET /api/admin/settings/online-withdraw
+ */
+export async function getOnlineWithdrawSettings(_req, res) {
+  try {
+    const resolved = await resolveOnlineWithdrawSettings(prisma);
+    return res.json({
+      feePercent: resolved.feePercent,
+      expiryHours: resolved.expiryHours,
+      configuredInDatabase: resolved.configuredInDatabase,
+      defaultFeePercent: DEFAULT_ONLINE_WITHDRAW_FEE_PERCENT,
+      defaultExpiryHours: DEFAULT_ONLINE_WITHDRAW_EXPIRY_HOURS,
+      minFeePercent: MIN_ONLINE_WITHDRAW_FEE_PERCENT,
+      maxFeePercent: MAX_ONLINE_WITHDRAW_FEE_PERCENT,
+      minExpiryHours: MIN_ONLINE_WITHDRAW_EXPIRY_HOURS,
+      maxExpiryHours: MAX_ONLINE_WITHDRAW_EXPIRY_HOURS,
+    });
+  } catch (error) {
+    console.error("getOnlineWithdrawSettings error:", error);
+    return res
+      .status(500)
+      .json({ message: "Failed to load online withdraw settings" });
+  }
+}
+
+/**
+ * PUT /api/admin/settings/online-withdraw
+ */
+export async function putOnlineWithdrawSettings(req, res) {
+  try {
+    const feePercent = Number(req.body?.feePercent);
+    const expiryHours = Number(req.body?.expiryHours);
+    if (
+      !Number.isFinite(feePercent) ||
+      feePercent < MIN_ONLINE_WITHDRAW_FEE_PERCENT ||
+      feePercent > MAX_ONLINE_WITHDRAW_FEE_PERCENT
+    ) {
+      return res.status(400).json({
+        message: `feePercent must be between ${MIN_ONLINE_WITHDRAW_FEE_PERCENT} and ${MAX_ONLINE_WITHDRAW_FEE_PERCENT}`,
+      });
+    }
+    if (
+      !Number.isFinite(expiryHours) ||
+      expiryHours < MIN_ONLINE_WITHDRAW_EXPIRY_HOURS ||
+      expiryHours > MAX_ONLINE_WITHDRAW_EXPIRY_HOURS
+    ) {
+      return res.status(400).json({
+        message: `expiryHours must be between ${MIN_ONLINE_WITHDRAW_EXPIRY_HOURS} and ${MAX_ONLINE_WITHDRAW_EXPIRY_HOURS}`,
+      });
+    }
+
+    const before = await resolveOnlineWithdrawSettings(prisma);
+    await prisma.setting.upsert({
+      where: { key: ONLINE_WITHDRAW_FEE_PERCENT_KEY },
+      create: { key: ONLINE_WITHDRAW_FEE_PERCENT_KEY, value: String(feePercent) },
+      update: { value: String(feePercent) },
+    });
+    await prisma.setting.upsert({
+      where: { key: ONLINE_WITHDRAW_EXPIRY_HOURS_KEY },
+      create: {
+        key: ONLINE_WITHDRAW_EXPIRY_HOURS_KEY,
+        value: String(expiryHours),
+      },
+      update: { value: String(expiryHours) },
+    });
+
+    await logAuditEvent({
+      req,
+      action: "SETTINGS_ONLINE_WITHDRAW_UPDATED",
+      module: "SETTINGS",
+      entityType: "SETTING",
+      entityId: "ONLINE_WITHDRAW",
+      before,
+      after: { feePercent, expiryHours },
+    });
+
+    return res.json({
+      message: "Online withdraw settings updated",
+      feePercent,
+      expiryHours,
+    });
+  } catch (error) {
+    console.error("putOnlineWithdrawSettings error:", error);
+    return res
+      .status(500)
+      .json({ message: "Failed to update online withdraw settings" });
   }
 }

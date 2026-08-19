@@ -9,6 +9,8 @@ import OnlineDepositReceiversRedirect from "./pages/admin/OnlineDepositReceivers
 import ApiConfigPage from "./pages/admin/ApiConfigPage";
 import CashierSettingsPage from "./pages/cashier/SettingsPage";
 import CashierWithdrawDepositPage from "./pages/cashier/WithdrawDepositPage";
+import CashierOnlineWithdrawPage from "./pages/cashier/OnlineWithdrawPage";
+import AdminOnlineWithdrawPage from "./pages/admin/OnlineWithdrawPage";
 import AgentsCashiersPage from "./pages/admin/AgentsCashiersPage";
 import WalletsPage from "./pages/admin/WalletsPage";
 import AuditLogPage from "./pages/admin/AuditLogPage";
@@ -101,6 +103,12 @@ function RoleDepositWithdrawPage() {
       description="Cashier wallet movements."
     />
   );
+}
+
+function RoleOnlineWithdrawPage() {
+  const { user } = useAuth();
+  if (user?.role === "CASHIER") return <CashierOnlineWithdrawPage />;
+  return <AdminOnlineWithdrawPage />;
 }
 
 export default function App() {
@@ -202,6 +210,21 @@ export default function App() {
             element={
               <ProtectedRoute allowedRoles={["CASHIER", "AGENT"]}>
                 <RoleDepositWithdrawPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/online-withdraw"
+            element={
+              <ProtectedRoute
+                allowedRoles={[
+                  "SUPER_ADMIN",
+                  "ADMIN",
+                  "FINANCIAL_SUPPORT",
+                  "CASHIER",
+                ]}
+              >
+                <RoleOnlineWithdrawPage />
               </ProtectedRoute>
             }
           />

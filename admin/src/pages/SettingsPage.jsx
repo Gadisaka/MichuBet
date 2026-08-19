@@ -16,6 +16,8 @@ import {
   useUpdateBettingLimitsMutation,
   useWinningsTaxQuery,
   useUpdateWinningsTaxMutation,
+  useOnlineWithdrawSettingsQuery,
+  useUpdateOnlineWithdrawSettingsMutation,
 } from "../hook/useSettingsQuery";
 
 const TABS = [
@@ -98,6 +100,7 @@ export default function SettingsPage() {
       )}
       {activeTab === "payments" && (
         <div className="space-y-6">
+          <OnlineWithdrawSettingsSection />
           <OnlineDepositReceiversPanel />
         </div>
       )}
@@ -484,6 +487,90 @@ function BettingLimitsSection() {
         </form>
       )}
 
+      <Feedback saved={saved} error={error} />
+    </PanelCard>
+  );
+}
+
+function OnlineWithdrawSettingsSection() {
+  const query = useOnlineWithdrawSettingsQuery();
+  const mutation = useUpdateOnlineWithdrawSettingsMutation();
+  const [feePercent, setFeePercent] = useState("10");
+  const [expiryHours, setExpiryHours] = useState("48");
+  const [saved, setSaved] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (query.data) {
+      if (query.data.feePercent != null) setFeePercent(String(query.data.feePercent));
+      if (query.data.expiryHours != null) setExpiryHours(String(query.data.expiryHours));
+    }
+  }, [query.data]);
+
+  async function handleSave(e) {
+    e.preventDefault();
+    setError("");
+    setSaved(false);
+    try {
+      await mutation.mutateAsync({
+        feePercent: Number(feePercent),
+        expiryHours: Number(expiryHours),
+      });
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2500);
+    } catch (err) {
+      setError(err.message || "Failed to update");
+    }
+  }
+
+  return (
+    <PanelCard className="p-6">
+      <h3 className="text-sm font-semibold uppercase tracking-wide">
+        Online withdraw
+      </h3>
+      <p className="mt-1 text-xs text-[var(--muted)]">
+        Fee is snapshotted on each request. Cashiers send the remaining amount
+        to the player and keep the fee.
+      </p>
+      {query.isLoading ? (
+        <p className="mt-4 text-sm text-[var(--muted)]">Loading...</p>
+      ) : (
+        <form onSubmit={handleSave} className="mt-4 grid max-w-lg gap-4 sm:grid-cols-2">
+          <label className="flex flex-col">
+            <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
+              Fee percent
+            </span>
+            <input
+              type="number"
+              min={query.data?.minFeePercent ?? 0}
+              max={query.data?.maxFeePercent ?? 50}
+              step="0.1"
+              value={feePercent}
+              onChange={(e) => setFeePercent(e.target.value)}
+              className="w-full rounded-sm border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5 text-sm text-[var(--text)] outline-none focus:border-[var(--accent)]"
+            />
+          </label>
+          <label className="flex flex-col">
+            <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
+              Expiry hours
+            </span>
+            <input
+              type="number"
+              min={query.data?.minExpiryHours ?? 1}
+              max={query.data?.maxExpiryHours ?? 168}
+              step="1"
+              value={expiryHours}
+              onChange={(e) => setExpiryHours(e.target.value)}
+              className="w-full rounded-sm border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5 text-sm text-[var(--text)] outline-none focus:border-[var(--accent)]"
+            />
+          </label>
+          <div className="sm:col-span-2">
+            <PrimaryButton type="submit" disabled={mutation.isPending} className="w-auto">
+              {mutation.isPending ? "Saving..." : "Save"}
+            </PrimaryButton>
+          </div>
+        </form>
+      )}
       <Feedback saved={saved} error={error} />
     </PanelCard>
   );

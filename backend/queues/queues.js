@@ -17,6 +17,7 @@ export const QUEUE_NAMES = {
   SETTLEMENT_RETRY: "settlement-retry",
   EXPIRE_UNPAID_TICKETS: "expire-unpaid-tickets",
   HOLD_REAPER: "hold-reaper",
+  EXPIRE_ONLINE_WITHDRAWALS: "expire-online-withdrawals",
 };
 
 export const REPEATABLE_JOB_NAMES = {
@@ -30,6 +31,7 @@ export const REPEATABLE_JOB_NAMES = {
   SETTLEMENT_RETRY: "settlement:retry",
   EXPIRE_UNPAID_TICKETS: "tickets:expire-unpaid",
   HOLD_REAPER_TICK: "hold-reaper:tick",
+  EXPIRE_ONLINE_WITHDRAWALS: "online-withdraw:expire",
 };
 
 const DEFAULT_JOB_OPTIONS = {

@@ -13,6 +13,9 @@ import ticketsRoutes from "./routes/tickets.js";
 import usersRoutes from "./routes/users.js";
 import walletRoutes from "./routes/wallet.js";
 import cashierWalletRoutes from "./routes/cashierWallet.js";
+import cashierOnlineWithdrawRoutes from "./routes/cashierOnlineWithdraw.js";
+import adminOnlineWithdrawRoutes from "./routes/adminOnlineWithdraw.js";
+import onlineWithdrawPublicRoutes from "./routes/onlineWithdrawPublic.js";
 import agentsCashiersRoutes from "./routes/agentsCashiers.js";
 import auditLogsRoutes from "./routes/auditLogs.js";
 import dummyMatchesRoutes from "./routes/dummyMatches.js";
@@ -74,6 +77,7 @@ app.use("/api/football", footballPublicRoutes);
 app.use("/api/bets", betsRoutes);
 app.use("/api/cms", cmsPublicRoutes);
 app.use("/api/casino", casinoPublicRoutes);
+app.use("/api/online-withdraw", onlineWithdrawPublicRoutes);
 
 // --- Authenticated ---
 app.use("/api/admin/users", authenticateToken, usersRoutes);
@@ -82,6 +86,8 @@ app.use("/api/admin/bonuses", authenticateToken, bonusesRoutes);
 app.use("/api/admin/upload", authenticateToken, uploadRoutes);
 app.use("/api/admin/wallet", authenticateToken, walletRoutes);
 app.use("/api/cashier/wallet", authenticateToken, cashierWalletRoutes);
+app.use("/api/cashier/online-withdraw", authenticateToken, cashierOnlineWithdrawRoutes);
+app.use("/api/admin/online-withdraw", authenticateToken, adminOnlineWithdrawRoutes);
 app.use("/api/admin/games", authenticateToken, gamesRoutes);
 app.use("/api/admin/fixtures", authenticateToken, adminFixturesRoutes);
 app.use("/api/admin/agents-cashiers", authenticateToken, agentsCashiersRoutes);

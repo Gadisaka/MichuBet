@@ -1,3 +1,4 @@
+import { useNavigate } from "react-router-dom";
 import {
   useMarkNotificationReadMutation,
   useNotificationsQuery,
@@ -19,6 +20,7 @@ function formatWhen(iso) {
 }
 
 export default function CashierInboxList() {
+  const navigate = useNavigate();
   const notificationsQuery = useNotificationsQuery({ page: 1, limit: 30 });
   const markRead = useMarkNotificationReadMutation();
 
@@ -56,6 +58,9 @@ export default function CashierInboxList() {
               type="button"
               onClick={() => {
                 if (unread) markRead.mutate(n.id);
+                if (n.kind === "WITHDRAW_REQUEST") {
+                  navigate("/online-withdraw");
+                }
               }}
               className={`w-full rounded-sm border px-3 py-2.5 text-left transition ${
                 unread

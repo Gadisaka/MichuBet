@@ -9,9 +9,12 @@
  *   - other PAYOUT on player wallets (default win/payout)
  *
  * Non-withdrawable credits (balance only):
- *   - DEPOSIT / BONUS
+ *   - DEPOSIT / BONUS (except `online-withdraw-refund:*`)
  *   - PAYOUT  inout:rollback:*     (casino stake refund)
  *   - DEPOSIT bet-refund:* / cancel-refund:* / void-refund:* etc.
+ *
+ * Withdrawable DEPOSIT:
+ *   - online-withdraw-refund:*     (rejected/expired online withdraw)
  *
  * Debits:
  *   - BET      — stake: burn non-withdrawable first, then withdrawable
@@ -37,6 +40,11 @@ export function isWithdrawableLedgerCredit(type, reference) {
     // Stake refunds must not unlock deposits.
     if (ref.startsWith("inout:rollback:")) return false;
     // Explicit game / sportsbook win refs (and any other player PAYOUT).
+    return true;
+  }
+
+  // Online-withdraw reject/expiry restores the original withdrawable debit.
+  if (t === "DEPOSIT" && ref.startsWith("online-withdraw-refund:")) {
     return true;
   }
 
@@ -74,6 +82,14 @@ export function replayWithdrawableLedger(transactions) {
 
     if (type === "DEPOSIT" || type === "BONUS") {
       balance = toMoney(d(balance).add(amount));
+      if (
+        amount > 0 &&
+        type === "DEPOSIT" &&
+        isWithdrawableLedgerCredit(type, tx.reference)
+      ) {
+        withdrawable = toMoney(d(withdrawable).add(amount));
+        if (withdrawable > balance) withdrawable = balance;
+      }
       continue;
     }
 

@@ -74,9 +74,18 @@ enum NotificationKind {
   DEPOSIT
   WITHDRAW_PENDING
   WITHDRAW_COMPLETED
+  WITHDRAW_REQUEST
+  WITHDRAW_REJECTED
   DEVICE_APPROVAL_PENDING
   DEVICE_APPROVED
   DEVICE_REJECTED
+}
+
+enum OnlineWithdrawStatus {
+  PENDING
+  COMPLETED
+  REJECTED
+  EXPIRED
 }
 
 enum CashierPendingDeviceStatus {
@@ -115,7 +124,8 @@ model User {
   tickets           Ticket[]
   processed_cashout     CashOut[]              @relation("CashOutProcessor")
   audit_logs            AuditLog[]
-  shop_withdraw_intents ShopWithdrawIntent[]
+  shop_withdraw_intents      ShopWithdrawIntent[]
+  online_withdraw_requests   OnlineWithdrawRequest[]
   notifications              Notification[]
   sent_notifications         Notification[] @relation("NotificationSender")
   cashier_trusted_devices    CashierTrustedDevice[]
@@ -142,6 +152,37 @@ model ShopWithdrawIntent {
   @@map("shop_withdraw_intents")
 }
 
+model OnlineWithdrawRequest {
+  id                        String               @id @default(uuid()) @map("_id")
+  user_id                   String
+  cashier_id                String
+  transaction_id            String               @unique
+  amount                    Float
+  fee_percent               Float
+  fee_amount                Float
+  net_amount                Float
+  bank_code                 String
+  bank_name                 String
+  account_number            String
+  account_name              String
+  status                    OnlineWithdrawStatus @default(PENDING)
+  reject_reason             String?
+  completed_at              DateTime?
+  settlement_transaction_id String?
+  refund_transaction_id     String?
+  expires_at                DateTime
+  created_at                DateTime             @default(now())
+
+  user    User    @relation(fields: [user_id], references: [id], onDelete: Restrict)
+  cashier Cashier @relation(fields: [cashier_id], references: [id], onDelete: Restrict)
+
+  @@index([status])
+  @@index([cashier_id])
+  @@index([user_id])
+  @@index([expires_at])
+  @@map("online_withdraw_requests")
+}
+
 model Cashier {
   id              String   @id @default(uuid()) @map("_id")
   user_id         String   @unique
@@ -150,12 +191,19 @@ model Cashier {
   branch_location String
   status          Boolean  @default(true)
   created_at      DateTime @default(now())
+  // Admin must opt a cashier in before they can process online withdrawals.
+  online_withdraw_enabled   Boolean  @default(false)
+  // Cashier self-toggle: visible on the player picker only when true.
+  online_withdraw_available Boolean  @default(false)
+  // Bank/wallet codes from the seeded Ethiopian list.
+  online_withdraw_banks     String[] @default([])
 
   user   User   @relation(fields: [user_id], references: [id], onDelete: Restrict)
   wallet Wallet @relation(fields: [wallet_id], references: [id], onDelete: Restrict)
 
-  tickets           Ticket[]
-  agent_assignments AgentCashier[]
+  tickets                    Ticket[]
+  agent_assignments          AgentCashier[]
+  online_withdraw_requests   OnlineWithdrawRequest[]
 
   @@map("cashiers")
 }

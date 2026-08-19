@@ -191,6 +191,28 @@ export function useUpdateWinningsTaxMutation() {
   });
 }
 
+export function useOnlineWithdrawSettingsQuery() {
+  return useQuery({
+    queryKey: ["admin", "settings", "online-withdraw"],
+    queryFn: () => apiRequest("/admin/settings/online-withdraw"),
+  });
+}
+
+export function useUpdateOnlineWithdrawSettingsMutation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body) =>
+      apiRequest("/admin/settings/online-withdraw", {
+        method: "PUT",
+        body: JSON.stringify(body),
+      }),
+    onSuccess: () =>
+      qc.invalidateQueries({
+        queryKey: ["admin", "settings", "online-withdraw"],
+      }),
+  });
+}
+
 // ─── Bonuses ────────────────────────────────────────────────────────────────
 
 export function useBonusesQuery() {

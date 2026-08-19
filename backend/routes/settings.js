@@ -17,6 +17,8 @@ import {
   putPlayerSiteBranding,
   putTicketCancelWindow,
   putWinningsTax,
+  getOnlineWithdrawSettings,
+  putOnlineWithdrawSettings,
 } from "../controllers/settingsController.js";
 import { authorizePermission } from "../middleware/auth.js";
 
@@ -29,6 +31,8 @@ router.get("/cashout-margin", authorizePermission("settings:read"), getCashoutMa
 router.put("/cashout-margin", authorizePermission("settings:update"), putCashoutMargin);
 router.get("/winnings-tax", authorizePermission("settings:read"), getWinningsTax);
 router.put("/winnings-tax", authorizePermission("settings:update"), putWinningsTax);
+router.get("/online-withdraw", authorizePermission("settings:read"), getOnlineWithdrawSettings);
+router.put("/online-withdraw", authorizePermission("settings:update"), putOnlineWithdrawSettings);
 router.get("/betting-limits", authorizePermission("settings:read"), getBettingLimits);
 router.put("/betting-limits", authorizePermission("settings:update"), putBettingLimits);
 router.get("/online-deposit-receivers", authorizePermission("settings:read"), getOnlineDepositReceivers);
