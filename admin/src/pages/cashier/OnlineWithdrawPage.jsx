@@ -60,15 +60,24 @@ function SetupCard({ query }) {
   const [available, setAvailable] = useState(false);
   const [error, setError] = useState("");
   const [saved, setSaved] = useState(false);
+  const [open, setOpen] = useState(false);
 
   useEffect(() => {
     if (!data) return;
     setBanks((data.banks ?? []).map((b) => b.code));
     setAvailable(Boolean(data.available));
+    const needsSetup =
+      !data.enabled ||
+      !data.available ||
+      (data.banks ?? []).length === 0;
+    setOpen(needsSetup);
   }, [data]);
 
   const allBanks = data?.allBanks ?? [];
   const enabled = Boolean(data?.enabled);
+  const summary = query.isLoading
+    ? "Loading…"
+    : `${available ? "Available" : "Unavailable"} · ${banks.length} bank${banks.length === 1 ? "" : "s"}`;
 
   async function save(e) {
     e.preventDefault();
@@ -77,6 +86,7 @@ function SetupCard({ query }) {
     try {
       await patch.mutateAsync({ banks, available });
       setSaved(true);
+      setOpen(false);
       setTimeout(() => setSaved(false), 2500);
     } catch (err) {
       setError(err.message || "Failed to save");
@@ -91,76 +101,93 @@ function SetupCard({ query }) {
 
   return (
     <PanelCard className="mb-6 p-5">
-      <h3 className="text-sm font-semibold uppercase tracking-wide">
-        Availability
-      </h3>
-      {!query.isLoading && !enabled ? (
-        <p className="mt-2 text-sm text-amber-600">
-          An admin must mark you eligible for online withdraw before players can
-          pick you.
-        </p>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h3 className="text-sm font-semibold uppercase tracking-wide">
+            Availability
+          </h3>
+          <p className="mt-1 text-xs text-[var(--muted)]">{summary}</p>
+        </div>
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          className="rounded-sm border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 text-xs font-semibold text-[var(--text)]"
+        >
+          {open ? "Close" : "Edit banks"}
+        </button>
+      </div>
+      {open ? (
+        <>
+          {!query.isLoading && !enabled ? (
+            <p className="mt-3 text-sm text-amber-600">
+              An admin must mark you eligible for online withdraw before players
+              can pick you.
+            </p>
+          ) : null}
+          {query.isLoading ? (
+            <p className="mt-3 text-sm text-[var(--muted)]">Loading…</p>
+          ) : (
+            <form onSubmit={save} className="mt-4 space-y-4">
+              <label className="flex cursor-pointer items-center gap-3">
+                <input
+                  type="checkbox"
+                  checked={available}
+                  onChange={(e) => setAvailable(e.target.checked)}
+                  className="h-4 w-4 rounded border-[var(--border)]"
+                />
+                <span className="text-sm font-semibold">
+                  I am available for online withdrawals
+                </span>
+              </label>
+              <p className="text-xs text-[var(--muted)]">
+                Select every bank or wallet you can pay. Players only see
+                cashiers who selected at least one.
+              </p>
+              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                {allBanks.map((bank) => {
+                  const on = banks.includes(bank.code);
+                  return (
+                    <label
+                      key={bank.code}
+                      className={`flex cursor-pointer items-center gap-2 rounded-sm border px-3 py-2 text-sm ${
+                        on
+                          ? "border-[var(--accent)] bg-[var(--accent)]/10"
+                          : "border-[var(--border)]"
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={on}
+                        onChange={() => toggleBank(bank.code)}
+                      />
+                      <span>
+                        {bank.name}
+                        <span className="ml-1 text-[10px] uppercase text-[var(--muted)]">
+                          {bank.type}
+                        </span>
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+              <PrimaryButton
+                type="submit"
+                disabled={patch.isPending}
+                className="w-auto"
+              >
+                {patch.isPending ? "Saving…" : "Save profile"}
+              </PrimaryButton>
+              {error ? (
+                <p className="text-xs font-medium text-[var(--danger)]">
+                  {error}
+                </p>
+              ) : null}
+            </form>
+          )}
+        </>
+      ) : saved ? (
+        <p className="mt-3 text-xs font-medium text-green-600">Saved.</p>
       ) : null}
-      {query.isLoading ? (
-        <p className="mt-3 text-sm text-[var(--muted)]">Loading…</p>
-      ) : (
-        <form onSubmit={save} className="mt-4 space-y-4">
-          <label className="flex cursor-pointer items-center gap-3">
-            <input
-              type="checkbox"
-              checked={available}
-              onChange={(e) => setAvailable(e.target.checked)}
-              className="h-4 w-4 rounded border-[var(--border)]"
-            />
-            <span className="text-sm font-semibold">
-              I am available for online withdrawals
-            </span>
-          </label>
-          <p className="text-xs text-[var(--muted)]">
-            Select every bank or wallet you can pay. Players only see cashiers
-            who selected at least one.
-          </p>
-          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-            {allBanks.map((bank) => {
-              const on = banks.includes(bank.code);
-              return (
-                <label
-                  key={bank.code}
-                  className={`flex cursor-pointer items-center gap-2 rounded-sm border px-3 py-2 text-sm ${
-                    on
-                      ? "border-[var(--accent)] bg-[var(--accent)]/10"
-                      : "border-[var(--border)]"
-                  }`}
-                >
-                  <input
-                    type="checkbox"
-                    checked={on}
-                    onChange={() => toggleBank(bank.code)}
-                  />
-                  <span>
-                    {bank.name}
-                    <span className="ml-1 text-[10px] uppercase text-[var(--muted)]">
-                      {bank.type}
-                    </span>
-                  </span>
-                </label>
-              );
-            })}
-          </div>
-          <PrimaryButton
-            type="submit"
-            disabled={patch.isPending}
-            className="w-auto"
-          >
-            {patch.isPending ? "Saving…" : "Save profile"}
-          </PrimaryButton>
-          {saved ? (
-            <p className="text-xs font-medium text-green-600">Saved.</p>
-          ) : null}
-          {error ? (
-            <p className="text-xs font-medium text-[var(--danger)]">{error}</p>
-          ) : null}
-        </form>
-      )}
     </PanelCard>
   );
 }
@@ -253,8 +280,16 @@ function RequestsTable({ query, page, setPage, ready }) {
                     <p className="font-mono text-xs">{r.accountNumber}</p>
                     <p className="text-xs text-[var(--muted)]">{r.accountName}</p>
                   </td>
-                  <td className={`px-4 py-3 text-xs font-semibold ${statusClass(r.status)}`}>
-                    {r.status}
+                  <td className="px-4 py-3">
+                    <p className={`text-xs font-semibold ${statusClass(r.status)}`}>
+                      {r.status}
+                    </p>
+                    {(r.status === "REJECTED" || r.status === "EXPIRED") &&
+                    r.rejectReason ? (
+                      <p className="mt-1 text-[11px] font-normal leading-snug text-[var(--muted)]">
+                        {r.rejectReason}
+                      </p>
+                    ) : null}
                   </td>
                   <td className="px-4 py-3 text-xs">
                     {r.createdAt ? new Date(r.createdAt).toLocaleString() : "—"}

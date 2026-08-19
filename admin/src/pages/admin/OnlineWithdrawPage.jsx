@@ -195,8 +195,16 @@ function TransactionsTable() {
                     <p className="font-mono text-xs">{r.accountNumber}</p>
                     <p className="text-xs text-[var(--muted)]">{r.accountName}</p>
                   </td>
-                  <td className={`px-4 py-3 text-xs font-semibold ${statusClass(r.status)}`}>
-                    {r.status}
+                  <td className="px-4 py-3">
+                    <p className={`text-xs font-semibold ${statusClass(r.status)}`}>
+                      {r.status}
+                    </p>
+                    {(r.status === "REJECTED" || r.status === "EXPIRED") &&
+                    r.rejectReason ? (
+                      <p className="mt-1 text-[11px] font-normal leading-snug text-[var(--muted)]">
+                        {r.rejectReason}
+                      </p>
+                    ) : null}
                   </td>
                   <td className="px-4 py-3 text-xs">
                     {r.createdAt ? new Date(r.createdAt).toLocaleString() : "—"}

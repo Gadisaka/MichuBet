@@ -498,9 +498,17 @@ function HistoryList({ items, t }) {
                 {r.bankName} · {r.accountNumber}
               </p>
             </div>
-            <span className="text-xs font-semibold text-[rgba(255,255,255,0.7)]">
-              {statusLabel(r.status, t)}
-            </span>
+            <div className="max-w-[45%] text-right">
+              <span className="text-xs font-semibold text-[rgba(255,255,255,0.7)]">
+                {statusLabel(r.status, t)}
+              </span>
+              {(r.status === "REJECTED" || r.status === "EXPIRED") &&
+              r.rejectReason ? (
+                <p className="mt-1 m-0 text-[11px] leading-snug text-[rgba(255,255,255,0.5)]">
+                  {r.rejectReason}
+                </p>
+              ) : null}
+            </div>
           </li>
         ))}
       </ul>
