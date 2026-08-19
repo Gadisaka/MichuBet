@@ -5,6 +5,7 @@ const ELIGIBLE_TICKET_STATUSES = new Set(["OPEN", "PRINTED"]);
 const TERMINAL_TICKET_STATUSES = new Set([
   "WON",
   "LOST",
+  "REFUND",
   "PAID",
   "VOID",
   "CANCELED",

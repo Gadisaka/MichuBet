@@ -48,6 +48,8 @@ export function mapTicketRow(ticket) {
     netPayout: Number(ticket.net_payout ?? ticket.netPayout ?? 0),
     payoutSummary: ticket.payoutSummary ?? ticket.payout_summary ?? null,
     status: String(ticket.status || "").toUpperCase(),
+    cashbackAmount: Number(ticket.cashback_amount ?? ticket.cashbackAmount ?? 0),
+    cashbackPaid: Boolean(ticket.cashback_paid_at ?? ticket.cashbackPaid),
     createdAt: ticket.created_at ?? ticket.createdAt ?? null,
     printed: Boolean(ticket.printed),
   };
@@ -192,6 +194,28 @@ export function usePayoutTicketMutation() {
         method: "PATCH",
         body: JSON.stringify(cashierId ? { cashierId } : {}),
       });
+      return {
+        ...payload,
+        ticket: payload?.ticket ? mapTicketDetail(payload.ticket) : null,
+      };
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: TICKETS_KEY });
+    },
+  });
+}
+
+export function useCashbackPayoutMutation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ ticketId, cashierId }) => {
+      const payload = await apiRequest(
+        `/tickets/${ticketId}/cashback-payout`,
+        {
+          method: "PATCH",
+          body: JSON.stringify(cashierId ? { cashierId } : {}),
+        },
+      );
       return {
         ...payload,
         ticket: payload?.ticket ? mapTicketDetail(payload.ticket) : null,

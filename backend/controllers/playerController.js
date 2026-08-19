@@ -665,6 +665,10 @@ function mapPlayerTicket(ticket) {
       : [];
 
   const taxBreakdown = ticketWinningsTaxBreakdown(ticket);
+  const cashbackAmount =
+    Number(ticket.cashback_amount) > 0 ? Number(ticket.cashback_amount) : 0;
+  const isCashbackTicket =
+    cashbackAmount > 0 && String(ticket.status || "").toUpperCase() !== "WON";
 
   return {
     id: ticket.id,
@@ -672,12 +676,15 @@ function mapPlayerTicket(ticket) {
     receiptNumber: ticket.receipt_number ?? null,
     stake: ticket.stake,
     totalOdds: ticket.total_odds,
-    potentialWin: ticket.potential_win,
-    applyWinningsTax: Boolean(ticket.apply_winnings_tax),
+    potentialWin: isCashbackTicket ? cashbackAmount : ticket.potential_win,
+    applyWinningsTax: isCashbackTicket
+      ? false
+      : Boolean(ticket.apply_winnings_tax),
     winningsTaxRate: ticket.winnings_tax_rate ?? null,
-    winningsTaxAmount: taxBreakdown.taxAmount,
-    netPayout: taxBreakdown.netPayout,
+    winningsTaxAmount: isCashbackTicket ? 0 : taxBreakdown.taxAmount,
+    netPayout: isCashbackTicket ? cashbackAmount : taxBreakdown.netPayout,
     status: ticket.status,
+    cashbackAmount,
     createdAt: ticket.created_at,
     selections: normalSelections.length > 0 ? normalSelections : snapshotSelections,
   };

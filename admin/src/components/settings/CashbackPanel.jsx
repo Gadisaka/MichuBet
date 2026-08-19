@@ -337,7 +337,7 @@ export default function CashbackPanel() {
         Multi-track refund for tickets that lose exactly 1, 2, or 3 selections.
         Amount = <strong>stake × multiplier</strong>, where{" "}
         <code className="text-xs">
-          result = total odds ÷ sum of lost-leg odds
+          result = total odds ÷ each lost-leg odd (product)
         </code>
         . Online credits the player wallet; offline stores a claimable amount
         for cashier redemption. Example: total 46, lost leg 1.2, stake 10 → 46 ÷

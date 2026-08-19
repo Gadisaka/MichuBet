@@ -161,6 +161,7 @@ export default function AgentTicketsPage() {
                 <option value="PRINTED">Printed (sold)</option>
                 <option value="WON">Won</option>
                 <option value="LOST">Lost</option>
+                <option value="REFUND">Refund</option>
                 <option value="PAID">Paid</option>
                 <option value="VOID">Void</option>
                 <option value="CANCELED">Canceled</option>

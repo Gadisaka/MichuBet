@@ -662,13 +662,18 @@ function mapPlayerTicketToBet(ticket) {
     WON: "won",
     PAID: "won",
     LOST: "lost",
+    REFUND: "refund",
     VOID: "cancelled",
     CANCELED: "cancelled",
     CASHED_OUT: "cancelled",
     EXPIRED: "cancelled",
   };
   const key = String(ticket.status || "").toUpperCase();
-  const uiStatus = statusMap[key] || "pending";
+  const cashback = Number(ticket.cashbackAmount ?? ticket.cashback_amount ?? 0);
+  const uiStatus =
+    (Number.isFinite(cashback) && cashback > 0 && (key === "PAID" || key === "LOST"))
+      ? "refund"
+      : statusMap[key] || "pending";
 
   const gross = Number(ticket.potentialWin ?? ticket.potential_win ?? 0);
   const taxVal =

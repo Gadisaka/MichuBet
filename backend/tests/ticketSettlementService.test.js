@@ -1093,8 +1093,9 @@ test("v3 offline LOST ticket stores cashback_amount without wallet credit", asyn
   await settlement.settleFixture("fx-ol");
 
   const ticket = store.ticket.get("tk-off");
-  assert.equal(ticket.status, "LOST");
+  assert.equal(ticket.status, "REFUND");
   assert.equal(ticket.cashback_amount, 20);
+  assert.equal(ticket.potential_win, 20);
   assert.equal(
     [...store.transaction.values()].find(
       (t) => t.type === "BONUS" && String(t.reference).startsWith("bonus:cashback:"),
@@ -1144,7 +1145,10 @@ test("v3 online LOST ticket credits wallet and persists cashback_amount", async 
   await settlement.settleFixture("fx-nl");
 
   const ticket = store.ticket.get("tk-on");
+  assert.equal(ticket.status, "PAID");
   assert.equal(ticket.cashback_amount, 20);
+  assert.equal(ticket.potential_win, 20);
+  assert.ok(ticket.cashback_paid_at);
   const bonusTx = [...store.transaction.values()].find((t) => t.type === "BONUS");
   assert.ok(bonusTx);
   assert.equal(bonusTx.reference, "bonus:cashback:tk-on");

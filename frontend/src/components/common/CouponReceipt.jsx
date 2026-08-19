@@ -17,6 +17,7 @@ import {
 
 const TICKET_STATUS_CLS = {
   won: "coupon-receipt__ticket-status--won",
+  refund: "coupon-receipt__ticket-status--won",
   lost: "coupon-receipt__ticket-status--lost",
   pending: "coupon-receipt__ticket-status--pending",
   cancelled: "coupon-receipt__ticket-status--cancelled",
@@ -85,7 +86,9 @@ function SummaryRow({ label, value, highlight = false }) {
 function CouponReceipt({ ticket, className = "" }) {
   if (!ticket) return null;
   const selections = ticket.selections || [];
-  const ticketStatus = mapTicketUiStatus(ticket.status);
+  const ticketStatus = mapTicketUiStatus(ticket.status, {
+    cashbackAmount: ticket.cashbackAmount,
+  });
   const showTax =
     Boolean(ticket.applyWinningsTax) &&
     Number(ticket.winningsTaxAmount) > 0;

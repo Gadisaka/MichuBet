@@ -21,6 +21,7 @@ import { taxLabelForBetHistory } from "../utils/winningsTax";
 const STATUS_STYLES = {
   pending: "bg-(--sb-accent-surface) text-[#F6AF01]",
   won: "bg-[var(--sb-accent-surface)] text-(--sb-accent-soft)",
+  refund: "bg-[var(--sb-accent-surface)] text-(--sb-accent-soft)",
   lost: "bg-[#3a1515] text-[#ff6b6b]",
   cancelled: "bg-[#2a2a3e] text-[rgba(255,255,255,0.72)]",
 };

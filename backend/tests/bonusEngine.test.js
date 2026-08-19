@@ -11,7 +11,7 @@ import {
   evaluateCashback,
   evaluateCashbackV3,
   pickCashbackTier,
-  sumLostOdds,
+  productLostOdds,
   cashbackTotalOddsFromSelections,
   DEFAULT_CASHBACK_V3_TRACKS,
   potentialWinWithAccumulator,
@@ -382,15 +382,15 @@ test("pickCashbackTier halfOpen matches [min, max) and open-ended last", () => {
   assert.equal(pickCashbackTier(3000, tiers, "halfOpen").stakeMultiplier, 100);
 });
 
-test("sumLostOdds counts and sums LOST legs", () => {
-  const { count, sumOdds } = sumLostOdds([
+test("productLostOdds counts LOST legs and multiplies their odds", () => {
+  const { count, productOdds } = productLostOdds([
     { result: "WON", odds: 2 },
-    { result: "LOST", odds: 1.3 },
-    { result: "LOST", odds: 1.3 },
+    { result: "LOST", odds: 1.42 },
+    { result: "LOST", odds: 1.67 },
     { result: "VOID", odds: 9 },
   ]);
   assert.equal(count, 2);
-  assert.equal(sumOdds, 2.6);
+  assert.equal(productOdds, 1.42 * 1.67);
 });
 
 test("evaluateCashbackV3 worked example: 46/1.2 ≈ 38.33 → ×1 → 10", () => {
@@ -407,18 +407,44 @@ test("evaluateCashbackV3 worked example: 46/1.2 ≈ 38.33 → ×1 → 10", () =>
   assert.equal(ev.amount, 10);
 });
 
-test("evaluateCashbackV3 worked example: 110/2.6 ≈ 42.3 → ×1 → 5 (sum divisor)", () => {
-  const lost = [1.3, 1.3];
+test("evaluateCashbackV3 2-loss: sequential 129.36÷1.42÷1.67 ≈ 54.55 → ×2.5", () => {
+  const lost = [1.42, 1.67];
+  const totalOdds = 129.36;
   const ev = evaluateCashbackV3({
-    ticket: { user_id: "u1", stake: 5, total_odds: 110, created_at: new Date() },
-    selections: selectionsMultiLoss(8, lost, 110),
+    ticket: {
+      user_id: "u1",
+      stake: 20,
+      total_odds: totalOdds,
+      created_at: new Date(),
+    },
+    selections: selectionsMultiLoss(8, lost, totalOdds),
     bonus: v3Bonus(),
   });
   assert.equal(ev.eligible, true);
   assert.equal(ev.track.lostLegs, 2);
-  assert.ok(Math.abs(ev.result - 110 / 2.6) < 1e-9);
-  assert.equal(ev.tier.stakeMultiplier, 1);
-  assert.equal(ev.amount, 5);
+  assert.ok(Math.abs(ev.result - totalOdds / (1.42 * 1.67)) < 1e-9);
+  assert.equal(ev.tier.stakeMultiplier, 2.5);
+  assert.equal(ev.amount, 50);
+});
+
+test("evaluateCashbackV3 2-loss: sequential above 90 → ×6", () => {
+  const lost = [1.57, 1.44];
+  const totalOdds = 241.5737;
+  const ev = evaluateCashbackV3({
+    ticket: {
+      user_id: "u1",
+      stake: 20,
+      total_odds: totalOdds,
+      created_at: new Date(),
+    },
+    selections: selectionsMultiLoss(9, lost, totalOdds),
+    bonus: v3Bonus(),
+  });
+  assert.equal(ev.eligible, true);
+  assert.equal(ev.track.lostLegs, 2);
+  assert.ok(Math.abs(ev.result - totalOdds / (1.57 * 1.44)) < 1e-9);
+  assert.equal(ev.tier.stakeMultiplier, 6);
+  assert.equal(ev.amount, 120);
 });
 
 test("evaluateCashbackV3 rejects 4+ lost legs", () => {

@@ -73,6 +73,7 @@ const SETTLEABLE_TICKET_STATUSES = new Set(["OPEN", "PRINTED", "HELD"]);
 const TERMINAL_TICKET_STATUSES = new Set([
   "WON",
   "LOST",
+  "REFUND",
   "PAID",
   "VOID",
   "CANCELED",

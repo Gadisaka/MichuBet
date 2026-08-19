@@ -6,6 +6,13 @@ describe("mapTicketUiStatus", () => {
     expect(mapTicketUiStatus("WON")).toEqual({ key: "won", label: "WON" });
     expect(mapTicketUiStatus("PAID")).toEqual({ key: "won", label: "WON" });
     expect(mapTicketUiStatus("LOST")).toEqual({ key: "lost", label: "LOST" });
+    expect(mapTicketUiStatus("REFUND")).toEqual({
+      key: "refund",
+      label: "REFUND",
+    });
+    expect(
+      mapTicketUiStatus("PAID", { cashbackAmount: 50 }),
+    ).toEqual({ key: "refund", label: "REFUND" });
     expect(mapTicketUiStatus("OPEN")).toEqual({
       key: "pending",
       label: "PENDING",

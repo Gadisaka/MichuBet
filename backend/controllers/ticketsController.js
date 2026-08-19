@@ -608,7 +608,13 @@ function mapTicket(ticket, { printed = false, omitReceipt = false } = {}) {
   const snapshotSelections =
     normalSelections.length === 0 ? mapSnapshotSelections(ticket) : [];
 
-  const taxBreakdown = ticketWinningsTaxBreakdown(ticket);
+  const cashbackAmount =
+    Number(ticket.cashback_amount) > 0 ? Number(ticket.cashback_amount) : 0;
+  const isCashbackTicket =
+    cashbackAmount > 0 && String(ticket.status || "").toUpperCase() !== "WON";
+  const taxBreakdown = isCashbackTicket
+    ? { taxAmount: 0, netPayout: cashbackAmount }
+    : ticketWinningsTaxBreakdown(ticket);
   const resolvedSelections =
     normalSelections.length > 0 ? normalSelections : snapshotSelections;
 
@@ -626,13 +632,17 @@ function mapTicket(ticket, { printed = false, omitReceipt = false } = {}) {
     stake: ticket.stake,
     totalOdds: ticket.total_odds,
     accumulatorBonusPercent: Number(ticket.accumulator_bonus_percent) || 0,
-    potentialWin: ticket.potential_win,
-    applyWinningsTax: Boolean(ticket.apply_winnings_tax),
+    potentialWin: isCashbackTicket ? cashbackAmount : ticket.potential_win,
+    applyWinningsTax: isCashbackTicket
+      ? false
+      : Boolean(ticket.apply_winnings_tax),
     winningsTaxRate: ticket.winnings_tax_rate ?? null,
     winningsTaxAmount: taxBreakdown.taxAmount,
     netPayout: taxBreakdown.netPayout,
     payoutSummary: buildPayoutSummary(resolvedSelections),
     status: ticket.status,
+    cashbackAmount,
+    cashbackPaid: Boolean(ticket.cashback_paid_at),
     createdAt: ticket.created_at,
     printed,
     selections: resolvedSelections,
@@ -749,7 +759,13 @@ function mapPublicCouponPayload(ticket) {
           };
         });
 
-  const taxBreakdown = ticketWinningsTaxBreakdown(ticket);
+  const cashbackAmount =
+    Number(ticket.cashback_amount) > 0 ? Number(ticket.cashback_amount) : 0;
+  const isCashbackTicket =
+    cashbackAmount > 0 && String(ticket.status || "").toUpperCase() !== "WON";
+  const taxBreakdown = isCashbackTicket
+    ? { taxAmount: 0, netPayout: cashbackAmount }
+    : ticketWinningsTaxBreakdown(ticket);
 
   return {
     couponNumber: ticket.coupon_number,
@@ -757,11 +773,14 @@ function mapPublicCouponPayload(ticket) {
     status: ticket.status,
     stake: ticket.stake,
     totalOdds: ticket.total_odds,
-    potentialWin: ticket.potential_win,
-    applyWinningsTax: Boolean(ticket.apply_winnings_tax),
+    potentialWin: isCashbackTicket ? cashbackAmount : ticket.potential_win,
+    applyWinningsTax: isCashbackTicket
+      ? false
+      : Boolean(ticket.apply_winnings_tax),
     winningsTaxRate: ticket.winnings_tax_rate ?? null,
     winningsTaxAmount: taxBreakdown.taxAmount,
     netPayout: taxBreakdown.netPayout,
+    cashbackAmount,
     selections: selectionLegs,
   };
 }
@@ -959,7 +978,13 @@ function mapPublicCouponCheckPayload(ticket, cashbackAmount = null) {
       : cashbackAmount != null && Number(cashbackAmount) > 0
         ? Number(cashbackAmount)
         : null;
-  const taxBreakdown = ticketWinningsTaxBreakdown(ticket);
+  const isCashbackTicket =
+    credited != null &&
+    credited > 0 &&
+    String(ticket.status || "").toUpperCase() !== "WON";
+  const taxBreakdown = isCashbackTicket
+    ? { taxAmount: 0, netPayout: credited }
+    : ticketWinningsTaxBreakdown(ticket);
 
   return {
     couponNumber: ticket.coupon_number,
@@ -968,7 +993,7 @@ function mapPublicCouponCheckPayload(ticket, cashbackAmount = null) {
     createdAt: ticket.created_at,
     stake: ticket.stake,
     totalOdds: ticket.total_odds,
-    potentialWin: ticket.potential_win,
+    potentialWin: isCashbackTicket ? credited : ticket.potential_win,
     netPayout: taxBreakdown.netPayout,
     selections: selectionLegs,
     cashbackAmount: credited,
@@ -2920,9 +2945,9 @@ export async function payoutTicket(req, res) {
 /**
  * PATCH /api/tickets/:id/cashback-payout
  * Body: { cashierId?: string } — required for non-cashier roles; cashiers use their profile.
- * Redeems stored offline cashback on a LOST ticket. Credits the selling cashier's
+ * Redeems stored offline cashback on a REFUND ticket. Credits the selling cashier's
  * wallet (reimbursement) and records BONUS ref `cashback-payout:<ticketId>`.
- * Ticket status stays LOST.
+ * Ticket status becomes PAID (same as a WON payout).
  */
 export async function cashbackPayoutTicket(req, res) {
   try {
@@ -2949,9 +2974,9 @@ export async function cashbackPayoutTicket(req, res) {
       return res.status(404).json({ message: "Ticket not found" });
     }
 
-    if (ticket.status !== "LOST") {
+    if (ticket.status !== "REFUND") {
       return res.status(400).json({
-        message: "Only LOST tickets can redeem cashback",
+        message: "Only REFUND tickets can redeem cashback",
       });
     }
 
@@ -3044,20 +3069,25 @@ export async function cashbackPayoutTicket(req, res) {
           },
         });
 
+        const paymentReceiptNumber =
+          ticket.payment_receipt_number ??
+          (await reserveUniquePaymentReceiptNumber(tx));
         const cashbackReceiptNumber =
-          ticket.cashback_receipt_number ??
-          (await reserveUniqueCashbackReceiptNumber(tx));
+          ticket.cashback_receipt_number ?? paymentReceiptNumber;
         const paidAt = new Date();
 
         const { count } = await tx.ticket.updateMany({
           where: {
             id: ticket.id,
-            status: "LOST",
-            cashback_paid_at: null,
+            status: "REFUND",
           },
           data: {
+            status: "PAID",
+            paid_at: paidAt,
+            payment_receipt_number: paymentReceiptNumber,
             cashback_paid_at: paidAt,
             cashback_receipt_number: cashbackReceiptNumber,
+            potential_win: cashbackAmount,
           },
         });
         if (count === 0) {
@@ -3107,7 +3137,7 @@ export async function cashbackPayoutTicket(req, res) {
         cashback_paid_at: null,
       },
       after: {
-        status: "LOST",
+        status: "PAID",
         cashback_amount: result.cashbackAmount,
         cashback_paid_at: true,
         cashierWalletBalance: result.walletBalance,

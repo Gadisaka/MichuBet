@@ -16,6 +16,7 @@ import {
 
 const TICKET_STATUS_CLS = {
   won: "coupon-receipt__ticket-status--won",
+  refund: "coupon-receipt__ticket-status--won",
   lost: "coupon-receipt__ticket-status--lost",
   pending: "coupon-receipt__ticket-status--pending",
   cancelled: "coupon-receipt__ticket-status--cancelled",
@@ -96,11 +97,14 @@ function SummaryStat({ label, value, highlight = false }) {
 function SingleTicketCard({ ticket, className = "" }) {
   if (!ticket) return null;
   const selections = ticket.selections || [];
-  const ticketStatus = mapTicketUiStatus(ticket.status);
+  const ticketStatus = mapTicketUiStatus(ticket.status, {
+    cashbackAmount: ticket.cashbackAmount,
+  });
   const rawStatus = String(ticket.status || "").toUpperCase();
-  const isWon = rawStatus === "WON" || rawStatus === "PAID";
-  const isPaid = rawStatus === "PAID";
   const cashbackLabel = formatCashbackEtb(ticket.cashbackAmount);
+  const isWon =
+    (rawStatus === "WON" || rawStatus === "PAID") && !cashbackLabel;
+  const isPaid = rawStatus === "PAID";
   const payout = wonAmount(ticket);
   const payoutLabel = payout != null ? formatEtb(payout) : null;
 

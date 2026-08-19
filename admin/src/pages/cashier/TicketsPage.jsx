@@ -18,6 +18,7 @@ import {
   useCouponLookupMutation,
   useExecuteCashoutMutation,
   usePayoutTicketMutation,
+  useCashbackPayoutMutation,
   usePreparePrintTicketMutation,
   useReceiptLookupMutation,
   useRemoveTicketSelectionMutation,
@@ -160,6 +161,13 @@ function TicketStatusBadge({ status }) {
       </span>
     );
   }
+  if (normalized === "REFUND") {
+    return (
+      <span className="rounded-sm bg-amber-500/15 px-2 py-0.5 text-xs font-semibold uppercase tracking-wide text-amber-700">
+        Refund
+      </span>
+    );
+  }
   if (normalized === "EXPIRED") {
     return (
       <span className="rounded-sm bg-[var(--surfaceMuted)] px-2 py-0.5 text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
@@ -168,6 +176,11 @@ function TicketStatusBadge({ status }) {
     );
   }
   return <span className="font-mono">{normalized || "-"}</span>;
+}
+
+function isPayoutEligibleStatus(status) {
+  const normalized = String(status || "").toUpperCase();
+  return normalized === "WON" || normalized === "REFUND";
 }
 
 function isFirstSaleTicket(ticket) {
@@ -187,7 +200,10 @@ function TicketSummary({
     ticket.potentialWin,
     ticket,
   );
-  const showTax = tax != null && tax > 0;
+  const skipTax =
+    String(ticket.status || "").toUpperCase() === "REFUND" ||
+    Number(ticket.cashbackAmount) > 0;
+  const showTax = !skipTax && tax != null && tax > 0;
   const taxLabel = formatTaxLineLabel(ticket, platformWinningsTax);
 
   return (
@@ -520,6 +536,7 @@ export default function CashierTicketsPage() {
   const loadTicketById = useTicketByIdLookupMutation();
   const cancelTicket = useCancelTicketMutation();
   const payoutTicketMutation = usePayoutTicketMutation();
+  const cashbackPayoutMutation = useCashbackPayoutMutation();
   const cashoutQuoteMutation = useCashoutQuoteMutation();
   const executeCashoutMutation = useExecuteCashoutMutation();
   const confirmPrint = useConfirmPrintedTicketMutation();
@@ -623,6 +640,7 @@ export default function CashierTicketsPage() {
     loadTicketById.isPending ||
     cancelTicket.isPending ||
     payoutTicketMutation.isPending ||
+    cashbackPayoutMutation.isPending ||
     cashoutQuoteMutation.isPending ||
     executeCashoutMutation.isPending ||
     confirmPrint.isPending ||
@@ -1018,10 +1036,18 @@ export default function CashierTicketsPage() {
     if (!payoutTicket) return;
     setPayoutError("");
     try {
-      const response = await payoutTicketMutation.mutateAsync({
-        ticketId: payoutTicket.id,
-      });
-      setActionSuccess(response?.message || "Ticket payout completed");
+      const isCashback = String(payoutTicket.status).toUpperCase() === "REFUND";
+      const response = isCashback
+        ? await cashbackPayoutMutation.mutateAsync({
+            ticketId: payoutTicket.id,
+          })
+        : await payoutTicketMutation.mutateAsync({
+            ticketId: payoutTicket.id,
+          });
+      setActionSuccess(
+        response?.message ||
+          (isCashback ? "Cashback payout completed" : "Ticket payout completed"),
+      );
       if (response?.ticket) {
         setPayoutTicket(response.ticket);
       } else {
@@ -1582,7 +1608,7 @@ export default function CashierTicketsPage() {
                         disabled={
                           isBusy ||
                           (payoutAction === "payout" &&
-                            payoutTicket.status !== "WON") ||
+                            !isPayoutEligibleStatus(payoutTicket.status)) ||
                           (payoutAction === "cashout" &&
                             payoutQuote &&
                             !payoutQuote.allowed)
@@ -1630,10 +1656,11 @@ export default function CashierTicketsPage() {
                       Current status:{" "}
                       <TicketStatusBadge status={payoutTicket.status} />
                       {payoutAction === "payout" &&
-                        payoutTicket.status !== "WON" && (
+                        !isPayoutEligibleStatus(payoutTicket.status) && (
                           <>
                             {" "}
-                            &middot; Payout is only available for WON tickets.
+                            &middot; Payout is only available for WON or REFUND
+                            tickets.
                           </>
                         )}
                       {payoutAction === "cancel" &&

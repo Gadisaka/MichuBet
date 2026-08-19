@@ -200,24 +200,28 @@ export function pickCashbackTier(result, tiers, mode = "inclusive") {
 }
 
 /**
- * Count LOST legs and sum their odds (v3 divisor).
+ * Count LOST legs and multiply their odds (v3 divisor).
+ *
+ * Sequential division `total ÷ lost1 ÷ lost2 ÷ lost3` is the same as
+ * `total / product(lost-leg odds)`. A single lost leg is unchanged
+ * versus a sum divisor.
  *
  * @param {Array<{ result?: string, odds?: number }>} selections
- * @returns {{ count: number, sumOdds: number }}
+ * @returns {{ count: number, productOdds: number }}
  */
-export function sumLostOdds(selections) {
+export function productLostOdds(selections) {
   let count = 0;
-  let sumOdds = 0;
-  if (!Array.isArray(selections)) return { count, sumOdds };
+  let productOdds = 1;
+  if (!Array.isArray(selections)) return { count: 0, productOdds: 0 };
   for (const sel of selections) {
     if (!sel) continue;
     if (String(sel.result ?? "").toUpperCase() !== "LOST") continue;
     const o = Number(sel.odds);
     if (!Number.isFinite(o) || o <= 0) continue;
     count += 1;
-    sumOdds += o;
+    productOdds *= o;
   }
-  return { count, sumOdds };
+  return { count, productOdds: count > 0 ? productOdds : 0 };
 }
 
 /**
@@ -455,7 +459,8 @@ export function evaluateCashback({
 }
 
 /**
- * Multi-track cashback (v3). Ratio = totalOdds / sum(lost leg odds).
+ * Multi-track cashback (v3). Ratio = totalOdds / product(lost leg odds)
+ * (i.e. divide total odds by each lost-leg odd in turn).
  * Exact lost-leg count 1|2|3 selects the track; 4+ pays nothing.
  *
  * @param {Object} p
@@ -502,8 +507,9 @@ export function evaluateCashbackV3({
   );
   if (hasPending) return cashbackFail("legs_pending");
 
-  const { count: lostCount, sumOdds: lostSum } = sumLostOdds(selections);
-  if (lostCount <= 0 || lostSum <= 0) return cashbackFail("no_lost_leg");
+  const { count: lostCount, productOdds: lostProduct } =
+    productLostOdds(selections);
+  if (lostCount <= 0 || lostProduct <= 0) return cashbackFail("no_lost_leg");
   if (lostCount < 1 || lostCount > 3) {
     return cashbackFail("unsupported_lost_count");
   }
@@ -537,7 +543,7 @@ export function evaluateCashbackV3({
     return cashbackFail("invalid_total_odds");
   }
 
-  const result = totalOdds / lostSum;
+  const result = totalOdds / lostProduct;
   const tier = pickCashbackTier(result, track.tiers, "halfOpen");
   if (!tier) return cashbackFail("no_matching_tier");
 
@@ -694,10 +700,11 @@ export async function applyDepositBonusesInTx(tx, p) {
 /**
  * Evaluate cashback on a LOST ticket.
  *
- * - Online (user_id set, no cashier print): credit player wallet and persist
- *   `cashback_amount` on the ticket.
- * - Offline (cashier-printed or no user): persist `cashback_amount` only;
- *   cashier redeems later via `cashback-payout:<ticketId>`.
+ * - Online (user_id set, no cashier print): credit player wallet, persist
+ *   `cashback_amount` / `potential_win`, and mark the ticket PAID.
+ * - Offline (cashier-printed or no user): persist `cashback_amount` /
+ *   `potential_win` and set status REFUND; cashier redeems later via
+ *   `cashback-payout:<ticketId>`.
  *
  * @param {import("@prisma/client").Prisma.TransactionClient} tx
  * @param {string} ticketId
@@ -759,12 +766,15 @@ export async function creditCashbackOnLostTicketInTx(tx, ticketId) {
   });
   if (amount <= 0) return { credited: false, reason: "not_eligible" };
 
-  await tx.ticket.update({
-    where: { id: ticketId },
-    data: { cashback_amount: amount },
-  });
-
   if (isOffline) {
+    await tx.ticket.update({
+      where: { id: ticketId },
+      data: {
+        cashback_amount: amount,
+        potential_win: amount,
+        status: "REFUND",
+      },
+    });
     return { credited: false, stored: true, amount, reason: "offline_pending" };
   }
 
@@ -772,6 +782,14 @@ export async function creditCashbackOnLostTicketInTx(tx, ticketId) {
     where: { user_id: ticket.user_id, wallet_type: "PLAYER" },
   });
   if (!wallet) {
+    await tx.ticket.update({
+      where: { id: ticketId },
+      data: {
+        cashback_amount: amount,
+        potential_win: amount,
+        status: "REFUND",
+      },
+    });
     return { credited: false, stored: true, amount, reason: "no_wallet" };
   }
 
@@ -779,6 +797,17 @@ export async function creditCashbackOnLostTicketInTx(tx, ticketId) {
     walletId: wallet.id,
     amount,
     reference: cashbackBonusRef(ticketId),
+  });
+  const paidAt = new Date();
+  await tx.ticket.update({
+    where: { id: ticketId },
+    data: {
+      cashback_amount: amount,
+      potential_win: amount,
+      status: "PAID",
+      cashback_paid_at: paidAt,
+      paid_at: paidAt,
+    },
   });
   return { ...credit, amount, stored: true };
 }

@@ -47,7 +47,7 @@ export const PRESET_BONUSES = [
     percentage: 0,
     // Multi-track (v3): payout = stake × multiplier where multiplier comes
     // from the track matching exact lost-leg count (1|2|3). Ratio =
-    // total_odds / sum(lost-leg odds). Offline tickets store amount for
+    // total_odds / product(lost-leg odds) (sequential division). Offline tickets store amount for
     // cashier redemption.
     rules: {
       maxHours: 48,

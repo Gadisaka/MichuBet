@@ -58,8 +58,8 @@ function seedOfflineCashbackTicket({
     branch_location: "L",
     stake: 10,
     total_odds: 80,
-    potential_win: 0,
-    status: "LOST",
+    potential_win: amount,
+    status: "REFUND",
     created_at: new Date(),
     cashback_amount: amount,
     cashback_paid_at: paidAt,
@@ -111,7 +111,10 @@ test("cashbackPayoutTicket credits cashier wallet and marks paid", async () => {
   const ticket = store.ticket.get(ticketId);
   assert.ok(ticket.cashback_paid_at);
   assert.ok(ticket.cashback_receipt_number);
-  assert.equal(ticket.status, "LOST");
+  assert.equal(ticket.status, "PAID");
+  assert.ok(ticket.paid_at);
+  assert.ok(ticket.payment_receipt_number);
+  assert.equal(ticket.potential_win, 20);
   const bonus = [...store.transaction.values()].find(
     (t) => t.reference === `cashback-payout:${ticketId}`,
   );
@@ -161,4 +164,21 @@ test("cashbackPayoutTicket blocks double redemption", async () => {
   await cashbackPayoutTicket(req, res);
   assert.equal(res.statusCode, 409);
   assert.equal(res.body?.code, "already_paid");
+});
+
+test("cashbackPayoutTicket rejects LOST tickets without REFUND status", async () => {
+  resetStore();
+  const { ticketId, cashierId } = seedOfflineCashbackTicket();
+  getStore().ticket.get(ticketId).status = "LOST";
+  const req = {
+    params: { id: ticketId },
+    body: { cashierId },
+    user: { role: "ADMIN", sub: "admin-1" },
+    headers: {},
+    method: "PATCH",
+    originalUrl: `/api/tickets/${ticketId}/cashback-payout`,
+  };
+  const res = mockRes();
+  await cashbackPayoutTicket(req, res);
+  assert.equal(res.statusCode, 400);
 });

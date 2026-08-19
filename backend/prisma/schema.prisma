@@ -45,6 +45,7 @@ enum TicketStatus {
   PRINTED
   WON
   LOST
+  REFUND
   VOID
   CANCELED
   PAID

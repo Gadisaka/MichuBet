@@ -4,7 +4,7 @@
 **Last reviewed:** 2026-08-07
 
 > This document describes the earlier single-track v2 plan. Live rules are now
-> three lost-leg tracks with sum divisor, caps, 48h window, and offline
+> three lost-leg tracks with product (sequential) divisor, caps, 48h window, and offline
 > cashier redemption. Do not implement from this file.
 
 ---

@@ -6,10 +6,16 @@ import { classifyLegStatus } from "./legResultStatus";
 
 /**
  * @param {string|undefined|null} rawStatus
- * @returns {{ key: 'won'|'lost'|'pending'|'cancelled', label: string }}
+ * @param {{ cashbackAmount?: number|null }} [opts]
+ * @returns {{ key: 'won'|'lost'|'pending'|'cancelled'|'refund', label: string }}
  */
-export function mapTicketUiStatus(rawStatus) {
+export function mapTicketUiStatus(rawStatus, opts = {}) {
   const key = String(rawStatus || "").toUpperCase();
+  const cashback = Number(opts.cashbackAmount);
+  const hasCashback = Number.isFinite(cashback) && cashback > 0;
+  if (key === "REFUND" || (hasCashback && (key === "PAID" || key === "LOST"))) {
+    return { key: "refund", label: "REFUND" };
+  }
   if (key === "WON" || key === "PAID") {
     return { key: "won", label: "WON" };
   }
