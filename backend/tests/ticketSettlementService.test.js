@@ -839,14 +839,15 @@ test("PENDING legs on terminal tickets (LOST/EXPIRED) are VOIDed so the fixture 
   assert.equal(summary.pendingLegsRemaining, 0);
   assert.equal(summary.gradingCompleted, true);
 
-  // Both legs are resolved (non-pending) to VOID with the terminal reason.
+  // EXPIRED leftover legs VOID so the fixture can complete. Already-LOST
+  // tickets still get a market grade (needed for deferred cashback) but
+  // the dead ticket itself is not recomputed or paid.
   const legLost = store.ticketSelection.get("sel-lost");
   const legExp = store.ticketSelection.get("sel-exp");
   assert.notEqual(legLost.result, SELECTION_RESULT.PENDING);
   assert.notEqual(legExp.result, SELECTION_RESULT.PENDING);
-  assert.equal(legLost.result, SELECTION_RESULT.VOID);
+  assert.equal(legLost.result, SELECTION_RESULT.WON);
   assert.equal(legExp.result, SELECTION_RESULT.VOID);
-  assert.equal(legLost.result_meta?.reason, "ticket_terminal");
   assert.equal(legExp.result_meta?.reason, "ticket_terminal");
 
   // The dead tickets are untouched: status, payout, refund all unchanged.
@@ -1154,4 +1155,56 @@ test("v3 online LOST ticket credits wallet and persists cashback_amount", async 
   assert.equal(bonusTx.reference, "bonus:cashback:tk-on");
   assert.equal(bonusTx.amount, 20);
   assert.equal(store.wallet.get("w-on").balance, 20);
+});
+
+test("settleFixture grades and pays across multiple $transaction chunks", async () => {
+  resetStore();
+  seedFixture({ id: "fx-chunk", status: "FT", homeScore: 2, awayScore: 0 });
+  for (let i = 1; i <= 3; i++) {
+    seedTicket({
+      id: `tk-chunk-${i}`,
+      userId: `user-chunk-${i}`,
+      stake: 10,
+      totalOdds: 2,
+    });
+    seedSelection({
+      id: `sel-chunk-${i}`,
+      ticketId: `tk-chunk-${i}`,
+      fixtureId: "fx-chunk",
+      selection: "1",
+      marketCode: "MATCH_WINNER",
+      odds: 2,
+    });
+    seedWallet({ id: `w-chunk-${i}`, userId: `user-chunk-${i}`, balance: 0 });
+  }
+
+  const originalTx = prisma.$transaction.bind(prisma);
+  let txCalls = 0;
+  prisma.$transaction = async (...args) => {
+    txCalls += 1;
+    return originalTx(...args);
+  };
+
+  try {
+    const summary = await settlement.settleFixture("fx-chunk");
+    assert.equal(summary.skipped, undefined);
+    assert.equal(summary.selectionsUpdated, 3);
+    assert.equal(summary.ticketsWon, 3);
+    assert.equal(summary.payoutsCredited, 3);
+    assert.equal(summary.pendingLegsRemaining, 0);
+    assert.equal(summary.gradingCompleted, true);
+    assert.ok(
+      txCalls >= 2,
+      `expected chunked settlement (>=2 transactions), got ${txCalls}`,
+    );
+
+    const store = getStore();
+    assert.ok(store.fixture.get("fx-chunk").grading_completed_at instanceof Date);
+    for (let i = 1; i <= 3; i++) {
+      assert.equal(store.ticket.get(`tk-chunk-${i}`).status, "PAID");
+      assert.equal(store.wallet.get(`w-chunk-${i}`).balance, 20);
+    }
+  } finally {
+    prisma.$transaction = originalTx;
+  }
 });
