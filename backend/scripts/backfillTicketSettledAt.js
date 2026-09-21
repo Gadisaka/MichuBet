@@ -13,6 +13,11 @@ import { prisma } from "../Config/db.js";
 const TERMINAL_STATUSES = ["WON", "LOST", "VOID", "PAID", "REFUND", "CASHED_OUT"];
 const CHUNK = 50;
 
+/** Mongo docs created before the column exist with the field unset, not null. */
+const UNSET_SETTLED_AT = {
+  OR: [{ settled_at: null }, { settled_at: { isSet: false } }],
+};
+
 function later(current, candidate) {
   if (!(candidate instanceof Date) || Number.isNaN(candidate.getTime())) {
     return current;
@@ -33,7 +38,7 @@ function refsFor(ticketId) {
 async function main() {
   const tickets = await prisma.ticket.findMany({
     where: {
-      settled_at: null,
+      ...UNSET_SETTLED_AT,
       status: { in: TERMINAL_STATUSES },
     },
     select: {
@@ -117,7 +122,7 @@ async function main() {
         continue;
       }
       const { count } = await prisma.ticket.updateMany({
-        where: { id: ticket.id, settled_at: null },
+        where: { id: ticket.id, ...UNSET_SETTLED_AT },
         data: { settled_at: chosen },
       });
       if (count > 0) updated += 1;
