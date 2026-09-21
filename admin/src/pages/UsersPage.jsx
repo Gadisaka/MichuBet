@@ -8,6 +8,7 @@ import SelectInput from "../components/ui/SelectInput";
 import PrimaryButton from "../components/ui/PrimaryButton";
 import Modal from "../components/ui/Modal";
 import UserForm from "../components/users/UserForm";
+import PlayerBetsPanel from "../components/users/PlayerBetsPanel";
 import { useUsersQuery, useUsersMetaQuery } from "../hook/useUsersQuery";
 import { useCreateUserMutation, useUpdateUserMutation } from "../hook/useUserMutations";
 import { ROLE_LABELS } from "../constants/auth";
@@ -37,6 +38,7 @@ export default function UsersPage() {
 
   const [modalMode, setModalMode] = useState(null); // "create" | "edit" | null
   const [editingUser, setEditingUser] = useState(null);
+  const [betsPlayer, setBetsPlayer] = useState(null);
 
   function openCreate() {
     setEditingUser(null);
@@ -84,6 +86,7 @@ export default function UsersPage() {
               onClick={() => {
                 setActiveTab("staff");
                 setPage(1);
+                setBetsPlayer(null);
               }}
               className={`rounded-sm px-3 py-1.5 text-xs font-semibold ${
                 activeTab === "staff"
@@ -203,13 +206,24 @@ export default function UsersPage() {
                     </span>
                   </td>
                   <td className="px-4 py-3 text-right">
-                    <button
-                      type="button"
-                      onClick={() => openEdit(u)}
-                      className="rounded-sm border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1 text-xs font-semibold text-[var(--accent)]"
-                    >
-                      Edit
-                    </button>
+                    <div className="flex justify-end gap-2">
+                      {activeTab === "players" ? (
+                        <button
+                          type="button"
+                          onClick={() => setBetsPlayer(u)}
+                          className="rounded-sm border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1 text-xs font-semibold text-[var(--text)]"
+                        >
+                          View bets
+                        </button>
+                      ) : null}
+                      <button
+                        type="button"
+                        onClick={() => openEdit(u)}
+                        className="rounded-sm border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1 text-xs font-semibold text-[var(--accent)]"
+                      >
+                        Edit
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -259,6 +273,11 @@ export default function UsersPage() {
           currentUserRole={user?.role}
         />
       </Modal>
+      <PlayerBetsPanel
+        key={betsPlayer?.id ?? "closed"}
+        player={betsPlayer}
+        onClose={() => setBetsPlayer(null)}
+      />
     </AdminShell>
   );
 }

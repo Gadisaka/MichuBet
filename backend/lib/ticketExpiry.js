@@ -1,5 +1,6 @@
 /**
- * Unpaid prebook tickets expire at the earliest leg kickoff.
+ * Unpaid prebook tickets expire when every remaining leg has kicked off.
+ * Mixed slips stay OPEN so cashiers can drop started games and print the rest.
  * Shared helpers for the expiry job, settlement guards, and API flows.
  *
  * @module lib/ticketExpiry
@@ -28,28 +29,33 @@ function selectionKickoffTime(selection) {
   );
 }
 
-/**
- * @param {{ selections?: Array<unknown>, selection_snapshot?: unknown }} ticket
- * @returns {Date | null}
- */
-export function getEarliestKickoff(ticket) {
+function listSelectionKickoffs(ticket) {
   const selections = ticket?.selections || [];
   const snapshot = Array.isArray(ticket?.selection_snapshot)
     ? ticket.selection_snapshot
     : [];
   const count = Math.max(selections.length, snapshot.length);
-
-  let earliest = null;
+  const kickoffs = [];
   for (let i = 0; i < count; i++) {
     const kickoff = parseKickoff(
       selectionKickoffTime(selections[i]) ||
         (snapshot[i]?.kickoffAt != null ? snapshot[i].kickoffAt : null),
     );
-    if (kickoff && (!earliest || kickoff < earliest)) {
-      earliest = kickoff;
-    }
+    if (kickoff) kickoffs.push(kickoff);
   }
-  return earliest;
+  return { count, kickoffs };
+}
+
+/**
+ * @param {{ selections?: Array<unknown>, selection_snapshot?: unknown }} ticket
+ * @returns {Date | null}
+ */
+export function getEarliestKickoff(ticket) {
+  const { kickoffs } = listSelectionKickoffs(ticket);
+  if (kickoffs.length === 0) return null;
+  return kickoffs.reduce((earliest, kickoff) =>
+    kickoff < earliest ? kickoff : earliest,
+  );
 }
 
 /**
@@ -67,9 +73,24 @@ export function isUnpaidOpenTicket(ticket) {
  */
 export function shouldExpireUnpaidTicket(ticket, now = new Date()) {
   if (!isUnpaidOpenTicket(ticket)) return false;
-  const earliest = getEarliestKickoff(ticket);
-  if (!earliest) return false;
-  return now >= earliest;
+  const { count, kickoffs } = listSelectionKickoffs(ticket);
+  if (count === 0 || kickoffs.length === 0) return false;
+  // Missing kickoff on any remaining leg — do not expire the whole coupon.
+  if (kickoffs.length < count) return false;
+  return kickoffs.every((kickoff) => now >= kickoff);
+}
+
+/**
+ * Unpaid EXPIRED drafts that still have a future leg can be sold after the
+ * cashier drops the started games.
+ *
+ * @param {{ status?: string, receipt_number?: string | null, selections?: Array<unknown>, selection_snapshot?: unknown }} ticket
+ * @param {Date} [now]
+ */
+export function shouldReopenExpiredUnpaidTicket(ticket, now = new Date()) {
+  if (ticket?.status !== "EXPIRED") return false;
+  if (String(ticket?.receipt_number || "").trim()) return false;
+  return !shouldExpireUnpaidTicket({ ...ticket, status: "OPEN" }, now);
 }
 
 /**
@@ -146,13 +167,25 @@ export function applyReportableTicketFilter(where, statusFilter = "") {
 }
 
 /**
- * Flip OPEN unpaid ticket to EXPIRED when kickoff has passed.
+ * Flip OPEN unpaid ticket to EXPIRED when every remaining leg has kicked off.
+ * Reopen unpaid EXPIRED drafts that still have a future printable leg.
  *
  * @param {import("@prisma/client").PrismaClient | import("@prisma/client").Prisma.TransactionClient} client
  * @param {{ id: string, status?: string, receipt_number?: string | null, selections?: Array<unknown>, selection_snapshot?: unknown }} ticket
  * @param {Date} [now]
  */
 export async function expireTicketIfDue(client, ticket, now = new Date()) {
+  if (shouldReopenExpiredUnpaidTicket(ticket, now)) {
+    const { count } = await client.ticket.updateMany({
+      where: { id: ticket.id, status: "EXPIRED" },
+      data: { status: "OPEN" },
+    });
+    if (count === 0) {
+      const fresh = await client.ticket.findUnique({ where: { id: ticket.id } });
+      return fresh || ticket;
+    }
+    return { ...ticket, status: "OPEN" };
+  }
   if (ticket?.status === "EXPIRED") return ticket;
   if (!shouldExpireUnpaidTicket(ticket, now)) return ticket;
 

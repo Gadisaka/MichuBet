@@ -482,6 +482,8 @@ model Ticket {
   selection_snapshot  Json?
   status              TicketStatus @default(OPEN)
   created_at          DateTime     @default(now())
+  /** First transition to WON, LOST, or VOID. Payout reports use this, not created_at. */
+  settled_at               DateTime?
   /** Computed cashback on LOST (online credited immediately; offline claimable). */
   cashback_amount          Float     @default(0)
   cashback_paid_at         DateTime?
@@ -499,6 +501,7 @@ model Ticket {
   @@index([payment_receipt_number])
   @@index([idempotency_key])
   @@index([cashback_receipt_number])
+  @@index([settled_at])
   @@map("tickets")
 }
 

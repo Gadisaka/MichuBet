@@ -44,6 +44,8 @@ const EMPTY_SHOP = {
   totalWithdrawAmount: 0,
   totalPaidTickets: 0,
   totalPaidAmount: 0,
+  totalCashbackTickets: 0,
+  totalCashbackAmount: 0,
   grandNet: 0,
 };
 
@@ -70,6 +72,8 @@ export default function ShopReportSummary({ shop, loading, error }) {
       <StatCard title="Total Withdraw Amount" value={fmtMoney(s.totalWithdrawAmount)} />
       <StatCard title="Total paid tickets" value={fmtCount(s.totalPaidTickets)} isCount />
       <StatCard title="Total paid amount" value={fmtMoney(s.totalPaidAmount)} />
+      <StatCard title="Cashback paid tickets" value={fmtCount(s.totalCashbackTickets)} isCount />
+      <StatCard title="Cashback paid" value={fmtMoney(s.totalCashbackAmount)} />
       <div className="sm:col-span-2">
         <StatCard title="Grand Net" value={fmtMoney(s.grandNet)} />
       </div>

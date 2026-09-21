@@ -15,8 +15,11 @@ import {
   cancelPlayerTicket,
 } from "../services/api";
 import { usePlatformSettings } from "../hooks/usePlatformSettings";
+import { accountGhostBtn } from "../components/common/accountFormClasses";
 import { playerOnlineCancelEligible } from "../utils/ticketCancelUi";
 import { taxLabelForBetHistory } from "../utils/winningsTax";
+
+const BET_HISTORY_PAGE_SIZE = 20;
 
 const STATUS_STYLES = {
   pending: "bg-(--sb-accent-surface) text-[#F6AF01]",
@@ -151,44 +154,41 @@ function BetCard({
         </div>
       </button>
 
-      <div
-        className={`overflow-hidden transition-all duration-300 ${
-          expanded ? "max-h-[800px] opacity-100" : "max-h-0 opacity-0"
-        }`}
-      >
-        <div className="border-t border-white/8 bg-[#0a0a0a]/25">
-          {bet.selections.map((sel, i) => {
-            const kickoffLabel = formatDateTimeEnGB(sel.matchStartTime);
-            return (
-              <div
-                key={i}
-                className="flex items-center justify-between gap-3 border-b border-b-[#2a2f45]/80 px-4 py-3 last:border-b-0"
-              >
-                <div className="min-w-0 flex-1">
-                  <div className="text-[13px] font-bold text-[#ffffff]">
-                    {sel.matchName}
-                  </div>
-                  {kickoffLabel ? (
-                    <div className="mt-0.5 text-[11px] text-[rgba(255,255,255,0.5)]">
-                      {kickoffLabel}
+      {expanded ? (
+        <div>
+          <div className="max-h-[min(55vh,28rem)] overflow-y-auto overscroll-y-contain border-t border-white/8 bg-[#0a0a0a]/25 [-webkit-overflow-scrolling:touch]">
+            {bet.selections.map((sel, i) => {
+              const kickoffLabel = formatDateTimeEnGB(sel.matchStartTime);
+              return (
+                <div
+                  key={i}
+                  className="flex items-center justify-between gap-3 border-b border-b-[#2a2f45]/80 px-4 py-3 last:border-b-0"
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="text-[13px] font-bold text-[#ffffff]">
+                      {sel.matchName}
                     </div>
-                  ) : null}
-                  <div className="mt-0.5 text-[11px] text-[rgba(255,255,255,0.72)]">
-                    {sel.marketLabel}: {sel.label}
+                    {kickoffLabel ? (
+                      <div className="mt-0.5 text-[11px] text-[rgba(255,255,255,0.5)]">
+                        {kickoffLabel}
+                      </div>
+                    ) : null}
+                    <div className="mt-0.5 text-[11px] text-[rgba(255,255,255,0.72)]">
+                      {sel.marketLabel}: {sel.label}
+                    </div>
+                  </div>
+                  <div className="flex shrink-0 flex-col items-end gap-0.5">
+                    <span className="text-sm font-extrabold leading-none text-(--sb-positive)">
+                      {sel.odds}
+                    </span>
+                    <SelectionResultDot result={sel.result} />
                   </div>
                 </div>
-                <div className="flex shrink-0 flex-col items-end gap-0.5">
-                  <span className="text-sm font-extrabold leading-none text-(--sb-positive)">
-                    {sel.odds}
-                  </span>
-                  <SelectionResultDot result={sel.result} />
-                </div>
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
 
-        <div className="border-t border-white/8 px-4 py-4">
+          <div className="border-t border-white/8 px-4 py-4">
           <div className="flex flex-col gap-2">
             <div className="flex justify-between rounded-xl bg-[#0a0a0a]/35 px-3 py-2 ">
               <span className="text-xs text-[rgba(255,255,255,0.72)]">Stake</span>
@@ -229,7 +229,7 @@ function BetCard({
               </span>
             </div>
           </div>
-          {expanded && cancelEligibleUi ? (
+          {cancelEligibleUi ? (
             <div className="mt-4 border-t border-white/8 pt-4">
               <button
                 type="button"
@@ -251,7 +251,7 @@ function BetCard({
               </p>
             </div>
           ) : null}
-          {expanded && canAttemptCashout && (
+          {canAttemptCashout && (
             <div className="mt-4 border-t border-white/8 pt-4">
               <div className="flex flex-wrap items-center gap-2">
                 <button
@@ -286,8 +286,9 @@ function BetCard({
               ) : null}
             </div>
           )}
+          </div>
         </div>
-      </div>
+      ) : null}
     </div>
   );
 }
@@ -296,6 +297,9 @@ function BetHistory() {
   const navigate = useNavigate();
   const { ticketCancelWindowMinutes, winningsTax } = usePlatformSettings();
   const [bets, setBets] = useState([]);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [quoteByTicket, setQuoteByTicket] = useState({});
@@ -307,23 +311,37 @@ function BetHistory() {
   const [cancelErrorByTicket, setCancelErrorByTicket] = useState({});
   const [cancelSuccessByTicket, setCancelSuccessByTicket] = useState({});
 
-  const loadBetHistory = useCallback(() => {
-    setLoading(true);
-    fetchBetHistory()
-      .then(setBets)
-      .catch((err) => {
-        if (err.message === "NOT_LOGGED_IN") {
-          navigate("/login");
-          return;
-        }
-        setError(err.message);
-      })
-      .finally(() => setLoading(false));
-  }, [navigate]);
+  const loadBetHistory = useCallback(
+    (nextPage = 1) => {
+      setError(null);
+      setLoading(true);
+      fetchBetHistory({ page: nextPage, limit: BET_HISTORY_PAGE_SIZE })
+        .then((data) => {
+          setBets(data.items);
+          setPage(data.page ?? nextPage);
+          setTotalPages(data.totalPages ?? 1);
+          setTotal(data.total ?? data.items.length);
+        })
+        .catch((err) => {
+          if (err.message === "NOT_LOGGED_IN") {
+            navigate("/login");
+            return;
+          }
+          setError(err.message);
+        })
+        .finally(() => setLoading(false));
+    },
+    [navigate],
+  );
 
   useEffect(() => {
-    loadBetHistory();
+    loadBetHistory(1);
   }, [loadBetHistory]);
+
+  function goToPage(nextPage) {
+    loadBetHistory(nextPage);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
 
   async function handleCheckQuote(ticketId) {
     setQuoteLoadingId(ticketId);
@@ -363,7 +381,7 @@ function BetHistory() {
         ...prev,
         [ticketId]: payload.quote || null,
       }));
-      loadBetHistory();
+      loadBetHistory(page);
     } catch (err) {
       if (err.message === "NOT_LOGGED_IN") {
         navigate("/login");
@@ -390,7 +408,7 @@ function BetHistory() {
           "Ticket canceled. Funds were returned when you paid online.",
       }));
       window.dispatchEvent(new Event("balanceUpdated"));
-      loadBetHistory();
+      loadBetHistory(page);
     } catch (err) {
       if (err.message === "NOT_LOGGED_IN") {
         navigate("/login");
@@ -428,7 +446,7 @@ function BetHistory() {
           </button>
           <div>
             <p className="m-0 text-[11px] font-extrabold uppercase tracking-[0.2em] text-[rgba(255,255,255,0.72)]">
-              Your slips
+              Your slips{total > 0 ? ` · ${total}` : ""}
             </p>
             <h1 className="m-0 text-2xl font-black tracking-tight text-[#ffffff] sm:text-3xl">
               Bet history
@@ -451,6 +469,13 @@ function BetHistory() {
             <p className="m-0 text-center text-sm font-semibold text-[#ff6b6b]">
               {error}
             </p>
+            <button
+              type="button"
+              onClick={() => loadBetHistory(page)}
+              className="mt-4 w-full rounded-xl bg-[#0a0a0a]/70 py-3 text-sm font-bold text-[#ffffff]"
+            >
+              Try again
+            </button>
           </SoftPanel>
         ) : bets.length === 0 ? (
           <SoftPanel className="animate-deposit-panel">
@@ -459,6 +484,7 @@ function BetHistory() {
             </p>
           </SoftPanel>
         ) : (
+          <>
           <div className="flex flex-col gap-4">
             {bets.map((bet) => (
               <BetCard
@@ -480,6 +506,30 @@ function BetHistory() {
               />
             ))}
           </div>
+          {totalPages > 1 ? (
+            <div className="mt-6 flex items-center gap-3">
+              <button
+                type="button"
+                disabled={page <= 1}
+                onClick={() => goToPage(page - 1)}
+                className={accountGhostBtn}
+              >
+                Previous
+              </button>
+              <span className="flex-1 text-center text-xs font-bold text-[rgba(255,255,255,0.72)]">
+                Page {page} / {totalPages}
+              </span>
+              <button
+                type="button"
+                disabled={page >= totalPages}
+                onClick={() => goToPage(page + 1)}
+                className={accountGhostBtn}
+              >
+                Next
+              </button>
+            </div>
+          ) : null}
+          </>
         )}
       </div>
 

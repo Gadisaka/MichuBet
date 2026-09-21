@@ -130,6 +130,26 @@ export async function validateOpenTicketForPrint({
     };
   }
 
+  if (!validated.ok && validated.code === "fixture_started") {
+    return {
+      ok: false,
+      statusCode: 409,
+      logCode: "fixture_started",
+      logMeta: {
+        ticketId: ticket.id,
+        expiredCount: (validated.selections || []).length,
+      },
+      body: {
+        ok: false,
+        code: "fixture_started",
+        requiresRemoval: true,
+        message:
+          "Some selections have already started. Remove them to continue.",
+        selections: validated.selections || [],
+      },
+    };
+  }
+
   if (!validated.ok && validated.code === "market_locked") {
     return {
       ok: false,

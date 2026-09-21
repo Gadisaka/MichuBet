@@ -54,6 +54,7 @@ import {
   applyExcludeUnpaidOpenFilter,
   expireTicketIfDue,
   ticketExpiredResponse,
+  TICKET_EXPIRY_SELECTION_INCLUDE,
 } from "../lib/ticketExpiry.js";
 
 const LIVE_ACCEPTANCE_DELAY_MS = Math.max(
@@ -2181,7 +2182,7 @@ export async function createPrebookTicket(req, res) {
 /**
  * GET /api/tickets
  * Query filters: couponNumber, receiptId (ticket id), status, cashierId,
- * branchName, branchLocation, date (YYYY-MM-DD), page, limit
+ * userId, branchName, branchLocation, date (YYYY-MM-DD), page, limit
  */
 export async function listTickets(req, res) {
   try {
@@ -2194,6 +2195,7 @@ export async function listTickets(req, res) {
     const receiptId = String(req.query.receiptId || "").trim();
     const status = String(req.query.status || "").trim();
     const cashierId = String(req.query.cashierId || "").trim();
+    const userId = String(req.query.userId || "").trim();
     const branchName = String(req.query.branchName || "").trim();
     const branchLocation = String(req.query.branchLocation || "").trim();
     const date = String(req.query.date || "").trim();
@@ -2242,6 +2244,10 @@ export async function listTickets(req, res) {
     if (cashierId && req.user.role !== "CASHIER") {
       where.cashier_id = cashierId;
       resolvedCashierId = cashierId;
+    }
+
+    if (userId) {
+      where.user_id = userId;
     }
 
     // Cashier view:
@@ -2378,15 +2384,16 @@ export async function getTicketById(req, res) {
       }
     }
 
-    const printed = ticket.cashier_id
+    const resolved = await expireTicketIfDue(prisma, ticket);
+    const printed = resolved.cashier_id
       ? await getPrintedTicketIdSet({
-          cashierId: ticket.cashier_id,
-          ticketIds: [ticket.id],
+          cashierId: resolved.cashier_id,
+          ticketIds: [resolved.id],
         })
       : new Set();
     return res.json(
-      mapTicket(ticket, {
-        printed: printed.has(ticket.id),
+      mapTicket(resolved, {
+        printed: printed.has(resolved.id),
         omitReceipt: req.user.role === "AGENT",
       }),
     );
@@ -2521,13 +2528,16 @@ export async function getTicketByCoupon(req, res) {
       return res.status(404).json({ message: "Ticket not found" });
     }
 
-    const printed = ticket.cashier_id
+    const resolved = await expireTicketIfDue(prisma, ticket);
+    const printed = resolved.cashier_id
       ? await getPrintedTicketIdSet({
-          cashierId: ticket.cashier_id,
-          ticketIds: [ticket.id],
+          cashierId: resolved.cashier_id,
+          ticketIds: [resolved.id],
         })
       : new Set();
-    return res.json(mapTicket(ticket, { printed: printed.has(ticket.id) }));
+    return res.json(
+      mapTicket(resolved, { printed: printed.has(resolved.id) }),
+    );
   } catch (error) {
     console.error("getTicketByCoupon error:", error);
     return res.status(500).json({ message: "Failed to get ticket" });
@@ -3296,7 +3306,7 @@ export async function preparePrintTicket(req, res) {
     const ticket = await perfSpan(req.id, "print.prepare.loadTicket", () =>
       prisma.ticket.findUnique({
         where: { id: req.params.id },
-        include: { selections: true },
+        include: TICKET_EXPIRY_SELECTION_INCLUDE,
       }),
     );
     if (!ticket) {
@@ -3312,14 +3322,11 @@ export async function preparePrintTicket(req, res) {
     if (ticket.cashier_id && ticket.cashier_id !== cashier.id) {
       return res.status(403).json({ message: "Access denied" });
     }
-    if (ticket.status === "EXPIRED") {
-      return res.status(400).json(ticketExpiredResponse(ticket));
-    }
     const expiredNow = await expireTicketIfDue(prisma, ticket);
     if (expiredNow.status === "EXPIRED") {
       return res.status(400).json(ticketExpiredResponse(expiredNow));
     }
-    if (ticket.status !== "OPEN") {
+    if (expiredNow.status !== "OPEN") {
       return res.status(400).json({
         message: "Only OPEN tickets can be prepared for print",
       });
@@ -3328,7 +3335,7 @@ export async function preparePrintTicket(req, res) {
     const validation = await perfSpan(req.id, "print.prepare.oddsValidation", () =>
       validateOpenTicketForPrint({
         prismaClient: prisma,
-        ticket,
+        ticket: expiredNow,
         cashierId: cashier.id,
         requestBody,
         acceptOddsChanges,
@@ -3426,7 +3433,7 @@ export async function confirmPrintTicket(req, res) {
     );
     const ticket = await prisma.ticket.findUnique({
       where: { id: req.params.id },
-      include: { selections: true },
+      include: TICKET_EXPIRY_SELECTION_INCLUDE,
     });
     if (!ticket) {
       return res.status(404).json({ message: "Ticket not found" });
@@ -3438,9 +3445,6 @@ export async function confirmPrintTicket(req, res) {
     }
     if (ticket.cashier_id && ticket.cashier_id !== cashier.id) {
       return res.status(403).json({ message: "Access denied" });
-    }
-    if (ticket.status === "EXPIRED") {
-      return res.status(400).json(ticketExpiredResponse(ticket));
     }
     const expiredNow = await expireTicketIfDue(prisma, ticket);
     if (expiredNow.status === "EXPIRED") {
@@ -3496,7 +3500,7 @@ export async function confirmPrintTicket(req, res) {
           : undefined,
       });
     }
-    if (ticket.status !== "OPEN") {
+    if (expiredNow.status !== "OPEN") {
       return res.status(400).json({
         message: "Only OPEN tickets can be print-confirmed",
       });
@@ -3504,7 +3508,7 @@ export async function confirmPrintTicket(req, res) {
 
     const validation = await validateOpenTicketForPrint({
       prismaClient: prisma,
-      ticket,
+      ticket: expiredNow,
       cashierId: cashier.id,
       requestBody,
       acceptOddsChanges,
@@ -4180,7 +4184,9 @@ export async function removeTicketSelection(req, res) {
         actorId: req.user?.sub ? `cashier:${req.user.sub}` : null,
         writeFreeze: false,
       });
-      if (!validated.ok) {
+      // Started remaining legs are expected while cashiers peel expired games
+      // off a mixed slip. Other validation failures still block the remove.
+      if (!validated.ok && validated.code !== "fixture_started") {
         return res.status(409).json({
           code: validated.code || "validation_failed",
           message: "Remaining selections failed validation",

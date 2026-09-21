@@ -298,13 +298,21 @@ export async function recomputeTicketStatus(tx, ticketId) {
     newPotentialWin = capGrossPotentialWin(limits, newPotentialWin);
   }
 
+  const updateData = {
+    status: nextStatus,
+    total_odds: Number(newTotalOdds.toFixed(4)),
+    potential_win: newPotentialWin,
+  };
+  if (
+    (nextStatus === "WON" || nextStatus === "LOST" || nextStatus === "VOID") &&
+    !ticket.settled_at
+  ) {
+    updateData.settled_at = new Date();
+  }
+
   await tx.ticket.update({
     where: { id: ticket.id },
-    data: {
-      status: nextStatus,
-      total_odds: Number(newTotalOdds.toFixed(4)),
-      potential_win: newPotentialWin,
-    },
+    data: updateData,
   });
 
   return {
@@ -384,7 +392,10 @@ export async function creditOnlineWinnerInTx(tx, ticketId) {
   }
   await tx.ticket.update({
     where: { id: ticket.id },
-    data: { status: "PAID" },
+    data: {
+      status: "PAID",
+      ...(ticket.paid_at ? {} : { paid_at: new Date() }),
+    },
   });
 
   return {

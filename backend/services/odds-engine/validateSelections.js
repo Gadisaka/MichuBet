@@ -63,6 +63,7 @@ export async function validatePlacementSelections({
         : resolvePrematchOdds({ prismaClient, selections, now }),
   );
 
+  const startedSelections = [];
   for (const row of resolved) {
     if (row.code === "unknown_fixture") {
       recordValidationMetric({
@@ -77,16 +78,11 @@ export async function validatePlacementSelections({
       };
     }
     if (!live && row.started) {
-      recordValidationMetric({
-        channel: "prematch",
-        code: "fixture_started",
-        latencyMs: Date.now() - startedAt,
+      startedSelections.push({
+        index: row.index,
+        kickoffAt: row.kickoffAt,
       });
-      return {
-        ok: false,
-        code: "fixture_started",
-        selections: [{ index: row.index, kickoffAt: row.kickoffAt }],
-      };
+      continue;
     }
     const blockedCode = hasBlockingState(row);
     if (blockedCode) {
@@ -101,6 +97,19 @@ export async function validatePlacementSelections({
         selections: [{ index: row.index }],
       };
     }
+  }
+
+  if (startedSelections.length > 0) {
+    recordValidationMetric({
+      channel: "prematch",
+      code: "fixture_started",
+      latencyMs: Date.now() - startedAt,
+    });
+    return {
+      ok: false,
+      code: "fixture_started",
+      selections: startedSelections,
+    };
   }
 
   const tolerance = getOddsTolerance({

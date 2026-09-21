@@ -1,5 +1,20 @@
 import { prisma } from "../Config/db.js";
 import { applyReportableTicketFilter } from "../lib/ticketExpiry.js";
+import {
+  isSportsbookWinPayoutRef,
+  loadSportsPayouts,
+} from "../services/sportsPayoutStats.js";
+
+function sumNonSportsPayouts(txs) {
+  let amount = 0;
+  let count = 0;
+  for (const tx of txs) {
+    if (isSportsbookWinPayoutRef(tx.reference)) continue;
+    amount += Number(tx.amount || 0);
+    count += 1;
+  }
+  return { amount, count };
+}
 
 function parseDateYmd(value) {
   if (!value) return null;
@@ -95,8 +110,10 @@ export async function getAdminDashboardInsights(req, res) {
       ticketsInRange,
       chartTickets,
       recentTicketsRaw,
-      payoutInRange,
-      chartPayouts,
+      payoutTxsInRange,
+      chartPayoutTxs,
+      sportsInRange,
+      chartSports,
       playerWalletInRange,
       pendingWithdrawals,
       recentWalletRaw,
@@ -139,15 +156,22 @@ export async function getAdminDashboardInsights(req, res) {
         orderBy: { created_at: "desc" },
         take: 15,
       }),
-      prisma.transaction.aggregate({
-        where: { type: "PAYOUT", created_at: { gte: start, lte: end } },
-        _sum: { amount: true },
-        _count: { _all: true },
+      prisma.transaction.findMany({
+        where: {
+          type: "PAYOUT",
+          created_at: { gte: start, lte: end },
+        },
+        select: { amount: true, reference: true },
       }),
       prisma.transaction.findMany({
-        where: { type: "PAYOUT", created_at: { gte: chartStart, lte: chartEnd } },
-        select: { amount: true, created_at: true },
+        where: {
+          type: "PAYOUT",
+          created_at: { gte: chartStart, lte: chartEnd },
+        },
+        select: { amount: true, created_at: true, reference: true },
       }),
+      loadSportsPayouts({ start, end }),
+      loadSportsPayouts({ start: chartStart, end: chartEnd }),
       prisma.transaction.findMany({
         where: {
           wallet: { wallet_type: "PLAYER" },
@@ -253,11 +277,19 @@ export async function getAdminDashboardInsights(req, res) {
       bucket.stake += Number(ticket.stake || 0);
     }
 
-    for (const tx of chartPayouts) {
+    for (const tx of chartPayoutTxs) {
+      if (isSportsbookWinPayoutRef(tx.reference)) continue;
       const ymd = tx.created_at.toISOString().slice(0, 10);
       const bucket = ticketVolumeMap.get(ymd);
       if (!bucket) continue;
       bucket.payouts += Number(tx.amount || 0);
+    }
+
+    for (const line of chartSports.lines) {
+      const ymd = line.settledAt.toISOString().slice(0, 10);
+      const bucket = ticketVolumeMap.get(ymd);
+      if (!bucket) continue;
+      bucket.payouts += Number(line.amount || 0);
     }
 
     const ticketVolumeLast7Days = [...ticketVolumeMap.values()].map((item) => ({
@@ -273,7 +305,8 @@ export async function getAdminDashboardInsights(req, res) {
       if (tx.type === "WITHDRAW") withdrawalsAmount += amount;
     }
 
-    const totalPayout = Number(payoutInRange._sum.amount || 0);
+    const nonSportsPayouts = sumNonSportsPayouts(payoutTxsInRange);
+    const totalPayout = nonSportsPayouts.amount + sportsInRange.totalPaidAmount;
     const byStatus = Object.entries(statusCounts).map(([status, count]) => ({
       status,
       count,
@@ -335,7 +368,11 @@ export async function getAdminDashboardInsights(req, res) {
       totalPotentialWin,
       totalPayout,
       platformProfit: totalStake - totalPayout,
-      payoutCount: Number(payoutInRange._count._all || 0),
+      payoutCount: nonSportsPayouts.count + sportsInRange.totalPaidCount,
+      onlineCashbackAmount: sportsInRange.onlineCashbackAmount,
+      onlineCashbackCount: sportsInRange.onlineCashbackCount,
+      shopCashbackAmount: sportsInRange.shopCashbackAmount,
+      shopCashbackCount: sportsInRange.shopCashbackCount,
       depositsAmount,
       withdrawalsAmount,
       pendingWithdrawalsAmount: Number(pendingWithdrawals._sum.amount || 0),

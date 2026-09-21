@@ -153,6 +153,8 @@ test("single-leg WON ticket transitions to PAID and credits player wallet", asyn
   const store = getStore();
   const ticket = store.ticket.get("tk-1");
   assert.equal(ticket.status, "PAID");
+  assert.ok(ticket.settled_at instanceof Date);
+  assert.ok(ticket.paid_at instanceof Date);
 
   const wallet = store.wallet.get("w-1");
   // Stake was already debited at placement (not modeled here); credit
@@ -328,9 +330,41 @@ test("cashier-printed ticket is NOT auto-credited (cashier payout flow owns it)"
   const ticket = store.ticket.get("tk-6");
   // Ticket is WON (cashier will payout manually) — not PAID.
   assert.equal(ticket.status, "WON");
+  assert.ok(ticket.settled_at instanceof Date);
+  const stamped = ticket.settled_at.getTime();
+
+  const skipped = await settlement.creditOnlineWinnerInTx(prisma, "tk-6");
+  assert.equal(skipped.skipped, true);
+  assert.equal(skipped.reason, "cashier_paid");
+  assert.equal(store.ticket.get("tk-6").settled_at.getTime(), stamped);
 
   const wallet = store.wallet.get("w-6");
   assert.equal(wallet.balance, 100); // untouched
+});
+
+test("online payout sets paid_at and does not move settled_at", async () => {
+  resetStore();
+  const settledAt = new Date("2026-09-15T08:00:00.000Z");
+  seedTicket({
+    id: "tk-later",
+    userId: "user-later",
+    stake: 10,
+    totalOdds: 2,
+    status: "WON",
+  });
+  const row = getStore().ticket.get("tk-later");
+  row.settled_at = settledAt;
+  row.potential_win = 20;
+  row.paid_at = null;
+  seedWallet({ id: "w-later", userId: "user-later", balance: 0 });
+
+  const result = await settlement.creditOnlineWinnerInTx(prisma, "tk-later");
+  assert.equal(result.reason, "credited");
+
+  const ticket = getStore().ticket.get("tk-later");
+  assert.equal(ticket.status, "PAID");
+  assert.ok(ticket.paid_at instanceof Date);
+  assert.equal(ticket.settled_at.getTime(), settledAt.getTime());
 });
 
 test("PENDING ticket with one resolved leg stays OPEN until others resolve", async () => {

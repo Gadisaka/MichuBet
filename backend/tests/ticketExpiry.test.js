@@ -9,6 +9,7 @@ import {
   getEarliestKickoff,
   isUnpaidOpenTicket,
   shouldExpireUnpaidTicket,
+  shouldReopenExpiredUnpaidTicket,
   isTicketSettleable,
   applyExcludeExpiredFilter,
   applyExcludeUnpaidOpenFilter,
@@ -77,6 +78,64 @@ describe("shouldExpireUnpaidTicket", () => {
     };
     assert.equal(
       shouldExpireUnpaidTicket(ticket, new Date("2026-06-20T13:00:00.000Z")),
+      false,
+    );
+  });
+
+  it("does not expire a mixed unpaid slip when later legs remain", () => {
+    const ticket = {
+      status: "OPEN",
+      receipt_number: null,
+      selections: [
+        {
+          fixture: { start_time: new Date("2026-06-20T12:00:00.000Z") },
+        },
+        {
+          fixture: { start_time: new Date("2026-06-20T15:00:00.000Z") },
+        },
+        {
+          fixture: { start_time: new Date("2026-06-20T18:00:00.000Z") },
+        },
+      ],
+      selection_snapshot: [],
+    };
+    assert.equal(
+      shouldExpireUnpaidTicket(ticket, new Date("2026-06-20T12:00:01.000Z")),
+      false,
+    );
+    assert.equal(
+      shouldExpireUnpaidTicket(ticket, new Date("2026-06-20T18:00:01.000Z")),
+      true,
+    );
+  });
+});
+
+describe("shouldReopenExpiredUnpaidTicket", () => {
+  it("reopens expired unpaid drafts that still have future legs", () => {
+    const ticket = {
+      status: "EXPIRED",
+      receipt_number: null,
+      selections: [
+        {
+          fixture: { start_time: new Date("2026-06-20T12:00:00.000Z") },
+        },
+        {
+          fixture: { start_time: new Date("2026-06-20T15:00:00.000Z") },
+        },
+      ],
+    };
+    assert.equal(
+      shouldReopenExpiredUnpaidTicket(
+        ticket,
+        new Date("2026-06-20T12:30:00.000Z"),
+      ),
+      true,
+    );
+    assert.equal(
+      shouldReopenExpiredUnpaidTicket(
+        ticket,
+        new Date("2026-06-20T16:00:00.000Z"),
+      ),
       false,
     );
   });

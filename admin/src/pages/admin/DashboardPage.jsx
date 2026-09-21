@@ -64,6 +64,10 @@ export default function DashboardPage() {
     totalPayout: 0,
     platformProfit: 0,
     payoutCount: 0,
+    onlineCashbackAmount: 0,
+    onlineCashbackCount: 0,
+    shopCashbackAmount: 0,
+    shopCashbackCount: 0,
     depositsAmount: 0,
     withdrawalsAmount: 0,
     pendingWithdrawalsAmount: 0,
@@ -111,6 +115,16 @@ export default function DashboardPage() {
       label: "Total payouts",
       value: `${money(summary.totalPayout)} ETB`,
       meta: `${Number(summary.payoutCount || 0).toLocaleString()} payout transactions`,
+    },
+    {
+      label: "Online cashback",
+      value: `${money(summary.onlineCashbackAmount)} ETB`,
+      meta: `${Number(summary.onlineCashbackCount || 0).toLocaleString()} transactions`,
+    },
+    {
+      label: "Shop cashback",
+      value: `${money(summary.shopCashbackAmount)} ETB`,
+      meta: `${Number(summary.shopCashbackCount || 0).toLocaleString()} transactions`,
     },
     {
       label: "Platform profit",

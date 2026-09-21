@@ -1,5 +1,5 @@
 /**
- * Expire unpaid OPEN tickets once the earliest leg has kicked off.
+ * Expire unpaid OPEN tickets once every remaining leg has kicked off.
  *
  * Runs on the `expire-unpaid-tickets` repeatable queue every few minutes.
  *

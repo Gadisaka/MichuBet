@@ -4,6 +4,26 @@ import assert from "node:assert/strict";
 import { validatePlacementSelections } from "../services/odds-engine/validateSelections.js";
 
 function makePrisma({ fixtures = [], oddLines = [] }) {
+  const markets = [];
+  const lines = [];
+  for (const row of oddLines) {
+    const marketId = `m-${row.fixtureId}-${row.marketName}`;
+    if (!markets.some((market) => market.id === marketId)) {
+      markets.push({
+        id: marketId,
+        name: row.marketName,
+        fixture_id: row.fixtureId,
+      });
+    }
+    lines.push({
+      market_id: marketId,
+      odd: row.odd,
+      value: row.value,
+      market: { name: row.marketName, fixture_id: row.fixtureId },
+      bookmaker: row.bookmaker || null,
+    });
+  }
+
   return {
     fixture: {
       findMany: async ({ where }) => {
@@ -11,25 +31,27 @@ function makePrisma({ fixtures = [], oddLines = [] }) {
         return fixtures.filter((f) => ids.includes(f.api_fixture_id));
       },
     },
+    fixtureMarket: {
+      findMany: async ({ where }) => {
+        const fixtureId = where?.fixture_id;
+        const names = where?.name?.in || [];
+        return markets.filter(
+          (market) =>
+            market.fixture_id === fixtureId && names.includes(market.name),
+        );
+      },
+    },
     fixtureOddLine: {
       findMany: async ({ where }) => {
-        const fixtureIds = where?.market?.fixture_id?.in || [];
-        const valueFilter = where?.value;
-        const values = Array.isArray(valueFilter?.in)
-          ? valueFilter.in
-          : [valueFilter].filter(Boolean);
-        return oddLines
+        const marketIds = where?.market_id?.in || [];
+        const values = where?.value?.in || [];
+        return lines
           .filter(
             (row) =>
-              fixtureIds.includes(row.fixtureId) &&
+              marketIds.includes(row.market_id) &&
               (values.length === 0 || values.includes(row.value)),
           )
-          .map((row) => ({
-            odd: row.odd,
-            value: row.value,
-            market: { name: row.marketName, fixture_id: row.fixtureId },
-            bookmaker: row.bookmaker || null,
-          }));
+          .map(({ market_id: _marketId, ...row }) => row);
       },
     },
   };
@@ -110,6 +132,88 @@ test("validatePlacementSelections rejects pre-match fixture that already started
 
   assert.equal(out.ok, false);
   assert.equal(out.code, "fixture_started");
+  assert.equal(out.selections.length, 1);
+  assert.equal(out.selections[0].index, 0);
+});
+
+test("validatePlacementSelections returns every started pre-match fixture", async () => {
+  const prisma = makePrisma({
+    fixtures: [
+      {
+        id: "fx1",
+        api_fixture_id: 11,
+        status: "NS",
+        start_time: new Date(Date.now() - 60_000),
+      },
+      {
+        id: "fx2",
+        api_fixture_id: 22,
+        status: "NS",
+        start_time: new Date(Date.now() + 60_000),
+      },
+      {
+        id: "fx3",
+        api_fixture_id: 33,
+        status: "NS",
+        start_time: new Date(Date.now() - 120_000),
+      },
+    ],
+    oddLines: [
+      {
+        fixtureId: "fx1",
+        marketName: "Match Winner",
+        value: "Home",
+        odd: 1.8,
+        bookmaker: { api_bookmaker_id: 8 },
+      },
+      {
+        fixtureId: "fx2",
+        marketName: "Match Winner",
+        value: "Home",
+        odd: 1.9,
+        bookmaker: { api_bookmaker_id: 8 },
+      },
+      {
+        fixtureId: "fx3",
+        marketName: "Match Winner",
+        value: "Home",
+        odd: 2.0,
+        bookmaker: { api_bookmaker_id: 8 },
+      },
+    ],
+  });
+
+  const out = await validatePlacementSelections({
+    prismaClient: prisma,
+    rawSelections: [
+      {
+        apiFixtureId: 11,
+        marketLabel: "Match Winner",
+        label: "Home",
+        odds: 1.8,
+      },
+      {
+        apiFixtureId: 22,
+        marketLabel: "Match Winner",
+        label: "Home",
+        odds: 1.9,
+      },
+      {
+        apiFixtureId: 33,
+        marketLabel: "Match Winner",
+        label: "Home",
+        odds: 2.0,
+      },
+    ],
+    live: false,
+  });
+
+  assert.equal(out.ok, false);
+  assert.equal(out.code, "fixture_started");
+  assert.deepEqual(
+    out.selections.map((row) => row.index),
+    [0, 2],
+  );
 });
 
 test("validatePlacementSelections returns market_suspended when odd line missing", async () => {

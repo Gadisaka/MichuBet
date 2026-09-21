@@ -3,6 +3,7 @@ import {
   aggregateShopStatsForWalletIds,
   emptyShopStats,
 } from "../services/shopReportStats.js";
+import { loadSportsPayouts } from "../services/sportsPayoutStats.js";
 import { applyReportableTicketFilter } from "../lib/ticketExpiry.js";
 
 function parseDateYmd(value) {
@@ -174,9 +175,11 @@ export async function getAdminSalesReports(req, res) {
     const where = {
       created_at: { gte: start, lte: end },
     };
+    let sportsCashierIds;
 
     if (cashierProfileId) {
       where.cashier_id = cashierProfileId;
+      sportsCashierIds = [cashierProfileId];
     } else if (agentId) {
       const assignments = await prisma.agentCashier.findMany({
         where: { agent_id: agentId },
@@ -187,22 +190,35 @@ export async function getAdminSalesReports(req, res) {
         return res.json(emptySalesPayload(start, end, { agentId, cashierProfileId }));
       }
       where.cashier_id = { in: ids };
+      sportsCashierIds = ids;
     }
 
-    const tickets = await prisma.ticket.findMany({
-      where: applyReportableTicketFilter(where),
-      select: {
-        id: true,
-        cashier_id: true,
-        branch_name: true,
-        stake: true,
-        status: true,
-        created_at: true,
-      },
-    });
+    const [tickets, sportsPayouts] = await Promise.all([
+      prisma.ticket.findMany({
+        where: applyReportableTicketFilter(where),
+        select: {
+          id: true,
+          cashier_id: true,
+          branch_name: true,
+          stake: true,
+          status: true,
+          created_at: true,
+        },
+      }),
+      loadSportsPayouts({
+        start,
+        end,
+        ...(sportsCashierIds ? { cashierIds: sportsCashierIds } : {}),
+      }),
+    ]);
 
     const cashierIds = [
-      ...new Set(tickets.map((t) => t.cashier_id).filter(Boolean)),
+      ...new Set(
+        [
+          ...tickets.map((t) => t.cashier_id),
+          ...sportsPayouts.lines.map((line) => line.cashierId),
+        ].filter(Boolean),
+      ),
     ];
     const cashierRows =
       cashierIds.length > 0
@@ -243,9 +259,7 @@ export async function getAdminSalesReports(req, res) {
         dayRow.tickets += 1;
         dayRow.stake += stake;
         if (isUnsettledTicketStatus(ticket.status)) dayRow.open += 1;
-        if (ticket.status === "WON") dayRow.won += 1;
         if (ticket.status === "LOST") dayRow.lost += 1;
-        if (ticket.status === "PAID") dayRow.paid += 1;
       }
 
       const branchKey = ticket.branch_name || "Unknown";
@@ -261,9 +275,7 @@ export async function getAdminSalesReports(req, res) {
       branchRow.tickets += 1;
       branchRow.stake += stake;
       if (isUnsettledTicketStatus(ticket.status)) branchRow.open += 1;
-      if (ticket.status === "WON") branchRow.won += 1;
       if (ticket.status === "LOST") branchRow.lost += 1;
-      if (ticket.status === "PAID") branchRow.paid += 1;
       branchMap.set(branchKey, branchRow);
 
       const cashierKey = ticket.cashier_id || ONLINE_CASHIER_KEY;
@@ -283,9 +295,55 @@ export async function getAdminSalesReports(req, res) {
       cashierRow.tickets += 1;
       cashierRow.stake += stake;
       if (isUnsettledTicketStatus(ticket.status)) cashierRow.open += 1;
-      if (ticket.status === "WON") cashierRow.won += 1;
       if (ticket.status === "LOST") cashierRow.lost += 1;
-      if (ticket.status === "PAID") cashierRow.paid += 1;
+      cashierMap.set(cashierKey, cashierRow);
+    }
+
+    let wonTickets = 0;
+    let paidTickets = 0;
+    for (const line of sportsPayouts.lines) {
+      const isWon = line.kind === "win" && line.status === "WON";
+      const isPaid = line.status === "PAID";
+      if (isWon) wonTickets += 1;
+      if (isPaid) paidTickets += 1;
+
+      const ymd = line.settledAt.toISOString().slice(0, 10);
+      const dayRow = dailyMap.get(ymd);
+      if (dayRow) {
+        if (isWon) dayRow.won += 1;
+        if (isPaid) dayRow.paid += 1;
+      }
+
+      const branchKey = line.branchName || "Unknown";
+      const branchRow = branchMap.get(branchKey) || {
+        branchName: branchKey,
+        tickets: 0,
+        stake: 0,
+        open: 0,
+        won: 0,
+        lost: 0,
+        paid: 0,
+      };
+      if (isWon) branchRow.won += 1;
+      if (isPaid) branchRow.paid += 1;
+      branchMap.set(branchKey, branchRow);
+
+      const cashierKey = line.cashierId || ONLINE_CASHIER_KEY;
+      const cashierRow = cashierMap.get(cashierKey) || {
+        cashierProfileId: cashierKey,
+        cashierName:
+          cashierKey === ONLINE_CASHIER_KEY
+            ? "Online / no cashier"
+            : cashierNameById.get(cashierKey) || "Cashier",
+        tickets: 0,
+        stake: 0,
+        open: 0,
+        won: 0,
+        lost: 0,
+        paid: 0,
+      };
+      if (isWon) cashierRow.won += 1;
+      if (isPaid) cashierRow.paid += 1;
       cashierMap.set(cashierKey, cashierRow);
     }
 
@@ -318,9 +376,9 @@ export async function getAdminSalesReports(req, res) {
         totalStake,
         averageStake: tickets.length > 0 ? totalStake / tickets.length : 0,
         openTickets: tickets.filter((t) => isUnsettledTicketStatus(t.status)).length,
-        wonTickets: tickets.filter((t) => t.status === "WON").length,
+        wonTickets,
         lostTickets: tickets.filter((t) => t.status === "LOST").length,
-        paidTickets: tickets.filter((t) => t.status === "PAID").length,
+        paidTickets,
         shop: shopStats,
       },
       byDay,

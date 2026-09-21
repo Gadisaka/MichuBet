@@ -1,10 +1,17 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { Link } from "react-router-dom";
 import AppIcon from "../common/AppIcon";
 import DesktopUserSidebar from "./DesktopUserSidebar";
 import MobileMenu from "./MobileMenu";
-import { fetchNotificationUnreadCount, fetchPlayerWallet } from "../../services/api";
+import {
+  fetchNotifications,
+  fetchPlayerWallet,
+  markNotificationRead,
+} from "../../services/api";
+import { dismissPopupNotification } from "../notifications/dismissPopupNotification";
+import NotificationPopup from "../notifications/NotificationPopup";
 import NotificationsDialog from "../notifications/NotificationsDialog";
+import { pickPopupNotification } from "../notifications/pickPopupNotification";
 import { usePlayerSiteBranding } from "../../hooks/usePlayerSiteBranding";
 import { useLanguage, useTranslation } from "../../i18n/LanguageContext.jsx";
 
@@ -17,6 +24,9 @@ const LANG_FLAG = Object.freeze({
 function flagSrc(iso2) {
   return `https://flagcdn.com/w40/${iso2}.png`;
 }
+
+/** Survives TopHeader remounts so a popup is not shown twice while mark-read is in flight. */
+const dismissedPopupIds = new Set();
 
 function TopHeader() {
   const { language, setLanguage } = useLanguage();
@@ -31,6 +41,8 @@ function TopHeader() {
   const [walletBalance, setWalletBalance] = useState(null);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [unreadItems, setUnreadItems] = useState([]);
+  const [dismissTick, setDismissTick] = useState(0);
 
   const token =
     localStorage.getItem("token") || sessionStorage.getItem("token");
@@ -56,18 +68,48 @@ function TopHeader() {
     };
   }, [isLoggedIn]);
 
-  const refreshUnreadCount = useCallback(async () => {
+  const refreshUnread = useCallback(async () => {
     if (!isLoggedIn) {
       setUnreadCount(0);
+      setUnreadItems([]);
       return;
     }
     try {
-      const data = await fetchNotificationUnreadCount();
-      setUnreadCount(Number(data?.count) || 0);
+      const data = await fetchNotifications({ unreadOnly: true, limit: 10 });
+      setUnreadCount(Number(data?.total) || 0);
+      setUnreadItems(Array.isArray(data.items) ? data.items : []);
     } catch {
       setUnreadCount(0);
+      setUnreadItems([]);
     }
   }, [isLoggedIn]);
+
+  const popupNotification = useMemo(
+    () =>
+      pickPopupNotification(
+        unreadItems,
+        dismissedPopupIds,
+        notificationsOpen,
+      ),
+    [unreadItems, notificationsOpen, dismissTick],
+  );
+
+  const handlePopupDismiss = useCallback(async () => {
+    const id = popupNotification?.id;
+    if (!id) return;
+    const pending = dismissPopupNotification({
+      id,
+      dismissedIds: dismissedPopupIds,
+      markRead: markNotificationRead,
+    });
+    setDismissTick((n) => n + 1);
+    const { marked } = await pending;
+    if (!marked) {
+      setDismissTick((n) => n + 1);
+      return;
+    }
+    void refreshUnread();
+  }, [popupNotification, refreshUnread]);
 
   useEffect(() => {
     const handler = () => {
@@ -76,21 +118,22 @@ function TopHeader() {
         const wallet = await fetchPlayerWallet();
         setWalletBalance(wallet?.balance ?? 0);
       })();
-      void refreshUnreadCount();
+      void refreshUnread();
     };
     window.addEventListener("balanceUpdated", handler);
     return () => window.removeEventListener("balanceUpdated", handler);
-  }, [refreshUnreadCount]);
+  }, [refreshUnread]);
 
   useEffect(() => {
     if (!isLoggedIn) {
       setUnreadCount(0);
+      setUnreadItems([]);
       return undefined;
     }
-    void refreshUnreadCount();
-    const id = setInterval(() => void refreshUnreadCount(), 60_000);
+    void refreshUnread();
+    const id = setInterval(() => void refreshUnread(), 15_000);
     return () => clearInterval(id);
-  }, [isLoggedIn, refreshUnreadCount]);
+  }, [isLoggedIn, refreshUnread]);
 
   useEffect(() => {
     const onSession = () => forceUpdate((n) => n + 1);
@@ -333,9 +376,16 @@ function TopHeader() {
           open={notificationsOpen}
           onClose={() => {
             setNotificationsOpen(false);
-            void refreshUnreadCount();
+            void refreshUnread();
           }}
-          onReadChange={() => void refreshUnreadCount()}
+          onReadChange={() => void refreshUnread()}
+        />
+      ) : null}
+
+      {isLoggedIn && !notificationsOpen ? (
+        <NotificationPopup
+          notification={popupNotification}
+          onDismiss={() => void handlePopupDismiss()}
         />
       ) : null}
     </>

@@ -737,11 +737,20 @@ function mapPlayerTicketToBet(ticket) {
   };
 }
 
-export async function fetchBetHistory() {
+/**
+ * GET /api/player/tickets — paginated own tickets for bet history.
+ * @param {{ page?: number, limit?: number }} opts
+ */
+export async function fetchBetHistory({ page = 1, limit = 20 } = {}) {
   const token = getToken();
   if (!token) throw new Error("NOT_LOGGED_IN");
 
-  const res = await fetch(`${API_URL}/api/player/tickets?limit=100`, {
+  const params = new URLSearchParams({
+    page: String(page),
+    limit: String(limit),
+  });
+
+  const res = await fetch(`${API_URL}/api/player/tickets?${params.toString()}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
 
@@ -753,7 +762,13 @@ export async function fetchBetHistory() {
   }
 
   const items = Array.isArray(data.items) ? data.items : [];
-  return items.map(mapPlayerTicketToBet);
+  return {
+    items: items.map(mapPlayerTicketToBet),
+    page: data.page ?? page,
+    limit: data.limit ?? limit,
+    total: data.total ?? items.length,
+    totalPages: data.totalPages ?? 1,
+  };
 }
 
 export async function fetchPlayerCashoutQuote(ticketId) {

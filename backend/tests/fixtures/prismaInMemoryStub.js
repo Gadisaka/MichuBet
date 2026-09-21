@@ -23,6 +23,8 @@ const store = {
   bonus: new Map(),
   setting: new Map(),
   cashier: new Map(),
+  user: new Map(),
+  notification: new Map(),
 };
 
 // Tracks which references have been written already. Simulates the
@@ -52,18 +54,59 @@ function clone(value) {
   return out;
 }
 
+function comparable(value) {
+  if (value instanceof Date) return value.getTime();
+  return value;
+}
+
 function matchesWhere(row, where) {
   if (!where) return true;
   for (const [key, condition] of Object.entries(where)) {
+    if (key === "OR" && Array.isArray(condition)) {
+      if (!condition.some((clause) => matchesWhere(row, clause))) return false;
+      continue;
+    }
+    if (key === "AND" && Array.isArray(condition)) {
+      if (!condition.every((clause) => matchesWhere(row, clause))) return false;
+      continue;
+    }
     if (key === "id" && typeof condition === "string") {
       if (row.id !== condition) return false;
       continue;
     }
-    if (condition && typeof condition === "object" && "in" in condition) {
-      if (!condition.in.includes(row[key])) return false;
+    if (
+      condition &&
+      typeof condition === "object" &&
+      !Array.isArray(condition) &&
+      !(condition instanceof Date)
+    ) {
+      const value = row[key];
+      if ("in" in condition) {
+        if (!condition.in.includes(value)) return false;
+      }
+      if ("startsWith" in condition) {
+        if (!String(value ?? "").startsWith(String(condition.startsWith))) {
+          return false;
+        }
+      }
+      if ("gte" in condition) {
+        if (value == null || comparable(value) < comparable(condition.gte)) {
+          return false;
+        }
+      }
+      if ("lte" in condition) {
+        if (value == null || comparable(value) > comparable(condition.lte)) {
+          return false;
+        }
+      }
       continue;
     }
-    if (typeof condition === "string" || typeof condition === "number" || condition === null) {
+    if (
+      typeof condition === "string" ||
+      typeof condition === "number" ||
+      typeof condition === "boolean" ||
+      condition === null
+    ) {
       if (row[key] !== condition) return false;
       continue;
     }
@@ -175,6 +218,8 @@ export const prisma = {
   bonus: model("bonus"),
   setting: model("setting"),
   cashier: model("cashier"),
+  user: model("user"),
+  notification: model("notification"),
   async $transaction(callback) {
     // The in-memory stub doesn't snapshot/rollback; it's only used by
     // happy-path settlement tests where the service runs to completion.

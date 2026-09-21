@@ -26,9 +26,14 @@ export function depositBonusRef(depositTxId) {
   return `bonus:deposit-tx:${depositTxId}`;
 }
 
+/** Online cashback BONUS ledger prefix (`bonus:cashback:<ticketId>`). */
+export const ONLINE_CASHBACK_REF_PREFIX = "bonus:cashback:";
+/** Shop cashback BONUS ledger prefix (`cashback-payout:<ticketId>`). */
+export const SHOP_CASHBACK_REF_PREFIX = "cashback-payout:";
+
 /** @param {string} ticketId */
 export function cashbackBonusRef(ticketId) {
-  return `bonus:cashback:${ticketId}`;
+  return `${ONLINE_CASHBACK_REF_PREFIX}${ticketId}`;
 }
 
 /** Fixture feed statuses that void a ticket's cashback eligibility. */
@@ -291,7 +296,7 @@ export const DEFAULT_CASHBACK_V3_TRACKS = [
 
 /** @param {string} ticketId */
 export function cashbackPayoutRef(ticketId) {
-  return `cashback-payout:${ticketId}`;
+  return `${SHOP_CASHBACK_REF_PREFIX}${ticketId}`;
 }
 
 /**

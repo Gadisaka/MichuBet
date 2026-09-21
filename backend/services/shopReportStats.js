@@ -5,18 +5,14 @@
  * @module services/shopReportStats
  */
 import { prisma } from "../Config/db.js";
+import {
+  isJackpotTicket,
+  loadSportsPayouts,
+} from "./sportsPayoutStats.js";
 
-/** @param {{ selection_snapshot?: unknown }} ticket */
-export function isJackpotTicket(ticket) {
-  const snap = ticket.selection_snapshot;
-  if (snap == null) return false;
-  if (typeof snap === "object" && !Array.isArray(snap)) {
-    if (snap.isJackpot === true) return true;
-    if (snap.gameMode === "jackpot" || snap.type === "jackpot") return true;
-    if (snap.product === "jackpot") return true;
-  }
-  return false;
-}
+const TICKET_PRINT_REF_PREFIX = "ticket-print:";
+
+export { isJackpotTicket };
 
 export function emptyShopStats() {
   return {
@@ -26,6 +22,8 @@ export function emptyShopStats() {
     totalWithdrawAmount: 0,
     totalPaidTickets: 0,
     totalPaidAmount: 0,
+    totalCashbackTickets: 0,
+    totalCashbackAmount: 0,
     totalCancelledTickets: 0,
     totalCancelledAmount: 0,
     grandNet: 0,
@@ -50,7 +48,7 @@ export async function aggregateShopStatsForWalletIds(walletIds, { start, end }) 
     where: {
       wallet_id: { in: ids },
       type: "BET",
-      reference: { startsWith: "ticket-print:" },
+      reference: { startsWith: TICKET_PRINT_REF_PREFIX },
       created_at: dateWhere,
     },
   });
@@ -58,7 +56,9 @@ export async function aggregateShopStatsForWalletIds(walletIds, { start, end }) 
   const betTicketIds = betTxs
     .map((tx) => {
       const ref = String(tx.reference || "");
-      return ref.startsWith("ticket-print:") ? ref.slice("ticket-print:".length) : null;
+      return ref.startsWith(TICKET_PRINT_REF_PREFIX)
+        ? ref.slice(TICKET_PRINT_REF_PREFIX.length)
+        : null;
     })
     .filter(Boolean);
 
@@ -78,7 +78,9 @@ export async function aggregateShopStatsForWalletIds(walletIds, { start, end }) 
 
   const soldBets = betTxs.filter((tx) => {
     const ref = String(tx.reference || "");
-    const tid = ref.startsWith("ticket-print:") ? ref.slice("ticket-print:".length) : "";
+    const tid = ref.startsWith(TICKET_PRINT_REF_PREFIX)
+      ? ref.slice(TICKET_PRINT_REF_PREFIX.length)
+      : "";
     if (!tid || jackpotSoldIds.has(tid)) return false;
     const ticket = betTicketById.get(tid);
     return ticket?.status !== "CANCELED";
@@ -87,42 +89,16 @@ export async function aggregateShopStatsForWalletIds(walletIds, { start, end }) 
   const totalTicketsSold = soldBets.length;
   const totalSoldPrice = soldBets.reduce((s, tx) => s + Number(tx.amount), 0);
 
-  const payoutTxs = await prisma.transaction.findMany({
-    where: {
-      wallet_id: { in: ids },
-      type: "PAYOUT",
-      reference: { startsWith: "ticket:" },
-      created_at: dateWhere,
-    },
+  const sportsPayouts = await loadSportsPayouts({
+    start,
+    end,
+    walletIds: ids,
+    excludeJackpot: true,
   });
-
-  const payoutTicketIds = payoutTxs
-    .map((tx) => {
-      const ref = String(tx.reference || "");
-      return ref.startsWith("ticket:") ? ref.slice("ticket:".length) : null;
-    })
-    .filter(Boolean);
-
-  const payoutTickets =
-    payoutTicketIds.length > 0
-      ? await prisma.ticket.findMany({
-          where: { id: { in: payoutTicketIds } },
-          select: { id: true, selection_snapshot: true },
-        })
-      : [];
-
-  const jackpotPaidIds = new Set(
-    payoutTickets.filter((t) => isJackpotTicket(t)).map((t) => t.id),
-  );
-
-  const payoutsNonJackpot = payoutTxs.filter((tx) => {
-    const ref = String(tx.reference || "");
-    const tid = ref.startsWith("ticket:") ? ref.slice("ticket:".length) : "";
-    return tid && !jackpotPaidIds.has(tid);
-  });
-
-  const totalPaidTickets = payoutsNonJackpot.length;
-  const totalPaidAmount = payoutsNonJackpot.reduce((s, tx) => s + Number(tx.amount), 0);
+  const totalCashbackTickets = sportsPayouts.cashbackCount;
+  const totalCashbackAmount = sportsPayouts.cashbackAmount;
+  const totalPaidTickets = sportsPayouts.totalPaidCount;
+  const totalPaidAmount = sportsPayouts.totalPaidAmount;
 
   const depositTxs = await prisma.transaction.findMany({
     where: {
@@ -169,6 +145,8 @@ export async function aggregateShopStatsForWalletIds(walletIds, { start, end }) 
     totalWithdrawAmount,
     totalPaidTickets,
     totalPaidAmount,
+    totalCashbackTickets,
+    totalCashbackAmount,
     totalCancelledTickets,
     totalCancelledAmount,
     grandNet,

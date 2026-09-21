@@ -89,6 +89,9 @@ function buildSalesReportEscPosParts(report, opts = {}) {
   parts.push(
     line(leftRight("Total Amount", formatMoney(report?.totalPaidAmount), chars)),
   );
+  parts.push(
+    line(leftRight("Cashback", formatMoney(report?.totalCashbackAmount), chars)),
+  );
 
   parts.push(line(sectionDivider(chars)));
   parts.push(new Uint8Array(CMD.BOLD_ON));

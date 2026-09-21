@@ -39,6 +39,11 @@ import {
   isSelectionRemovable,
   isSelectionStarted,
 } from "../../utils/selectionExpiry";
+import {
+  printStartedCancelMessage,
+  printStartedConfirmMessage,
+  selectionIdsForPrintIndexes,
+} from "../../utils/printStartedSelections";
 import { formatCouponNumberInput } from "../../utils/couponNumber";
 import {
   formatTaxLineLabel,
@@ -47,11 +52,24 @@ import {
 
 const STARTED_SELECTION_PRUNE_MS = 15_000;
 
+function getStartedSelections(ticket, now = Date.now()) {
+  return (ticket?.selections || []).filter((selection) =>
+    isSelectionStarted(selection.match?.startTime, now),
+  );
+}
+
 function getStartedSelectionIds(ticket, now = Date.now()) {
-  return (ticket?.selections || [])
-    .filter((selection) => isSelectionStarted(selection.match?.startTime, now))
+  return getStartedSelections(ticket, now)
     .map((selection) => selection.id)
     .filter(Boolean);
+}
+
+function selectionMatchLabel(selection) {
+  const home = String(selection?.match?.homeTeam || "").trim();
+  const away = String(selection?.match?.awayTeam || "").trim();
+  if (home && away) return `${home} vs ${away}`;
+  if (home || away) return home || away;
+  return String(selection?.selection || "Selection");
 }
 
 function canEditSellSelections(ticket, sellConfirmed) {
@@ -309,7 +327,7 @@ function TicketDetail({
                       : "-"}
                     {started ? (
                       <span className="mt-0.5 block text-[10px] font-semibold uppercase text-[var(--danger)]">
-                        Started
+                        {showSelectionResults ? "Started" : "Expired"}
                       </span>
                     ) : startingSoon ? (
                       <span className="mt-0.5 block text-[10px] font-semibold uppercase text-[var(--danger)]">
@@ -371,6 +389,142 @@ function canRepeatSlip(ticket) {
   );
 }
 
+function RepeatSlipModal({
+  open,
+  onClose,
+  loading,
+  ticket,
+  loadError,
+  error,
+  stakeInput,
+  onStakeInputChange,
+  editingStake,
+  onStartEditStake,
+  busy,
+  onConfirm,
+}) {
+  const started = ticket ? getStartedSelections(ticket) : [];
+  const total = ticket ? (ticket.selections || []).length : 0;
+  const remaining = total - started.length;
+  const allStarted = Boolean(ticket) && (total === 0 || remaining < 1);
+  const someStarted = started.length > 0 && remaining >= 1;
+  const parsedStake = Number(stakeInput);
+  const invalidStake = !Number.isFinite(parsedStake) || parsedStake <= 0;
+
+  return (
+    <Modal
+      open={open}
+      onClose={busy ? () => {} : onClose}
+      title="Reprint ticket"
+      centered
+    >
+      <div className="space-y-4">
+        {loading ? (
+          <p className="text-sm text-[var(--muted)]">Loading ticket...</p>
+        ) : loadError ? (
+          <p className="text-sm text-[var(--danger)]">{loadError}</p>
+        ) : ticket ? (
+          <>
+            <p className="text-sm">Reprint this ticket?</p>
+            <div className="rounded-sm border border-[var(--border)] bg-[var(--surfaceMuted)] px-3 py-3 text-sm">
+              <p>
+                <span className="font-semibold">Coupon:</span>{" "}
+                <span className="font-mono">{ticket.couponNumber}</span>
+              </p>
+              {editingStake ? (
+                <label className="mt-2 flex flex-col gap-1">
+                  <span className="text-[11px] font-semibold uppercase tracking-wide text-[var(--muted)]">
+                    Stake (ETB)
+                  </span>
+                  <input
+                    type="number"
+                    min="1"
+                    step="1"
+                    value={stakeInput}
+                    onChange={(event) => onStakeInputChange(event.target.value)}
+                    disabled={busy}
+                    className="w-36 rounded-sm border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm outline-none focus:border-[var(--accent)] disabled:opacity-60"
+                  />
+                </label>
+              ) : (
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <p>
+                    <span className="font-semibold">Stake:</span>{" "}
+                    {formatCurrency(ticket.stake)}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={onStartEditStake}
+                    disabled={busy}
+                    className="rounded-sm border border-[var(--border)] bg-[var(--surface)] px-2 py-0.5 text-[11px] font-semibold disabled:opacity-60"
+                  >
+                    Change stake
+                  </button>
+                </div>
+              )}
+            </div>
+            {allStarted ? (
+              <p className="rounded-sm border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-800">
+                All games on this ticket have already started. It cannot be
+                reprinted.
+              </p>
+            ) : someStarted ? (
+              <div className="rounded-sm border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-800">
+                <p>
+                  Some games have already started. Print this ticket without
+                  those games?
+                </p>
+                <ul className="mt-2 list-disc space-y-0.5 pl-5 text-xs">
+                  {started.map((selection) => (
+                    <li key={selection.id || selectionMatchLabel(selection)}>
+                      {selectionMatchLabel(selection)}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+          </>
+        ) : (
+          <p className="text-sm text-[var(--muted)]">No ticket loaded.</p>
+        )}
+        {error ? (
+          <p className="text-sm text-[var(--danger)]">{error}</p>
+        ) : null}
+        {invalidStake && editingStake ? (
+          <p className="text-xs text-[var(--danger)]">
+            Stake must be a positive number
+          </p>
+        ) : null}
+        <div className="flex flex-wrap justify-end gap-2">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={busy}
+            className="rounded-sm border border-[var(--border)] px-4 py-2 text-sm font-semibold text-[var(--muted)] disabled:opacity-60"
+          >
+            No
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            disabled={
+              busy ||
+              loading ||
+              Boolean(loadError) ||
+              !ticket ||
+              allStarted ||
+              invalidStake
+            }
+            className="rounded-sm bg-[var(--accent)] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+          >
+            {busy ? "Printing..." : "Yes"}
+          </button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
 function SlipsTable({
   items,
   page,
@@ -378,6 +532,7 @@ function SlipsTable({
   onPageChange,
   onRepeat,
   onUseCoupon,
+  repeatDisabled = false,
 }) {
   return (
     <PanelCard className="p-0">
@@ -434,7 +589,8 @@ function SlipsTable({
                     {canRepeatSlip(ticket) ? (
                       <button
                         type="button"
-                        className="rounded-sm border border-[var(--border)] bg-[var(--surfaceMuted)] px-2 py-1 text-[11px] font-semibold"
+                        className="rounded-sm border border-[var(--border)] bg-[var(--surfaceMuted)] px-2 py-1 text-[11px] font-semibold disabled:opacity-50"
+                        disabled={repeatDisabled}
                         onClick={() => onRepeat(ticket)}
                       >
                         Repeat
@@ -504,6 +660,14 @@ export default function CashierTicketsPage() {
   const [removingSelectionId, setRemovingSelectionId] = useState("");
   const [fixturesPanelOpen, setFixturesPanelOpen] = useState(false);
   const [addSelectionError, setAddSelectionError] = useState("");
+  const [reprintOpen, setReprintOpen] = useState(false);
+  const [reprintTicket, setReprintTicket] = useState(null);
+  const [reprintLoading, setReprintLoading] = useState(false);
+  const [reprintLoadError, setReprintLoadError] = useState("");
+  const [reprintError, setReprintError] = useState("");
+  const [reprintStakeInput, setReprintStakeInput] = useState("");
+  const [reprintEditingStake, setReprintEditingStake] = useState(false);
+  const [reprintBusy, setReprintBusy] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -648,7 +812,8 @@ export default function CashierTicketsPage() {
     updateStake.isPending ||
     repeatTicket.isPending ||
     removeSelection.isPending ||
-    addSelection.isPending;
+    addSelection.isPending ||
+    reprintBusy;
   const printerConnected = Boolean(printerStatus?.connected);
   const printerPort = printerStatus?.port || "";
   const printerQueueLength = Number(printerStatus?.queueLength) || 0;
@@ -844,34 +1009,105 @@ export default function CashierTicketsPage() {
     }
   };
 
-  const handlePrint = async () => {
-    if (!sellTicket || printInFlightRef.current) return;
+  const printTicketToPrinter = async (
+    ticket,
+    { promptStartedRemoval = true, onTicketUpdate } = {},
+  ) => {
+    if (!ticket || printInFlightRef.current) {
+      return { ok: false, cancelled: true };
+    }
     printInFlightRef.current = true;
-    setSellError("");
-    const ticketForWalletAndPrint = sellTicket;
+    let current = ticket;
 
-    const runWithDriftRetry = async (mutateAsync, basePayload) => {
+    const applyTicket = (next) => {
+      current = next;
+      onTicketUpdate?.(next);
+      return next;
+    };
+
+    const removeStartedForPrint = async (startedRows) => {
+      const ids = selectionIdsForPrintIndexes(current, startedRows);
+      const remainingCount = (current.selections || []).length - ids.length;
+      if (ids.length === 0) {
+        throw Object.assign(
+          new Error(
+            "Some selections have already started. Remove them to continue printing.",
+          ),
+          { handled: true },
+        );
+      }
+      if (remainingCount < 1) {
+        throw Object.assign(
+          new Error(
+            "All selections on this ticket have already started. Reject it or add new selections.",
+          ),
+          { handled: true },
+        );
+      }
+      if (promptStartedRemoval) {
+        const shouldRemove = window.confirm(
+          printStartedConfirmMessage(ids.length),
+        );
+        if (!shouldRemove) {
+          throw Object.assign(new Error(printStartedCancelMessage()), {
+            handled: true,
+          });
+        }
+      }
+      let updated = current;
+      for (const selectionId of ids) {
+        if (!(updated.selections || []).some((row) => row.id === selectionId)) {
+          continue;
+        }
+        if ((updated.selections || []).length <= 1) break;
+        updated = await removeSelection.mutateAsync({
+          ticketId: updated.id,
+          selectionId,
+        });
+      }
+      applyTicket(updated);
+      setActionSuccess(
+        ids.length === 1
+          ? "Removed 1 started selection. Continuing print..."
+          : `Removed ${ids.length} started selections. Continuing print...`,
+      );
+      return updated;
+    };
+
+    const runWithPrintGuards = async (
+      mutateAsync,
+      basePayload,
+      { allowStartedRemoval = false } = {},
+    ) => {
       try {
         return await mutateAsync(basePayload);
       } catch (error) {
-        const driftCode = String(error?.code || "");
-        if (PRINT_DRIFT_CODES.has(driftCode) && error?.details) {
+        const code = String(error?.code || "");
+        if (
+          allowStartedRemoval &&
+          code === "fixture_started" &&
+          error?.details
+        ) {
+          const startedRows = Array.isArray(error.details.selections)
+            ? error.details.selections
+            : [];
+          await removeStartedForPrint(startedRows);
+          return mutateAsync(basePayload);
+        }
+        if (PRINT_DRIFT_CODES.has(code) && error?.details) {
           const changedRows = Array.isArray(error.details.selections)
             ? error.details.selections
             : [];
-          const shouldAccept = window.confirm(printDriftConfirmMessage(driftCode));
+          const shouldAccept = window.confirm(printDriftConfirmMessage(code));
           if (!shouldAccept) {
-            throw Object.assign(new Error(printDriftCancelMessage(driftCode)), {
+            throw Object.assign(new Error(printDriftCancelMessage(code)), {
               handled: true,
             });
           }
           return mutateAsync({
             ...basePayload,
             acceptOddsChanges: true,
-            selections: buildAcceptDriftSelections(
-              changedRows,
-              ticketForWalletAndPrint,
-            ),
+            selections: buildAcceptDriftSelections(changedRows, current),
           });
         }
         throw error;
@@ -879,36 +1115,40 @@ export default function CashierTicketsPage() {
     };
 
     try {
-      // Fail fast when the printer is offline — before any network call.
       if (!printerConnected) {
-        setSellError(
-          "Printer offline. Ensure local print service is running and POS80 printer is connected.",
-        );
-        setTicketPreviewOpen(false);
-        return;
+        return {
+          ok: false,
+          error:
+            "Printer offline. Ensure local print service is running and POS80 printer is connected.",
+          ticket: current,
+        };
       }
 
-      const stakeAmount = toNumber(ticketForWalletAndPrint.stake);
+      const stakeAmount = toNumber(current.stake);
       if (
         cashierBalance != null &&
         Number.isFinite(stakeAmount) &&
         toNumber(cashierBalance) < stakeAmount
       ) {
-        setSellError("Insufficient cashier balance");
-        setActionSuccess("");
-        setTicketPreviewOpen(false);
-        return;
+        return {
+          ok: false,
+          error: "Insufficient cashier balance",
+          ticket: current,
+          insufficient: true,
+        };
       }
 
-      // Single pre-print round trip: prepare-print validates odds/markets,
-      // checks cashier balance, and reserves the receipt number.
       setActionSuccess("Validating ticket before print...");
-      const prepareResult = await runWithDriftRetry(preparePrint.mutateAsync, {
-        ticketId: ticketForWalletAndPrint.id,
-      });
+      const prepareResult = await runWithPrintGuards(
+        preparePrint.mutateAsync,
+        {
+          ticketId: current.id,
+        },
+        { allowStartedRemoval: true },
+      );
       const ticketToPrint = prepareResult?.ticket
         ? mapTicketDetail(prepareResult.ticket)
-        : ticketForWalletAndPrint;
+        : current;
 
       setActionSuccess("Sending ticket to printer...");
       const escposData = await encodeTicketAsync(ticketToPrint, {
@@ -917,37 +1157,29 @@ export default function CashierTicketsPage() {
       });
       const localPrintResult = await printViaLocalService(escposData);
       if (!localPrintResult.success) {
-        const localError = String(
+        let error = String(
           localPrintResult.error?.message ||
             "Failed to send ticket to local printer service.",
         );
-        setActionSuccess("");
         if (localPrintResult.code === "service_unreachable") {
-          setSellError(
-            "Local print service unreachable. Start PrinterBridge.exe on this PC.",
-          );
+          error =
+            "Local print service unreachable. Start PrinterBridge.exe on this PC.";
         } else if (localPrintResult.code === "com_unavailable") {
-          setSellError(
-            "Printer queue unavailable. Check POS80 is installed in Windows Print queues.",
-          );
-        } else {
-          setSellError(localError);
+          error =
+            "Printer queue unavailable. Check POS80 is installed in Windows Print queues.";
         }
-        setTicketPreviewOpen(false);
-        return;
+        return { ok: false, error, ticket: current };
       }
 
       setActionSuccess("Print sent. Confirming sale...");
       let confirmResult;
       try {
-        confirmResult = await runWithDriftRetry(confirmPrint.mutateAsync, {
-          ticketId: ticketForWalletAndPrint.id,
+        confirmResult = await runWithPrintGuards(confirmPrint.mutateAsync, {
+          ticketId: current.id,
         });
       } catch (error) {
         if (error?.code === "status_conflict") {
-          const existing = await loadTicketById.mutateAsync(
-            ticketForWalletAndPrint.id,
-          );
+          const existing = await loadTicketById.mutateAsync(current.id);
           if (existing?.status === "PRINTED") {
             confirmResult = {
               alreadyPrinted: true,
@@ -962,43 +1194,52 @@ export default function CashierTicketsPage() {
         }
       }
 
-      setPrintedTicket(ticketForWalletAndPrint.id);
+      setPrintedTicket(current.id);
 
       let updatedTicket;
       if (confirmResult?.ticket) {
         updatedTicket = mapTicketDetail(confirmResult.ticket);
       } else {
-        updatedTicket = await loadTicketById.mutateAsync(
-          ticketForWalletAndPrint.id,
-        );
+        updatedTicket = await loadTicketById.mutateAsync(current.id);
       }
-      setSellTicket(updatedTicket);
+      applyTicket(updatedTicket);
 
-      // Fire-and-forget: don't block the cashier on post-sale refetches.
       Promise.all([slipsQuery.refetch(), walletQuery.refetch()]).catch(() => {});
 
-      const walletMessage = confirmResult.alreadyPrinted
-        ? "Ticket already confirmed; wallet was not deducted again."
-        : `Wallet deducted by ${formatCurrency(confirmResult.deductedAmount)}.`;
-
-      setTicketPreviewOpen(false);
-      setActionSuccess(`${walletMessage} Ticket printed successfully.`);
+      return {
+        ok: true,
+        ticket: updatedTicket,
+        alreadyPrinted: Boolean(confirmResult.alreadyPrinted),
+        deductedAmount: confirmResult.deductedAmount,
+      };
     } catch (error) {
-      if (error?.handled) {
-        setSellError(error.message);
-      } else {
-        setSellError(error?.message || "Failed to print ticket");
-      }
+      return {
+        ok: false,
+        error: error?.message || "Failed to print ticket",
+        handled: Boolean(error?.handled),
+        ticket: current,
+        insufficient: /insufficient/i.test(String(error?.message || "")),
+      };
+    } finally {
+      printInFlightRef.current = false;
+    }
+  };
+
+  const handlePrint = async () => {
+    if (!sellTicket || printInFlightRef.current) return;
+    setSellError("");
+    const result = await printTicketToPrinter(sellTicket, {
+      promptStartedRemoval: true,
+      onTicketUpdate: setSellTicket,
+    });
+    if (result.cancelled) return;
+    setTicketPreviewOpen(false);
+    if (!result.ok) {
+      setSellError(result.error);
       setActionSuccess("");
-      setTicketPreviewOpen(false);
-      if (
-        /insufficient/i.test(String(error?.message || "")) &&
-        ticketForWalletAndPrint?.id
-      ) {
+      if (result.insufficient && result.ticket?.id) {
         try {
-          const refreshed = await loadTicketById.mutateAsync(
-            ticketForWalletAndPrint.id,
-          );
+          const refreshed = await loadTicketById.mutateAsync(result.ticket.id);
           setSellTicket(refreshed);
         } catch {
           /* keep current ticket if refresh fails */
@@ -1007,9 +1248,12 @@ export default function CashierTicketsPage() {
           () => {},
         );
       }
-    } finally {
-      printInFlightRef.current = false;
+      return;
     }
+    const walletMessage = result.alreadyPrinted
+      ? "Ticket already confirmed; wallet was not deducted again."
+      : `Wallet deducted by ${formatCurrency(result.deductedAmount)}.`;
+    setActionSuccess(`${walletMessage} Ticket printed successfully.`);
   };
 
   const refreshPayoutTicket = async (ticket) => {
@@ -1113,34 +1357,153 @@ export default function CashierTicketsPage() {
     }
   };
 
-  const handleRepeat = (ticket) => {
-    if (!ticket?.id) return;
+  const closeReprintModal = () => {
+    if (reprintBusy) return;
+    setReprintOpen(false);
+    setReprintTicket(null);
+    setReprintLoading(false);
+    setReprintLoadError("");
+    setReprintError("");
+    setReprintStakeInput("");
+    setReprintEditingStake(false);
+  };
+
+  const loadCopyIntoSell = (ticket, errorMessage) => {
     setLeftTab("sell");
-    setSellCouponInput(formatCouponNumberInput(ticket.couponNumber || ""));
-    setSellTicket(null);
-    setSellStakeInput("");
+    setSellTicket(ticket);
+    setSellCouponInput(formatCouponNumberInput(ticket?.couponNumber || ""));
+    setSellStakeInput(String(toNumber(ticket?.stake)));
     setSellConfirmed(false);
     setTicketPreviewOpen(false);
-    setSellError("");
+    setSellError(errorMessage || "Failed to print ticket");
     setActionSuccess("");
+  };
+
+  const dropStartedSelections = async (ticket) => {
+    const startedIds = getStartedSelectionIds(ticket);
+    if (startedIds.length === 0) return ticket;
+    const remainingCount = (ticket.selections || []).length - startedIds.length;
+    if (remainingCount < 1) {
+      throw new Error(
+        "All selections on this ticket have already started. Reject it or add new selections.",
+      );
+    }
+    let updated = ticket;
+    for (const selectionId of startedIds) {
+      const stillStarted = getStartedSelectionIds(updated);
+      if (!stillStarted.includes(selectionId)) continue;
+      if ((updated.selections || []).length <= 1) break;
+      updated = await removeSelection.mutateAsync({
+        ticketId: updated.id,
+        selectionId,
+      });
+    }
+    return updated;
+  };
+
+  const handleRepeat = (ticket) => {
+    if (!ticket?.id) return;
+    setReprintOpen(true);
+    setReprintTicket(null);
+    setReprintLoading(true);
+    setReprintLoadError("");
+    setReprintError("");
+    setReprintStakeInput(String(toNumber(ticket.stake)));
+    setReprintEditingStake(false);
     void (async () => {
       try {
-        const newTicket = await repeatTicket.mutateAsync(ticket.id);
-        setSellTicket(newTicket);
-        setSellCouponInput(
-          formatCouponNumberInput(newTicket.couponNumber || ""),
-        );
-        setSellStakeInput(String(toNumber(newTicket.stake)));
-        setSellConfirmed(false);
-        setActionSuccess("New ticket ready. Review selections and confirm.");
-        await pruneStartedSellSelections(newTicket);
+        const detail = await loadTicketById.mutateAsync(ticket.id);
+        setReprintTicket(detail);
+        setReprintStakeInput(String(toNumber(detail?.stake)));
       } catch (error) {
-        setSellTicket(null);
-        setSellStakeInput("");
-        setSellConfirmed(false);
-        setSellError(error?.message || "Failed to repeat ticket");
+        setReprintLoadError(error?.message || "Failed to load ticket");
+      } finally {
+        setReprintLoading(false);
       }
     })();
+  };
+
+  const handleReprintConfirm = async () => {
+    if (!reprintTicket || reprintBusy || printInFlightRef.current) return;
+
+    const parsedStake = Number(reprintStakeInput);
+    if (!Number.isFinite(parsedStake) || parsedStake <= 0) {
+      setReprintError("Stake must be a positive number");
+      return;
+    }
+
+    const started = getStartedSelections(reprintTicket);
+    const remaining =
+      (reprintTicket.selections || []).length - started.length;
+    if ((reprintTicket.selections || []).length === 0 || remaining < 1) {
+      setReprintError(
+        "All games on this ticket have already started. It cannot be reprinted.",
+      );
+      return;
+    }
+
+    setReprintBusy(true);
+    setReprintError("");
+    setSellError("");
+    setActionSuccess("");
+
+    let newTicket = null;
+    try {
+      if (!printerConnected) {
+        setReprintError(
+          "Printer offline. Ensure local print service is running and POS80 printer is connected.",
+        );
+        return;
+      }
+      if (
+        cashierBalance != null &&
+        Number.isFinite(parsedStake) &&
+        toNumber(cashierBalance) < parsedStake
+      ) {
+        setReprintError("Insufficient cashier balance");
+        return;
+      }
+
+      newTicket = await repeatTicket.mutateAsync(reprintTicket.id);
+      if (parsedStake !== toNumber(newTicket.stake)) {
+        newTicket = await updateStake.mutateAsync({
+          ticketId: newTicket.id,
+          stake: parsedStake,
+        });
+      }
+      newTicket = await dropStartedSelections(newTicket);
+
+      const result = await printTicketToPrinter(newTicket, {
+        promptStartedRemoval: true,
+        onTicketUpdate: (updated) => {
+          newTicket = updated;
+        },
+      });
+      if (result.cancelled) return;
+      if (!result.ok) {
+        setReprintOpen(false);
+        loadCopyIntoSell(result.ticket || newTicket, result.error);
+        return;
+      }
+
+      setReprintOpen(false);
+      setReprintTicket(null);
+      setReprintEditingStake(false);
+      const walletMessage = result.alreadyPrinted
+        ? "Ticket already confirmed; wallet was not deducted again."
+        : `Wallet deducted by ${formatCurrency(result.deductedAmount)}.`;
+      setActionSuccess(`${walletMessage} Ticket printed successfully.`);
+    } catch (error) {
+      const message = error?.message || "Failed to reprint ticket";
+      if (newTicket) {
+        setReprintOpen(false);
+        loadCopyIntoSell(newTicket, message);
+      } else {
+        setReprintError(message);
+      }
+    } finally {
+      setReprintBusy(false);
+    }
   };
 
   const handleRemoveSelection = async (selectionId) => {
@@ -1207,7 +1570,9 @@ export default function CashierTicketsPage() {
     if (!canEditSellSelections(sellTicket, sellConfirmed)) return undefined;
 
     const tick = () => {
-      if (!sellTicket || pruningStartedRef.current) return;
+      if (!sellTicket || pruningStartedRef.current || printInFlightRef.current) {
+        return;
+      }
       if (getStartedSelectionIds(sellTicket).length === 0) return;
       void pruneStartedSellSelections(sellTicket, { announce: true });
     };
@@ -1749,6 +2114,7 @@ export default function CashierTicketsPage() {
                     onPageChange={setSlipsPage}
                     onRepeat={handleRepeat}
                     onUseCoupon={handleUseCouponFromTable}
+                    repeatDisabled={isBusy || reprintOpen}
                   />
                 </div>
               )}
@@ -1756,6 +2122,21 @@ export default function CashierTicketsPage() {
           </PanelCard>
         </div>
       </div>
+
+      <RepeatSlipModal
+        open={reprintOpen}
+        onClose={closeReprintModal}
+        loading={reprintLoading}
+        ticket={reprintTicket}
+        loadError={reprintLoadError}
+        error={reprintError}
+        stakeInput={reprintStakeInput}
+        onStakeInputChange={setReprintStakeInput}
+        editingStake={reprintEditingStake}
+        onStartEditStake={() => setReprintEditingStake(true)}
+        busy={reprintBusy}
+        onConfirm={() => void handleReprintConfirm()}
+      />
 
       <Modal
         open={ticketPreviewOpen}

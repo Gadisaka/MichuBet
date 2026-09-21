@@ -20,8 +20,34 @@ import {
   fetchProfile,
 } from "../services/api";
 import { usePlatformSettings } from "../hooks/usePlatformSettings";
-import { withdrawAmountViolation } from "../utils/stakeLimits";
 import { useTranslation } from "../i18n/LanguageContext.jsx";
+
+function withdrawFormError(t, limits, amount, { balance, withdrawable }) {
+  if (!Number.isFinite(amount) || amount <= 0) {
+    return t("withdraw.invalidAmount");
+  }
+  if (withdrawable != null && amount > withdrawable) {
+    return `${t("withdraw.exceedsWithdrawable")} ${Number(withdrawable).toLocaleString()} ETB`;
+  }
+  if (balance != null && amount > balance) {
+    return t("withdraw.exceedsBalance");
+  }
+  const minW = limits?.MIN_WITHDRAW;
+  const maxW = limits?.MAX_WITHDRAW;
+  if (minW != null && Number.isFinite(minW) && amount < minW) {
+    return `${t("withdraw.min")} ${minW} ETB`;
+  }
+  if (maxW != null && Number.isFinite(maxW) && amount > maxW) {
+    return `${t("withdraw.max")} ${maxW} ETB`;
+  }
+  return "";
+}
+
+function bankTypeLabel(type, t) {
+  if (type === "WALLET") return t("withdraw.walletType");
+  if (type === "BANK") return t("withdraw.bankType");
+  return type;
+}
 
 function money(n) {
   return Number(n ?? 0).toLocaleString();
@@ -138,13 +164,10 @@ function WithdrawOnline() {
   }, [navigate]);
 
   function validateAmount() {
-    const n = Number(amount);
-    if (!Number.isFinite(n) || n <= 0) return "Enter a valid amount.";
-    if (withdrawable != null && n > withdrawable) {
-      return `Withdrawable balance is ${withdrawable.toLocaleString()} ETB.`;
-    }
-    if (balance != null && n > balance) return "Amount exceeds your balance.";
-    return withdrawAmountViolation(limits, n);
+    return withdrawFormError(t, limits, Number(amount), {
+      balance,
+      withdrawable,
+    });
   }
 
   async function handleConfirm(e) {
@@ -181,7 +204,7 @@ function WithdrawOnline() {
       setAccountName("");
       await load();
     } catch (err) {
-      setFormError(err.message || "Something went wrong.");
+      setFormError(err.message || t("withdraw.somethingWrong"));
     } finally {
       setSubmitting(false);
     }
@@ -216,7 +239,7 @@ function WithdrawOnline() {
         {loading ? (
           <div className="flex flex-col items-center justify-center gap-4 py-24 text-[rgba(255,255,255,0.72)]">
             <div className="h-7 w-7 animate-spin rounded-full border-2 border-[#F6AF01] border-t-(--sb-accent-fill)" />
-            <span className="text-sm font-semibold">Loading…</span>
+            <span className="text-sm font-semibold">{t("withdraw.loading")}</span>
           </div>
         ) : pageError ? (
           <SoftPanel>
@@ -253,16 +276,19 @@ function WithdrawOnline() {
 
             <SoftPanel>
               <p className="mb-2 text-center text-xs font-extrabold uppercase tracking-[0.18em] text-[rgba(255,255,255,0.72)]">
-                {t("menu.balance")}
+                {t("withdraw.balance")}
               </p>
               <p className="m-0 text-center text-3xl font-black tabular-nums text-(--sb-positive)">
                 {balance == null ? "—" : `${money(balance)} ETB`}
               </p>
               <p className="mt-3 m-0 text-center text-xs font-extrabold uppercase tracking-[0.18em] text-[rgba(255,255,255,0.72)]">
-                Withdrawable
+                {t("withdraw.withdrawable")}
               </p>
               <p className="m-0 text-center text-xl font-black tabular-nums text-[#ffffff]">
                 {withdrawable == null ? "—" : `${money(withdrawable)} ETB`}
+              </p>
+              <p className="mt-2 m-0 text-center text-[11px] leading-relaxed text-[rgba(255,255,255,0.5)]">
+                {t("withdraw.winningsOnly")}
               </p>
             </SoftPanel>
 
@@ -388,7 +414,7 @@ function WithdrawOnline() {
                     >
                       <p className="m-0 font-bold text-[#ffffff]">{b.name}</p>
                       <p className="m-0 text-[11px] uppercase text-[rgba(255,255,255,0.45)]">
-                        {b.type}
+                        {bankTypeLabel(b.type, t)}
                       </p>
                     </button>
                   ))}

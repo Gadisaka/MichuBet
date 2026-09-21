@@ -4,6 +4,7 @@
  *
  * @module controllers/cashierWalletController
  */
+import { randomUUID } from "node:crypto";
 import { prisma } from "../Config/db.js";
 import { logAuditEvent } from "../lib/auditLog.js";
 import { notifyUserSafe } from "../lib/createNotification.js";
@@ -79,6 +80,13 @@ export async function cashierDeposit(req, res) {
       const cWallet = await tx.wallet.findUnique({ where: { id: cashierWallet.id } });
       const pWallet = await tx.wallet.findUnique({ where: { id: playerWallet.id } });
 
+      if (!cWallet) {
+        throw new Error("CASHIER_WALLET_INVALID");
+      }
+      if (!pWallet || pWallet.balance == null) {
+        throw new Error("PLAYER_WALLET_INVALID");
+      }
+
       const playerUser = await tx.user.findUnique({
         where: { id: player.id },
         select: { first_deposit_at: true },
@@ -104,7 +112,9 @@ export async function cashierDeposit(req, res) {
         withdrawable: false,
       });
 
-      const depositRefBase = `cashier-deposit:${req.user.sub}:to:${player.id}`;
+      // `Transaction.reference` is unique. Include a UUID so a cashier can
+      // deposit to the same player more than once.
+      const depositRefBase = `cashier-deposit:${req.user.sub}:to:${player.id}:${randomUUID()}`;
 
       // Record on cashier wallet (WITHDRAW — money leaving cashier)
       const cashierTx = await tx.transaction.create({
@@ -130,12 +140,19 @@ export async function cashierDeposit(req, res) {
         },
       });
 
-      await applyDepositBonusesInTx(tx, {
-        walletId: pWallet.id,
-        depositAmount: numericAmount,
-        playerDepositTxId: playerTx.id,
-        hadFirstDepositAt: hadFirst,
-      });
+      try {
+        await applyDepositBonusesInTx(tx, {
+          walletId: pWallet.id,
+          depositAmount: numericAmount,
+          playerDepositTxId: playerTx.id,
+          hadFirstDepositAt: hadFirst,
+        });
+      } catch (bonusErr) {
+        console.error(
+          "Bonus application failed (deposit still succeeded):",
+          bonusErr,
+        );
+      }
 
       if (!hadFirst) {
         await tx.user.update({
@@ -179,8 +196,23 @@ export async function cashierDeposit(req, res) {
       cashierBalance: result.cashierBalance,
     });
   } catch (error) {
-    if (error.message === "INSUFFICIENT_BALANCE") {
+    if (error?.message === "INSUFFICIENT_BALANCE") {
       return res.status(400).json({ message: "Insufficient cashier balance" });
+    }
+    if (error?.message === "INVALID_AMOUNT") {
+      return res.status(400).json({ message: "Invalid deposit amount" });
+    }
+    if (error?.message === "WALLET_TYPE_MISSING") {
+      return res.status(500).json({ message: "Player wallet configuration error" });
+    }
+    if (error?.message === "PLAYER_WALLET_INVALID") {
+      return res.status(404).json({ message: "Player wallet not found" });
+    }
+    if (error?.message === "CASHIER_WALLET_INVALID") {
+      return res.status(404).json({ message: "Cashier wallet not found" });
+    }
+    if (error?.code === "P2002") {
+      return res.status(409).json({ message: "Deposit already recorded" });
     }
     console.error("cashierDeposit error:", error);
     return res.status(500).json({ message: "Failed to process deposit" });
