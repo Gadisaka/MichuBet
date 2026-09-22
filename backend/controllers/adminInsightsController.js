@@ -1,4 +1,5 @@
 import { prisma } from "../Config/db.js";
+import { excludeOnlineWithdrawLedgerWhere } from "../lib/onlineWithdrawSettings.js";
 import { applyReportableTicketFilter } from "../lib/ticketExpiry.js";
 import {
   isSportsbookWinPayoutRef,
@@ -177,6 +178,7 @@ export async function getAdminDashboardInsights(req, res) {
           wallet: { wallet_type: "PLAYER" },
           type: { in: ["DEPOSIT", "WITHDRAW"] },
           created_at: { gte: start, lte: end },
+          ...excludeOnlineWithdrawLedgerWhere(),
         },
         select: { type: true, amount: true },
       }),
@@ -193,6 +195,7 @@ export async function getAdminDashboardInsights(req, res) {
         where: {
           wallet: { wallet_type: "PLAYER" },
           type: { in: ["DEPOSIT", "WITHDRAW"] },
+          ...excludeOnlineWithdrawLedgerWhere(),
         },
         include: {
           wallet: {

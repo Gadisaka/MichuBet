@@ -4,6 +4,7 @@ import { ROLE_LABELS } from "../../constants/auth";
 import AdminShell from "../../components/layout/AdminShell";
 import PanelCard from "../../components/ui/PanelCard";
 import { useAdminDashboardInsightsQuery } from "../../hook/useAdminInsights";
+import TicketWatchSection from "../../components/dashboard/TicketWatchSection";
 
 const DASHBOARD_ALLOWED_ROLES = ["SUPER_ADMIN", "ADMIN"];
 
@@ -458,6 +459,31 @@ export default function DashboardPage() {
               </tbody>
             </table>
           </PanelCard>
+
+          <TicketWatchSection
+            mode="admin"
+            view="payable"
+            title="Payable — last 2 days"
+            description="Won tickets that have not been paid yet. Dates use the day the ticket was settled. Defaults to yesterday and today."
+            amountLabel="Net payout"
+            timeLabel="Settled"
+          />
+          <TicketWatchSection
+            mode="admin"
+            view="high-potential"
+            title="High win potential"
+            description="Sold tickets with 1 or 2 selections still pending and no lost selection. A void leg does not count as remaining. Leave dates empty to include every open ticket."
+            amountLabel="Net potential"
+            timeLabel="Placed"
+          />
+          <TicketWatchSection
+            mode="admin"
+            view="paid"
+            title="Paid tickets"
+            description="Winning tickets already paid in the selected payout dates, highest net payout first. Cashback refunds are excluded."
+            amountLabel="Net payout"
+            timeLabel="Paid"
+          />
         </div>
       )}
     </AdminShell>

@@ -23,6 +23,29 @@ export const ONLINE_WITHDRAW_DEBIT_REF_PREFIX = "online-withdraw:";
 export const ONLINE_WITHDRAW_SETTLE_REF_PREFIX = "online-withdraw-settle:";
 export const ONLINE_WITHDRAW_REFUND_REF_PREFIX = "online-withdraw-refund:";
 
+const ONLINE_WITHDRAW_LEDGER_PREFIXES = [
+  ONLINE_WITHDRAW_DEBIT_REF_PREFIX,
+  ONLINE_WITHDRAW_SETTLE_REF_PREFIX,
+  ONLINE_WITHDRAW_REFUND_REF_PREFIX,
+];
+
+/** Player debit, cashier settlement, and refund — not shop deposit/withdraw cash. */
+export function isOnlineWithdrawLedgerReference(reference) {
+  const ref = String(reference || "");
+  return ONLINE_WITHDRAW_LEDGER_PREFIXES.some((prefix) => ref.startsWith(prefix));
+}
+
+/** Prisma filter so wallet reports ignore the online-withdraw ledger. */
+export function excludeOnlineWithdrawLedgerWhere() {
+  return {
+    NOT: {
+      OR: ONLINE_WITHDRAW_LEDGER_PREFIXES.map((prefix) => ({
+        reference: { startsWith: prefix },
+      })),
+    },
+  };
+}
+
 /**
  * @param {number} amount gross
  * @param {number} feePercent e.g. 10 for 10%

@@ -2179,10 +2179,21 @@ export async function createPrebookTicket(req, res) {
   }
 }
 
+/** No cashier assigned: online/player slips (null or field omitted). */
+const PLAYER_TICKET_SOURCE_FILTER = {
+  OR: [{ cashier_id: null }, { cashier_id: { isSet: false } }],
+};
+
+/** Shop slips: cashier_id is present and not null. */
+const CASHIER_TICKET_SOURCE_FILTER = {
+  AND: [{ cashier_id: { isSet: true } }, { NOT: { cashier_id: null } }],
+};
+
 /**
  * GET /api/tickets
  * Query filters: couponNumber, receiptId (ticket id), status, cashierId,
- * userId, branchName, branchLocation, date (YYYY-MM-DD), page, limit
+ * userId, branchName, branchLocation, date (YYYY-MM-DD), source
+ * (player | cashier | all), page, limit
  */
 export async function listTickets(req, res) {
   try {
@@ -2199,6 +2210,15 @@ export async function listTickets(req, res) {
     const branchName = String(req.query.branchName || "").trim();
     const branchLocation = String(req.query.branchLocation || "").trim();
     const date = String(req.query.date || "").trim();
+    const sourceRaw = String(req.query.source || "").trim().toLowerCase();
+    const source = sourceRaw === "all" ? "" : sourceRaw;
+    if (source && source !== "player" && source !== "cashier") {
+      return res.status(400).json({ message: "Invalid source filter" });
+    }
+    const applySourceFilter =
+      Boolean(source) &&
+      req.user.role !== "CASHIER" &&
+      req.user.role !== "AGENT";
 
     const where = {};
     let resolvedCashierId = "";
@@ -2241,9 +2261,26 @@ export async function listTickets(req, res) {
       where.status = status;
     }
 
-    if (cashierId && req.user.role !== "CASHIER") {
+    const ignoreCashierId = applySourceFilter && source === "player";
+    if (cashierId && req.user.role !== "CASHIER" && !ignoreCashierId) {
       where.cashier_id = cashierId;
       resolvedCashierId = cashierId;
+    }
+
+    if (applySourceFilter && source === "player") {
+      where.AND = [
+        ...(Array.isArray(where.AND) ? where.AND : []),
+        PLAYER_TICKET_SOURCE_FILTER,
+      ];
+    } else if (
+      applySourceFilter &&
+      source === "cashier" &&
+      !where.cashier_id
+    ) {
+      where.AND = [
+        ...(Array.isArray(where.AND) ? where.AND : []),
+        CASHIER_TICKET_SOURCE_FILTER,
+      ];
     }
 
     if (userId) {
@@ -3296,6 +3333,8 @@ async function clearUnpaidPrintReservation(ticketId) {
  * for an OPEN ticket in one round trip before physical print (no wallet debit).
  * Balance is checked before receipt assignment because receipt_number is what
  * marks a ticket as paid/settleable in reports and coupon check.
+ * Cashier and branch are not saved here. Confirm-print persists them in the
+ * same transaction that charges the wallet and sets PRINTED.
  */
 export async function preparePrintTicket(req, res) {
   try {
@@ -3387,12 +3426,7 @@ export async function preparePrintTicket(req, res) {
       );
       await prisma.ticket.update({
         where: { id: ticket.id },
-        data: {
-          receipt_number: receiptNumber,
-          cashier_id: ticket.cashier_id || cashier.id,
-          branch_name: ticket.branch_name || cashier.branch_name,
-          branch_location: ticket.branch_location || cashier.branch_location,
-        },
+        data: { receipt_number: receiptNumber },
       });
     }
 
@@ -3409,11 +3443,26 @@ export async function preparePrintTicket(req, res) {
         })
       : new Set();
 
+    let mappedTicket = preparedTicket
+      ? mapTicket(preparedTicket, { printed: printedSet.has(ticket.id) })
+      : undefined;
+    // Slip text for the printer only. cashierId stays unset until confirm-print.
+    if (mappedTicket && preparedTicket && !preparedTicket.cashier_id) {
+      const cashierUser = await prisma.user.findUnique({
+        where: { id: cashier.user_id },
+        select: { name: true },
+      });
+      mappedTicket = {
+        ...mappedTicket,
+        branchName: cashier.branch_name || "",
+        branchLocation: cashier.branch_location || "",
+        cashierName: cashierUser?.name ?? null,
+      };
+    }
+
     return res.json({
       message: "Ticket prepared for print",
-      ticket: preparedTicket
-        ? mapTicket(preparedTicket, { printed: printedSet.has(ticket.id) })
-        : undefined,
+      ticket: mappedTicket,
     });
   } catch (error) {
     console.error("preparePrintTicket error:", error);

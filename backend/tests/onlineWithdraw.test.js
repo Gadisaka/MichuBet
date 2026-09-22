@@ -3,6 +3,8 @@ import test from "node:test";
 import {
   computeOnlineWithdrawFee,
   DEFAULT_ONLINE_WITHDRAW_FEE_PERCENT,
+  excludeOnlineWithdrawLedgerWhere,
+  isOnlineWithdrawLedgerReference,
 } from "../lib/onlineWithdrawSettings.js";
 import {
   getBankByCode,
@@ -21,6 +23,23 @@ test("fee rounding uses money decimals", () => {
   const r = computeOnlineWithdrawFee(33.33, 10);
   assert.equal(r.feeAmount, 3.33);
   assert.equal(r.netAmount, 30);
+});
+
+test("online withdraw ledger lines are excluded from wallet reports", () => {
+  assert.equal(isOnlineWithdrawLedgerReference("online-withdraw:req1"), true);
+  assert.equal(isOnlineWithdrawLedgerReference("online-withdraw-refund:req1"), true);
+  assert.equal(isOnlineWithdrawLedgerReference("online-withdraw-settle:req1"), true);
+  assert.equal(isOnlineWithdrawLedgerReference("cashier-deposit:abc"), false);
+  assert.equal(isOnlineWithdrawLedgerReference("cashier-withdraw-approve:abc"), false);
+  assert.equal(isOnlineWithdrawLedgerReference("pending:shop-withdraw:abc"), false);
+
+  const where = excludeOnlineWithdrawLedgerWhere();
+  const prefixes = where.NOT.OR.map((clause) => clause.reference.startsWith);
+  assert.deepEqual(prefixes, [
+    "online-withdraw:",
+    "online-withdraw-settle:",
+    "online-withdraw-refund:",
+  ]);
 });
 
 test("bank lookup is case-insensitive", () => {

@@ -1,4 +1,5 @@
 import { prisma } from "../Config/db.js";
+import { excludeOnlineWithdrawLedgerWhere } from "../lib/onlineWithdrawSettings.js";
 
 function parseDateYmd(value) {
   if (!value) return null;
@@ -116,6 +117,7 @@ export async function getFinancialSupportDashboard(req, res) {
           wallet: { wallet_type: "PLAYER" },
           type: { in: ["DEPOSIT", "WITHDRAW"] },
           created_at: { gte: start, lte: end },
+          ...excludeOnlineWithdrawLedgerWhere(),
         },
         include: {
           wallet: {
@@ -129,6 +131,7 @@ export async function getFinancialSupportDashboard(req, res) {
           wallet: { wallet_type: "PLAYER" },
           type: { in: ["DEPOSIT", "WITHDRAW"] },
           created_at: { gte: chartStart, lte: chartEnd },
+          ...excludeOnlineWithdrawLedgerWhere(),
         },
         select: { type: true, amount: true, created_at: true },
       }),
@@ -276,6 +279,7 @@ export async function getFinancialSupportReports(req, res) {
         wallet: { wallet_type: "PLAYER" },
         type: { in: ["DEPOSIT", "WITHDRAW"] },
         created_at: { gte: start, lte: end },
+        ...excludeOnlineWithdrawLedgerWhere(),
       },
       select: {
         type: true,

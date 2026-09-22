@@ -20,6 +20,21 @@ function formatDateTime(value) {
   return date.toLocaleString();
 }
 
+function TicketSourceBadge({ cashierId }) {
+  if (cashierId) {
+    return (
+      <span className="rounded-sm bg-amber-500/15 px-2 py-0.5 text-xs font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-300">
+        Cashier
+      </span>
+    );
+  }
+  return (
+    <span className="rounded-sm bg-sky-600/15 px-2 py-0.5 text-xs font-semibold uppercase tracking-wide text-sky-700 dark:text-sky-300">
+      Player
+    </span>
+  );
+}
+
 export default function AdminTicketsPage() {
   const { user, logout } = useAuth();
   const today = useMemo(() => formatYmd(new Date()), []);
@@ -30,6 +45,7 @@ export default function AdminTicketsPage() {
   const [branchName, setBranchName] = useState("");
   const [branchLocation, setBranchLocation] = useState("");
   const [cashierId, setCashierId] = useState("");
+  const [source, setSource] = useState("");
   const [page, setPage] = useState(1);
   const [expandedId, setExpandedId] = useState(null);
   const [applied, setApplied] = useState({
@@ -40,6 +56,7 @@ export default function AdminTicketsPage() {
     branchName: "",
     branchLocation: "",
     cashierId: "",
+    source: "",
   });
 
   const metaQuery = useUsersMetaQuery();
@@ -55,6 +72,7 @@ export default function AdminTicketsPage() {
     branchName: applied.branchName,
     branchLocation: applied.branchLocation,
     cashierId: applied.cashierId,
+    source: applied.source,
     enabled: true,
   });
 
@@ -76,8 +94,14 @@ export default function AdminTicketsPage() {
       receiptId: receiptId.trim(),
       branchName: branchName.trim(),
       branchLocation: branchLocation.trim(),
-      cashierId,
+      cashierId: source === "player" ? "" : cashierId,
+      source,
     });
+  }
+
+  function onSourceChange(value) {
+    setSource(value);
+    if (value === "player") setCashierId("");
   }
 
   function toggleRow(id) {
@@ -124,11 +148,24 @@ export default function AdminTicketsPage() {
               </select>
             </label>
             <label className="text-xs text-(--muted)">
+              Source
+              <select
+                value={source}
+                onChange={(e) => onSourceChange(e.target.value)}
+                className="mt-1 block rounded-sm border border-(--border) bg-(--surface) px-2.5 py-1.5 text-sm text-(--text)"
+              >
+                <option value="">All</option>
+                <option value="player">Player</option>
+                <option value="cashier">Cashier</option>
+              </select>
+            </label>
+            <label className="text-xs text-(--muted)">
               Cashier
               <select
                 value={cashierId}
                 onChange={(e) => setCashierId(e.target.value)}
-                className="mt-1 block min-w-[10rem] rounded-sm border border-(--border) bg-(--surface) px-2.5 py-1.5 text-sm text-(--text)"
+                disabled={source === "player"}
+                className="mt-1 block min-w-[10rem] rounded-sm border border-(--border) bg-(--surface) px-2.5 py-1.5 text-sm text-(--text) disabled:opacity-50"
               >
                 <option value="">All branches</option>
                 {cashiers.map((c) => (
@@ -200,6 +237,7 @@ export default function AdminTicketsPage() {
                 <th className="px-4 py-3 font-semibold">Time</th>
                 <th className="px-4 py-3 font-semibold">Receipt</th>
                 <th className="px-4 py-3 font-semibold">Coupon</th>
+                <th className="px-4 py-3 font-semibold">Source</th>
                 <th className="px-4 py-3 font-semibold">Branch</th>
                 <th className="px-4 py-3 font-semibold">Stake</th>
                 <th className="px-4 py-3 font-semibold">Potential Win</th>
@@ -209,13 +247,13 @@ export default function AdminTicketsPage() {
             <tbody>
               {query.isLoading ? (
                 <tr>
-                  <td className="px-4 py-4 text-(--muted)" colSpan={8}>
+                  <td className="px-4 py-4 text-(--muted)" colSpan={9}>
                     Loading tickets...
                   </td>
                 </tr>
               ) : items.length === 0 ? (
                 <tr>
-                  <td className="px-4 py-4 text-(--muted)" colSpan={8}>
+                  <td className="px-4 py-4 text-(--muted)" colSpan={9}>
                     No tickets found for this filter.
                   </td>
                 </tr>
@@ -234,7 +272,12 @@ export default function AdminTicketsPage() {
                           {item.receipt_number || "—"}
                         </td>
                         <td className="px-4 py-3 font-mono">{item.coupon_number}</td>
-                        <td className="px-4 py-3">{item.branch_name || "-"}</td>
+                        <td className="px-4 py-3">
+                          <TicketSourceBadge cashierId={item.cashier_id} />
+                        </td>
+                        <td className="px-4 py-3">
+                          {item.cashier_id ? item.branch_name || "-" : "—"}
+                        </td>
                         <td className="px-4 py-3">
                           {Number(item.stake || 0).toLocaleString()} ETB
                         </td>
@@ -248,7 +291,7 @@ export default function AdminTicketsPage() {
                           key={`${item.id}-detail`}
                           className="border-b border-(--border)/60 bg-(--surface)/80"
                         >
-                          <td colSpan={8} className="px-4 py-4">
+                          <td colSpan={9} className="px-4 py-4">
                             {detailQuery.isLoading ? (
                               <p className="text-sm text-(--muted)">Loading slip...</p>
                             ) : detailQuery.isError ? (

@@ -8,11 +8,13 @@ import {
   redeemShopWithdraw,
 } from "../controllers/cashierWalletController.js";
 import { getCashierDashboardStats } from "../controllers/cashierDashboardController.js";
+import { getCashierTicketWatch } from "../controllers/ticketWatchController.js";
 import { authorizePermission } from "../middleware/auth.js";
 
 const router = express.Router();
 
 router.get("/dashboard-stats", authorizePermission("tickets:read"), getCashierDashboardStats);
+router.get("/ticket-watch", authorizePermission("tickets:read"), getCashierTicketWatch);
 router.post("/deposit", authorizePermission("wallet:deposit"), cashierDeposit);
 router.post("/shop-withdraw/preview", authorizePermission("wallet:withdraw"), previewShopWithdraw);
 router.post("/shop-withdraw/redeem", authorizePermission("wallet:withdraw"), redeemShopWithdraw);

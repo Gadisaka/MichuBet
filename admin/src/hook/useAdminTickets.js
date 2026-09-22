@@ -24,6 +24,7 @@ export function useAdminTicketsQuery({
   branchLocation = "",
   cashierId = "",
   userId = "",
+  source = "",
   enabled = true,
 } = {}) {
   return useQuery({
@@ -41,6 +42,7 @@ export function useAdminTicketsQuery({
         branchLocation,
         cashierId,
         userId,
+        source,
       },
     ],
     queryFn: () =>
@@ -56,6 +58,7 @@ export function useAdminTicketsQuery({
           branchLocation,
           cashierId,
           userId,
+          source,
         }),
       ),
     enabled,
