@@ -196,6 +196,7 @@ function DashboardContent() {
       )}
       <TicketWatchSection
         embedInGrid
+        essentialFilters
         mode="cashier"
         view="payable"
         title="Two-Day Payable Report"
@@ -205,6 +206,7 @@ function DashboardContent() {
       />
       <TicketWatchSection
         embedInGrid
+        essentialFilters
         mode="cashier"
         view="high-potential"
         title="High Win Potential"
