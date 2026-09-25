@@ -15,6 +15,7 @@ export default function TicketWatchPage() {
           </p>
         </div>
         <TicketWatchSection
+          essentialFilters
           mode="admin"
           view="payable"
           title="Two-Day Payable Report"
@@ -23,6 +24,7 @@ export default function TicketWatchPage() {
           timeLabel="Settled"
         />
         <TicketWatchSection
+          essentialFilters
           mode="admin"
           view="high-potential"
           title="High Win Potential"
@@ -31,6 +33,7 @@ export default function TicketWatchPage() {
           timeLabel="Placed"
         />
         <TicketWatchSection
+          essentialFilters
           mode="admin"
           view="paid"
           title="Paid tickets"

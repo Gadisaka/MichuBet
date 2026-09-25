@@ -122,6 +122,7 @@ export default function TicketWatchSection({
   amountLabel,
   timeLabel,
   embedInGrid = false,
+  essentialFilters = false,
 }) {
   const isAdmin = mode === "admin";
   const [draft, setDraft] = useState(() => defaultTicketWatchFilters(view));
@@ -197,7 +198,7 @@ export default function TicketWatchSection({
 
       <form className="space-y-3 border-b border-(--border) px-4 py-3" onSubmit={onApply}>
         <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
-          <Field label="From">
+          <Field label={essentialFilters ? `${timeLabel} from` : "From"}>
             <input
               type="date"
               value={draft.from}
@@ -205,7 +206,7 @@ export default function TicketWatchSection({
               className={inputClass}
             />
           </Field>
-          <Field label="To">
+          <Field label={essentialFilters ? `${timeLabel} to` : "To"}>
             <input
               type="date"
               value={draft.to}
@@ -217,7 +218,7 @@ export default function TicketWatchSection({
             <input
               value={draft.couponNumber}
               onChange={(event) => setField("couponNumber", event.target.value)}
-              placeholder="Contains"
+              placeholder={essentialFilters ? "Coupon number" : "Contains"}
               className={inputClass}
             />
           </Field>
@@ -225,7 +226,7 @@ export default function TicketWatchSection({
             <input
               value={draft.receiptNumber}
               onChange={(event) => setField("receiptNumber", event.target.value)}
-              placeholder="Contains"
+              placeholder={essentialFilters ? "Receipt number" : "Contains"}
               className={inputClass}
             />
           </Field>
@@ -236,24 +237,28 @@ export default function TicketWatchSection({
               className={inputClass}
             />
           </Field>
-          <Field label="Location">
-            <input
-              value={draft.branchLocation}
-              onChange={(event) => setField("branchLocation", event.target.value)}
-              className={inputClass}
-            />
-          </Field>
-          <Field label="Channel">
-            <select
-              value={draft.channel}
-              onChange={(event) => setField("channel", event.target.value)}
-              className={inputClass}
-            >
-              <option value="">All</option>
-              <option value="PREMATCH">Prematch</option>
-              <option value="LIVE">Live</option>
-            </select>
-          </Field>
+          {essentialFilters ? null : (
+            <Field label="Location">
+              <input
+                value={draft.branchLocation}
+                onChange={(event) => setField("branchLocation", event.target.value)}
+                className={inputClass}
+              />
+            </Field>
+          )}
+          {essentialFilters ? null : (
+            <Field label="Channel">
+              <select
+                value={draft.channel}
+                onChange={(event) => setField("channel", event.target.value)}
+                className={inputClass}
+              >
+                <option value="">All</option>
+                <option value="PREMATCH">Prematch</option>
+                <option value="LIVE">Live</option>
+              </select>
+            </Field>
+          )}
           {isAdmin ? (
             <Field label="Source">
               <select
@@ -267,12 +272,12 @@ export default function TicketWatchSection({
               </select>
             </Field>
           ) : null}
-          {isAdmin ? (
+          {isAdmin && draft.source !== "player" ? (
             <Field label="Cashier">
               <select
                 value={draft.cashierId}
                 onChange={(event) => setField("cashierId", event.target.value)}
-                disabled={draft.source === "player" || cashiersQuery.isLoading}
+                disabled={cashiersQuery.isLoading}
                 className={`${inputClass} disabled:opacity-60`}
               >
                 <option value="">All cashiers</option>
@@ -284,54 +289,58 @@ export default function TicketWatchSection({
               </select>
             </Field>
           ) : null}
-          <Field label="Min stake">
-            <input
-              inputMode="decimal"
-              value={draft.minStake}
-              onChange={(event) => setField("minStake", event.target.value)}
-              className={inputClass}
-            />
-          </Field>
-          <Field label="Max stake">
-            <input
-              inputMode="decimal"
-              value={draft.maxStake}
-              onChange={(event) => setField("maxStake", event.target.value)}
-              className={inputClass}
-            />
-          </Field>
-          <Field label={`Min ${amountLabel.toLowerCase()}`}>
-            <input
-              inputMode="decimal"
-              value={draft.minAmount}
-              onChange={(event) => setField("minAmount", event.target.value)}
-              className={inputClass}
-            />
-          </Field>
-          <Field label={`Max ${amountLabel.toLowerCase()}`}>
-            <input
-              inputMode="decimal"
-              value={draft.maxAmount}
-              onChange={(event) => setField("maxAmount", event.target.value)}
-              className={inputClass}
-            />
-          </Field>
-          <Field label="Min selections">
-            <input
-              inputMode="numeric"
-              value={draft.minLegs}
-              onChange={(event) => setField("minLegs", event.target.value)}
-              className={inputClass}
-            />
-          </Field>
-          <Field label="Max selections">
-            <input
-              inputMode="numeric"
-              value={draft.maxLegs}
-              onChange={(event) => setField("maxLegs", event.target.value)}
-              className={inputClass}
-            />
-          </Field>
+          {essentialFilters ? null : (
+            <>
+              <Field label="Min stake">
+                <input
+                  inputMode="decimal"
+                  value={draft.minStake}
+                  onChange={(event) => setField("minStake", event.target.value)}
+                  className={inputClass}
+                />
+              </Field>
+              <Field label="Max stake">
+                <input
+                  inputMode="decimal"
+                  value={draft.maxStake}
+                  onChange={(event) => setField("maxStake", event.target.value)}
+                  className={inputClass}
+                />
+              </Field>
+              <Field label={`Min ${amountLabel.toLowerCase()}`}>
+                <input
+                  inputMode="decimal"
+                  value={draft.minAmount}
+                  onChange={(event) => setField("minAmount", event.target.value)}
+                  className={inputClass}
+                />
+              </Field>
+              <Field label={`Max ${amountLabel.toLowerCase()}`}>
+                <input
+                  inputMode="decimal"
+                  value={draft.maxAmount}
+                  onChange={(event) => setField("maxAmount", event.target.value)}
+                  className={inputClass}
+                />
+              </Field>
+              <Field label="Min selections">
+                <input
+                  inputMode="numeric"
+                  value={draft.minLegs}
+                  onChange={(event) => setField("minLegs", event.target.value)}
+                  className={inputClass}
+                />
+              </Field>
+              <Field label="Max selections">
+                <input
+                  inputMode="numeric"
+                  value={draft.maxLegs}
+                  onChange={(event) => setField("maxLegs", event.target.value)}
+                  className={inputClass}
+                />
+              </Field>
+            </>
+          )}
           {view === "high-potential" ? (
             <Field label="Remaining">
               <select
@@ -345,17 +354,19 @@ export default function TicketWatchSection({
               </select>
             </Field>
           ) : null}
-          <Field label="Sort">
-            <select
-              value={draft.sort}
-              onChange={(event) => setField("sort", event.target.value)}
-              className={inputClass}
-            >
-              <option value="amount">{amountLabel}, highest</option>
-              <option value="stake">Stake, highest</option>
-              <option value="time">{timeLabel}, newest</option>
-            </select>
-          </Field>
+          {essentialFilters ? null : (
+            <Field label="Sort">
+              <select
+                value={draft.sort}
+                onChange={(event) => setField("sort", event.target.value)}
+                className={inputClass}
+              >
+                <option value="amount">{amountLabel}, highest</option>
+                <option value="stake">Stake, highest</option>
+                <option value="time">{timeLabel}, newest</option>
+              </select>
+            </Field>
+          )}
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <button
