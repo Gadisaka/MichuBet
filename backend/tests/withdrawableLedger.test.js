@@ -95,6 +95,43 @@ test("replay: win, online withdraw, refund restores withdrawable", () => {
   assert.deepEqual(result, { balance: 200, withdrawable: 200 });
 });
 
+test("shop-withdraw refund DEPOSIT is a withdrawable credit", () => {
+  assert.equal(
+    isWithdrawableLedgerCredit("DEPOSIT", "shop-withdraw-refund:abc"),
+    true,
+  );
+});
+
+test("pre-held shop withdraw is applied and a legacy pending row is skipped", () => {
+  assert.equal(
+    isPendingWithdrawLedger({
+      type: "WITHDRAW",
+      reference: "pending:shop-withdraw:held",
+      balance_before: 200,
+      balance_after: 120,
+    }),
+    false,
+  );
+  const result = replayWithdrawableLedger([
+    { type: "PAYOUT", amount: 200, reference: "win-settlement:t1" },
+    {
+      type: "WITHDRAW",
+      amount: 80,
+      reference: "pending:shop-withdraw:held",
+      balance_before: 200,
+      balance_after: 120,
+    },
+    {
+      type: "WITHDRAW",
+      amount: 50,
+      reference: "pending:shop-withdraw:legacy",
+      balance_before: 120,
+      balance_after: 120,
+    },
+  ]);
+  assert.deepEqual(result, { balance: 120, withdrawable: 120 });
+});
+
 test("pending shop withdraw ledger rows are skipped", () => {
   assert.equal(
     isPendingWithdrawLedger({

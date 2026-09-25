@@ -1,6 +1,7 @@
 import { prisma } from "../Config/db.js";
 import { excludeOnlineWithdrawLedgerWhere } from "../lib/onlineWithdrawSettings.js";
 import { applyReportableTicketFilter } from "../lib/ticketExpiry.js";
+import { ticketWinningsTaxBreakdown } from "../lib/winningsTax.js";
 import {
   isSportsbookWinPayoutRef,
   loadSportsPayouts,
@@ -117,6 +118,7 @@ export async function getAdminDashboardInsights(req, res) {
       chartSports,
       playerWalletInRange,
       pendingWithdrawals,
+      payableTickets,
       recentWalletRaw,
       recentAdminRaw,
     ] = await Promise.all([
@@ -136,6 +138,7 @@ export async function getAdminDashboardInsights(req, res) {
           stake: true,
           potential_win: true,
           status: true,
+          cashier_id: true,
           branch_name: true,
           branch_location: true,
         },
@@ -162,7 +165,11 @@ export async function getAdminDashboardInsights(req, res) {
           type: "PAYOUT",
           created_at: { gte: start, lte: end },
         },
-        select: { amount: true, reference: true },
+        select: {
+          amount: true,
+          reference: true,
+          wallet: { select: { wallet_type: true } },
+        },
       }),
       prisma.transaction.findMany({
         where: {
@@ -190,6 +197,14 @@ export async function getAdminDashboardInsights(req, res) {
         },
         _sum: { amount: true },
         _count: { _all: true },
+      }),
+      prisma.ticket.findMany({
+        where: { status: "WON" },
+        select: {
+          potential_win: true,
+          apply_winnings_tax: true,
+          winnings_tax_rate: true,
+        },
       }),
       prisma.transaction.findMany({
         where: {
@@ -232,6 +247,8 @@ export async function getAdminDashboardInsights(req, res) {
     };
     let totalStake = 0;
     let totalPotentialWin = 0;
+    let onlineStake = 0;
+    let cashierStake = 0;
     const branchMap = new Map();
 
     for (const ticket of ticketsInRange) {
@@ -239,6 +256,11 @@ export async function getAdminDashboardInsights(req, res) {
       const potentialWin = Number(ticket.potential_win || 0);
       totalStake += stake;
       totalPotentialWin += potentialWin;
+      if (ticket.cashier_id) {
+        cashierStake += stake;
+      } else {
+        onlineStake += stake;
+      }
       if (statusCounts[ticket.status] !== undefined) {
         statusCounts[ticket.status] += 1;
       }
@@ -309,7 +331,37 @@ export async function getAdminDashboardInsights(req, res) {
     }
 
     const nonSportsPayouts = sumNonSportsPayouts(payoutTxsInRange);
+    let onlineNonSportsPayout = 0;
+    let cashierNonSportsPayout = 0;
+    for (const tx of payoutTxsInRange) {
+      if (isSportsbookWinPayoutRef(tx.reference)) continue;
+      const amount = Number(tx.amount || 0);
+      if (tx.wallet?.wallet_type === "CASHIER") {
+        cashierNonSportsPayout += amount;
+      } else {
+        onlineNonSportsPayout += amount;
+      }
+    }
+
+    let onlineSportsPayout = 0;
+    let cashierSportsPayout = 0;
+    for (const line of sportsInRange.lines) {
+      const amount = Number(line.amount || 0);
+      if (line.online) {
+        onlineSportsPayout += amount;
+      } else {
+        cashierSportsPayout += amount;
+      }
+    }
+
+    const onlineTotalPayout = onlineNonSportsPayout + onlineSportsPayout;
+    const cashierTotalPayout = cashierNonSportsPayout + cashierSportsPayout;
     const totalPayout = nonSportsPayouts.amount + sportsInRange.totalPaidAmount;
+
+    let payableAmount = 0;
+    for (const ticket of payableTickets) {
+      payableAmount += ticketWinningsTaxBreakdown(ticket).netPayout;
+    }
     const byStatus = Object.entries(statusCounts).map(([status, count]) => ({
       status,
       count,
@@ -368,9 +420,17 @@ export async function getAdminDashboardInsights(req, res) {
         statusCounts.PAID +
         statusCounts.CASHED_OUT,
       totalStake,
+      onlineStake,
+      cashierStake,
       totalPotentialWin,
       totalPayout,
+      onlineTotalPayout,
+      cashierTotalPayout,
       platformProfit: totalStake - totalPayout,
+      onlinePlatformProfit: onlineStake - onlineTotalPayout,
+      cashierPlatformProfit: cashierStake - cashierTotalPayout,
+      payableAmount,
+      payableCount: payableTickets.length,
       payoutCount: nonSportsPayouts.count + sportsInRange.totalPaidCount,
       onlineCashbackAmount: sportsInRange.onlineCashbackAmount,
       onlineCashbackCount: sportsInRange.onlineCashbackCount,

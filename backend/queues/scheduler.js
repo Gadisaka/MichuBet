@@ -197,6 +197,18 @@ function buildRepeatables() {
         jobId: toJobId(REPEATABLE_JOB_NAMES.EXPIRE_ONLINE_WITHDRAWALS),
       },
     },
+    {
+      // Unused shop codes hold player funds for SHOP_WITHDRAW_TTL_MS (30 min).
+      queue: QUEUE_NAMES.EXPIRE_SHOP_WITHDRAWALS,
+      name: REPEATABLE_JOB_NAMES.EXPIRE_SHOP_WITHDRAWALS,
+      data: {},
+      opts: {
+        repeat: {
+          every: envMinutes("SHOP_WITHDRAW_EXPIRE_MINUTES", 5 * MINUTES),
+        },
+        jobId: toJobId(REPEATABLE_JOB_NAMES.EXPIRE_SHOP_WITHDRAWALS),
+      },
+    },
   ];
 }
 

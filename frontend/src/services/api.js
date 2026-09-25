@@ -1,5 +1,6 @@
 import {
   clearAuthSession,
+  handleExpiredAuthResponse,
   isPlayerUser,
 } from "../utils/authSession.js";
 
@@ -24,6 +25,19 @@ const API_URL = getApiOrigin();
 function getToken() {
   return localStorage.getItem("token") || sessionStorage.getItem("token");
 }
+
+async function parseResponseJson(res) {
+  return res.json().catch(() => ({}));
+}
+
+function throwIfExpiredSession(res, data) {
+  if (handleExpiredAuthResponse(res, data)) {
+    const err = new Error("SESSION_EXPIRED");
+    err.sessionExpired = true;
+    throw err;
+  }
+}
+
 
 /** True when auth token exists (logged-in flows that debit wallet). */
 export function hasAuthToken() {
@@ -62,7 +76,8 @@ export async function fetchProfile() {
   const res = await fetch(`${API_URL}/api/auth/me`, {
     headers: { Authorization: `Bearer ${token}` },
   });
-  const data = await res.json().catch(() => ({}));
+  const data = await parseResponseJson(res);
+  throwIfExpiredSession(res, data);
   if (!res.ok) {
     throw new Error(data.message || data.error || "Failed to load profile");
   }
@@ -88,7 +103,8 @@ export async function updateProfile(payload) {
     },
     body: JSON.stringify(payload),
   });
-  const data = await res.json().catch(() => ({}));
+  const data = await parseResponseJson(res);
+  throwIfExpiredSession(res, data);
   if (!res.ok) {
     throw new Error(data.message || data.error || "Failed to update profile");
   }
@@ -117,7 +133,8 @@ export async function changeAccountPassword({
     },
     body: JSON.stringify({ oldPassword, newPassword, confirmPassword }),
   });
-  const data = await res.json().catch(() => ({}));
+  const data = await parseResponseJson(res);
+  throwIfExpiredSession(res, data);
   if (!res.ok) {
     throw new Error(data.message || data.error || "Failed to change password");
   }
@@ -368,7 +385,8 @@ export async function fetchPlayerWallet() {
     headers: { Authorization: `Bearer ${token}` },
   });
 
-  const data = await res.json().catch(() => ({}));
+  const data = await parseResponseJson(res);
+  if (handleExpiredAuthResponse(res, data)) return null;
   if (!res.ok) return null;
 
   return {
@@ -397,7 +415,8 @@ export async function fetchPlayerWalletHistory({ page = 1, limit = 20 } = {}) {
       headers: { Authorization: `Bearer ${token}` },
     },
   );
-  const data = await res.json().catch(() => ({}));
+  const data = await parseResponseJson(res);
+  throwIfExpiredSession(res, data);
   if (!res.ok) {
     throw new Error(
       data.message || data.error || "Failed to load transaction history",
@@ -421,7 +440,8 @@ export async function createPlayerShopWithdraw(amount) {
     },
     body: JSON.stringify({ amount }),
   });
-  const data = await res.json().catch(() => ({}));
+  const data = await parseResponseJson(res);
+  throwIfExpiredSession(res, data);
   if (!res.ok) {
     throw new Error(
       data.message || data.error || "Failed to create withdrawal code",
@@ -439,7 +459,8 @@ export async function fetchOnlineWithdrawConfig() {
   const res = await fetch(`${API_URL}/api/player/online-withdraw/config`, {
     headers: { Authorization: `Bearer ${token}` },
   });
-  const data = await res.json().catch(() => ({}));
+  const data = await parseResponseJson(res);
+  throwIfExpiredSession(res, data);
   if (!res.ok) {
     throw new Error(
       data.message || data.error || "Failed to load withdraw settings",
@@ -457,7 +478,8 @@ export async function fetchOnlineWithdrawCashiers() {
   const res = await fetch(`${API_URL}/api/player/online-withdraw/cashiers`, {
     headers: { Authorization: `Bearer ${token}` },
   });
-  const data = await res.json().catch(() => ({}));
+  const data = await parseResponseJson(res);
+  throwIfExpiredSession(res, data);
   if (!res.ok) {
     throw new Error(data.message || data.error || "Failed to load cashiers");
   }
@@ -478,7 +500,8 @@ export async function createOnlineWithdraw(payload) {
     },
     body: JSON.stringify(payload),
   });
-  const data = await res.json().catch(() => ({}));
+  const data = await parseResponseJson(res);
+  throwIfExpiredSession(res, data);
   if (!res.ok) {
     throw new Error(
       data.message || data.error || "Failed to create withdrawal",
@@ -501,7 +524,8 @@ export async function fetchOnlineWithdrawRequests({ page = 1, limit = 10 } = {})
     `${API_URL}/api/player/online-withdraw?${params.toString()}`,
     { headers: { Authorization: `Bearer ${token}` } },
   );
-  const data = await res.json().catch(() => ({}));
+  const data = await parseResponseJson(res);
+  throwIfExpiredSession(res, data);
   if (!res.ok) {
     throw new Error(data.message || data.error || "Failed to load withdrawals");
   }
@@ -524,7 +548,8 @@ export async function submitOnlineDeposit(payload) {
     },
     body: JSON.stringify(payload),
   });
-  const data = await res.json().catch(() => ({}));
+  const data = await parseResponseJson(res);
+  throwIfExpiredSession(res, data);
   if (!res.ok) {
     throw new Error(
       data.message || data.error || "Online deposit failed",
@@ -600,7 +625,8 @@ export async function placeBet(
     body: JSON.stringify(body),
   });
 
-  const data = await res.json().catch(() => ({}));
+  const data = await parseResponseJson(res);
+  if (token) throwIfExpiredSession(res, data);
   if (!res.ok) {
     const error = new Error(data.error || data.message || "Failed to place bet");
     error.status = res.status;
@@ -754,7 +780,8 @@ export async function fetchBetHistory({ page = 1, limit = 20 } = {}) {
     headers: { Authorization: `Bearer ${token}` },
   });
 
-  const data = await res.json();
+  const data = await parseResponseJson(res);
+  throwIfExpiredSession(res, data);
   if (!res.ok) {
     throw new Error(
       data.message || data.error || "Failed to fetch bet history",
@@ -780,7 +807,8 @@ export async function fetchPlayerCashoutQuote(ticketId) {
       headers: { Authorization: `Bearer ${token}` },
     },
   );
-  const data = await res.json().catch(() => ({}));
+  const data = await parseResponseJson(res);
+  throwIfExpiredSession(res, data);
   if (!res.ok) {
     throw new Error(
       data.message || data.error || "Failed to load cashout quote",
@@ -796,7 +824,8 @@ export async function executePlayerCashout(ticketId) {
     method: "POST",
     headers: { Authorization: `Bearer ${token}` },
   });
-  const data = await res.json().catch(() => ({}));
+  const data = await parseResponseJson(res);
+  throwIfExpiredSession(res, data);
   if (!res.ok) {
     throw new Error(data.message || data.error || "Failed to cash out ticket");
   }
@@ -814,7 +843,8 @@ export async function cancelPlayerTicket(ticketId) {
     method: "PATCH",
     headers: { Authorization: `Bearer ${token}` },
   });
-  const data = await res.json().catch(() => ({}));
+  const data = await parseResponseJson(res);
+  throwIfExpiredSession(res, data);
   if (!res.ok) {
     throw new Error(
       data.message || data.error || "Could not cancel this ticket",
@@ -839,7 +869,8 @@ export async function fetchNotifications({ page = 1, limit = 20, unreadOnly = fa
   const res = await fetch(`${API_URL}/api/notifications?${params}`, {
     headers: notificationAuthHeaders(),
   });
-  const data = await res.json().catch(() => ({}));
+  const data = await parseResponseJson(res);
+  throwIfExpiredSession(res, data);
   if (!res.ok) {
     throw new Error(data.message || "Failed to load notifications");
   }
@@ -851,7 +882,8 @@ export async function fetchNotificationUnreadCount() {
   const res = await fetch(`${API_URL}/api/notifications/unread-count`, {
     headers: notificationAuthHeaders(),
   });
-  const data = await res.json().catch(() => ({}));
+  const data = await parseResponseJson(res);
+  throwIfExpiredSession(res, data);
   if (!res.ok) {
     throw new Error(data.message || "Failed to load unread count");
   }
@@ -864,7 +896,8 @@ export async function markNotificationRead(id) {
     method: "PATCH",
     headers: notificationAuthHeaders(),
   });
-  const data = await res.json().catch(() => ({}));
+  const data = await parseResponseJson(res);
+  throwIfExpiredSession(res, data);
   if (!res.ok) {
     throw new Error(data.message || "Failed to mark notification read");
   }
@@ -877,7 +910,8 @@ export async function markAllNotificationsRead() {
     method: "PATCH",
     headers: notificationAuthHeaders(),
   });
-  const data = await res.json().catch(() => ({}));
+  const data = await parseResponseJson(res);
+  throwIfExpiredSession(res, data);
   if (!res.ok) {
     throw new Error(data.message || "Failed to mark all read");
   }
@@ -935,7 +969,8 @@ export async function fetchInoutLaunchUrl(gameMode, opts = {}) {
     },
     body: JSON.stringify({ gameMode, ...opts }),
   });
-  const data = await res.json().catch(() => ({}));
+  const data = await parseResponseJson(res);
+  throwIfExpiredSession(res, data);
   if (!res.ok) {
     throw new Error(data.message || data.error || "Failed to launch game");
   }
@@ -977,7 +1012,8 @@ export async function generateMrxSsoToken() {
       Authorization: `Bearer ${token}`,
     },
   });
-  const data = await res.json().catch(() => ({}));
+  const data = await parseResponseJson(res);
+  throwIfExpiredSession(res, data);
   if (!res.ok || !data.success) {
     throw new Error(data.message || "Failed to get SSO token");
   }

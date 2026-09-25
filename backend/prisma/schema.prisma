@@ -192,6 +192,8 @@ model Cashier {
   branch_location String
   status          Boolean  @default(true)
   created_at      DateTime @default(now())
+  // Set when an admin soft-deletes the cashier. History stays; listings hide the row.
+  deleted_at      DateTime?
   // Admin must opt a cashier in before they can process online withdrawals.
   online_withdraw_enabled   Boolean  @default(false)
   // Cashier self-toggle: visible on the player picker only when true.

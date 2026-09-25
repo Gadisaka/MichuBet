@@ -44,6 +44,23 @@ function editableQuerySuffix(includeIncompletePast) {
   return includeIncompletePast ? "?includeIncompletePast=true" : "";
 }
 
+function localDayBoundIso(ymd, endOfDay) {
+  if (!ymd) return "";
+  const [year, month, day] = ymd.split("-").map(Number);
+  if (!year || !month || !day) return "";
+  const date = endOfDay
+    ? new Date(year, month - 1, day, 23, 59, 59, 999)
+    : new Date(year, month - 1, day, 0, 0, 0, 0);
+  return Number.isNaN(date.getTime()) ? "" : date.toISOString();
+}
+
+function appendKickoffRange(params, range) {
+  const from = localDayBoundIso(range?.from, false);
+  const to = localDayBoundIso(range?.to, true);
+  if (from) params.set("from", from);
+  if (to) params.set("to", to);
+}
+
 function FixtureEditor({ detail, onClose, onSaved, allowOverride, includeIncompletePast }) {
   const fixture = detail?.fixture;
   const marketGroups = useMemo(
@@ -291,6 +308,9 @@ export default function FixtureOpsPage() {
   const [q, setQ] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [listFilter, setListFilter] = useState("");
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
+  const [appliedRange, setAppliedRange] = useState({ from: "", to: "" });
   const [editId, setEditId] = useState(null);
   const [detail, setDetail] = useState(null);
   const [error, setError] = useState("");
@@ -313,12 +333,14 @@ export default function FixtureOpsPage() {
       if (listFilter === "incomplete_past") {
         params.set("includeIncompletePast", "true");
       }
+      appendKickoffRange(params, appliedRange);
 
       const summaryParams = new URLSearchParams({ editableOnly: "true" });
       if (listFilter === "incomplete_past") {
         summaryParams.set("includeIncompletePast", "true");
         summaryParams.set("filter", "incomplete_past");
       }
+      appendKickoffRange(summaryParams, appliedRange);
 
       const [summaryPayload, listPayload] = await Promise.all([
         apiRequest(`/admin/fixtures/summary?${summaryParams.toString()}`),
@@ -336,11 +358,22 @@ export default function FixtureOpsPage() {
     } finally {
       setLoading(false);
     }
-  }, [listFilter, logout, page, q, statusFilter]);
+  }, [appliedRange, listFilter, logout, page, q, statusFilter]);
 
   useEffect(() => {
     loadList();
   }, [loadList]);
+
+  function applyDateRange(event) {
+    event.preventDefault();
+    if (fromDate && toDate && fromDate > toDate) {
+      setError("From must be on or before To");
+      return;
+    }
+    setError("");
+    setAppliedRange({ from: fromDate, to: toDate });
+    setPage(1);
+  }
 
   async function openEditor(fixtureId) {
     setDetailLoading(true);
@@ -422,6 +455,32 @@ export default function FixtureOpsPage() {
                 ))}
               </select>
             </label>
+            <form className="flex flex-wrap items-end gap-3" onSubmit={applyDateRange}>
+              <label className="text-sm">
+                <span className="mb-1 block font-semibold">From</span>
+                <input
+                  type="date"
+                  value={fromDate}
+                  onChange={(e) => setFromDate(e.target.value)}
+                  className="rounded-sm border border-(--border) bg-(--surface) px-2 py-1.5"
+                />
+              </label>
+              <label className="text-sm">
+                <span className="mb-1 block font-semibold">To</span>
+                <input
+                  type="date"
+                  value={toDate}
+                  onChange={(e) => setToDate(e.target.value)}
+                  className="rounded-sm border border-(--border) bg-(--surface) px-2 py-1.5"
+                />
+              </label>
+              <button
+                type="submit"
+                className="rounded-sm border border-(--border) px-3 py-1.5 text-sm font-semibold"
+              >
+                Apply
+              </button>
+            </form>
             <label className="text-sm">
               <span className="mb-1 block font-semibold">Preset</span>
               <select

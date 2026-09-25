@@ -35,9 +35,14 @@ import {
 } from "../lib/bonusEngine.js";
 import { normalizeEthiopiaPhone } from "../lib/phone.js";
 import { syncPlayerWithdrawableIfNeeded } from "../lib/syncWithdrawable.js";
+import {
+  debitWallet,
+  restoreWallet,
+  walletSnapshot,
+} from "../lib/walletBalance.js";
 
 const JWT_SECRET = process.env.JWT_SECRET;
-const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || "1d";
+const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || "7d";
 
 function cancelSelectionKickoffTime(selection) {
   return (
@@ -356,18 +361,44 @@ export async function createShopWithdraw(req, res) {
     const codeDigest = digestShopWithdrawCode(code);
     const expiresAt = new Date(Date.now() + SHOP_WITHDRAW_TTL_MS);
 
-    // Sequential writes (no interactive transaction): Prisma Mongo transactions require a
-    // replica set; standalone or misconfigured Mongo causes $transaction to throw.
-    const pendingTx = await prisma.transaction.create({
-      data: {
-        wallet_id: wallet.id,
-        type: "WITHDRAW",
-        amount: numericAmount,
-        balance_before: balance,
-        balance_after: balance,
-        reference: `${SHOP_WITHDRAW_REF_PREFIX}${intentId}`,
-      },
-    });
+    // Hold the funds now so the same balance cannot fund another code or a bet
+    // while this one is outstanding. Sequential writes (no interactive transaction):
+    // Prisma Mongo transactions require a replica set; standalone or misconfigured
+    // Mongo causes $transaction to throw. Compensate the debit if a later insert fails.
+    const before = walletSnapshot(wallet);
+    let debit;
+    try {
+      debit = await debitWallet(prisma, wallet, numericAmount, {
+        fromWithdrawable: true,
+      });
+    } catch (err) {
+      if (err?.message === "INSUFFICIENT_BALANCE") {
+        return res.status(400).json({ message: "Insufficient balance" });
+      }
+      if (err?.message === "INSUFFICIENT_WITHDRAWABLE") {
+        return res.status(400).json({
+          message: `Withdrawable balance is ${withdrawable} ETB. Only winnings are withdrawable; unused deposits stay locked.`,
+        });
+      }
+      throw err;
+    }
+
+    let pendingTx;
+    try {
+      pendingTx = await prisma.transaction.create({
+        data: {
+          wallet_id: wallet.id,
+          type: "WITHDRAW",
+          amount: numericAmount,
+          balance_before: debit.balanceBefore,
+          balance_after: debit.balanceAfter,
+          reference: `${SHOP_WITHDRAW_REF_PREFIX}${intentId}`,
+        },
+      });
+    } catch (txErr) {
+      await restoreWallet(prisma, wallet, before).catch(() => {});
+      throw txErr;
+    }
 
     try {
       await prisma.shopWithdrawIntent.create({
@@ -378,10 +409,12 @@ export async function createShopWithdraw(req, res) {
           amount: numericAmount,
           code_digest: codeDigest,
           expires_at: expiresAt,
+          consumed_at: null,
         },
       });
     } catch (intentErr) {
       await prisma.transaction.delete({ where: { id: pendingTx.id } }).catch(() => {});
+      await restoreWallet(prisma, wallet, before).catch(() => {});
       throw intentErr;
     }
 

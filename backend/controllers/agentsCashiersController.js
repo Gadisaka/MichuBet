@@ -43,6 +43,7 @@ export async function listCashiers(req, res) {
 
     const where = {
       role: { name: "CASHIER" },
+      cashier_profile: { is: { deleted_at: null } },
     };
 
     if (search) {
@@ -414,7 +415,8 @@ export async function updateCashier(req, res) {
 
 /**
  * DELETE /api/admin/agents-cashiers/cashiers/:id
- * Deletes cashier user, their cashier profile, wallet, and agent assignments.
+ * Soft-deletes a cashier: marks the profile deleted, disables the login,
+ * and removes agent assignments. Tickets and the wallet ledger stay.
  */
 export async function deleteCashier(req, res) {
   try {
@@ -425,20 +427,31 @@ export async function deleteCashier(req, res) {
       include: { role: true, cashier_profile: true },
     });
 
-    if (!existing || existing.role?.name !== "CASHIER") {
+    if (
+      !existing ||
+      existing.role?.name !== "CASHIER" ||
+      existing.cashier_profile?.deleted_at
+    ) {
       return res.status(404).json({ message: "Cashier not found" });
     }
+
+    const deletedAt = new Date();
 
     await prisma.$transaction(async (tx) => {
       if (existing.cashier_profile) {
         await tx.agentCashier.deleteMany({
           where: { cashier_id: existing.cashier_profile.id },
         });
-        await tx.cashier.delete({ where: { user_id: userId } });
+        await tx.cashier.update({
+          where: { user_id: userId },
+          data: { deleted_at: deletedAt, status: false },
+        });
       }
 
-      await tx.wallet.deleteMany({ where: { user_id: userId } });
-      await tx.user.delete({ where: { id: userId } });
+      await tx.user.update({
+        where: { id: userId },
+        data: { status: false },
+      });
     });
 
     await logAuditEvent({
@@ -454,7 +467,11 @@ export async function deleteCashier(req, res) {
         phone: existing.phone,
         status: existing.status,
       },
-      after: null,
+      after: {
+        id: existing.id,
+        status: false,
+        deletedAt,
+      },
     });
 
     return res.json({ message: "Cashier deleted" });
@@ -832,6 +849,7 @@ export async function unassignAgentFromCashier(req, res) {
 export async function listAssignableCashiers(_req, res) {
   try {
     const cashiers = await prisma.cashier.findMany({
+      where: { deleted_at: null },
       orderBy: { branch_name: "asc" },
       include: {
         user: { select: { id: true, name: true, phone: true } },

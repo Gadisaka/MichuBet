@@ -4,7 +4,6 @@ import { ROLE_LABELS } from "../../constants/auth";
 import AdminShell from "../../components/layout/AdminShell";
 import PanelCard from "../../components/ui/PanelCard";
 import { useAdminDashboardInsightsQuery } from "../../hook/useAdminInsights";
-import TicketWatchSection from "../../components/dashboard/TicketWatchSection";
 
 const DASHBOARD_ALLOWED_ROLES = ["SUPER_ADMIN", "ADMIN"];
 
@@ -61,9 +60,17 @@ export default function DashboardPage() {
     paidTickets: 0,
     settledTickets: 0,
     totalStake: 0,
+    onlineStake: 0,
+    cashierStake: 0,
     totalPotentialWin: 0,
     totalPayout: 0,
+    onlineTotalPayout: 0,
+    cashierTotalPayout: 0,
     platformProfit: 0,
+    onlinePlatformProfit: 0,
+    cashierPlatformProfit: 0,
+    payableAmount: 0,
+    payableCount: 0,
     payoutCount: 0,
     onlineCashbackAmount: 0,
     onlineCashbackCount: 0,
@@ -108,14 +115,19 @@ export default function DashboardPage() {
       meta: `${Number(summary.openTickets || 0).toLocaleString()} not settled (open + printed)`,
     },
     {
-      label: "Total wagered",
+      label: "Total bet",
       value: `${money(summary.totalStake)} ETB`,
       meta: `${Number(summary.paidTickets || 0).toLocaleString()} paid tickets`,
     },
     {
-      label: "Total payouts",
-      value: `${money(summary.totalPayout)} ETB`,
-      meta: `${Number(summary.payoutCount || 0).toLocaleString()} payout transactions`,
+      label: "Online payout",
+      value: `${money(summary.onlineTotalPayout)} ETB`,
+      meta: "Online wins, cashback, and game payouts",
+    },
+    {
+      label: "Cashier payout",
+      value: `${money(summary.cashierTotalPayout)} ETB`,
+      meta: "Shop wins and cashback",
     },
     {
       label: "Online cashback",
@@ -128,19 +140,47 @@ export default function DashboardPage() {
       meta: `${Number(summary.shopCashbackCount || 0).toLocaleString()} transactions`,
     },
     {
-      label: "Platform profit",
-      value: `${money(summary.platformProfit)} ETB`,
-      meta: "Wagered minus payout",
+      label: "Online profit",
+      value: `${money(summary.onlinePlatformProfit)} ETB`,
+      meta: "Online bet minus online payout",
+    },
+    {
+      label: "Cashier profit",
+      value: `${money(summary.cashierPlatformProfit)} ETB`,
+      meta: "Cashier bet minus cashier payout",
     },
     {
       label: "Net cash flow",
       value: `${money(summary.netCashFlow)} ETB`,
       meta: "Player deposits minus withdrawals",
+      hint: (
+        <div className="space-y-2">
+          <div>
+            <p className="font-semibold text-(--text)">Where this comes from</p>
+            <p className="mt-1 text-(--muted)">
+              Player wallet deposits and withdrawals in the selected date range. Online-withdraw
+              ledger rows (player debit, cashier settlement, and refund) are excluded.
+            </p>
+          </div>
+          <div>
+            <p className="font-semibold text-(--text)">Calculation</p>
+            <p className="mt-1 text-(--muted)">
+              {money(summary.depositsAmount)} deposits − {money(summary.withdrawalsAmount)}{" "}
+              withdrawals = {money(summary.netCashFlow)} ETB
+            </p>
+          </div>
+        </div>
+      ),
     },
     {
       label: "Pending withdrawals",
       value: `${money(summary.pendingWithdrawalsAmount)} ETB`,
       meta: `${Number(summary.pendingWithdrawalsCount || 0).toLocaleString()} pending`,
+    },
+    {
+      label: "Payable amount",
+      value: `${money(summary.payableAmount)} ETB`,
+      meta: `${Number(summary.payableCount || 0).toLocaleString()} unpaid won tickets`,
     },
   ];
 
@@ -212,8 +252,22 @@ export default function DashboardPage() {
 
           <section className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
             {topStats.map((item) => (
-              <PanelCard key={item.label} className="p-4">
-                <p className="text-xs uppercase tracking-wide text-(--muted)">{item.label}</p>
+              <PanelCard key={item.label} className="relative p-4">
+                {item.hint ? (
+                  <div className="group absolute right-3 top-3">
+                    <button
+                      type="button"
+                      aria-label={`How ${item.label} is calculated`}
+                      className="flex h-4 w-4 items-center justify-center rounded-full border border-(--border) text-[10px] leading-none text-(--muted) hover:text-(--text)"
+                    >
+                      ?
+                    </button>
+                    <div className="pointer-events-none absolute right-0 top-full z-20 mt-1 hidden w-64 rounded-sm border border-(--border) bg-(--surface) p-3 text-xs shadow-[0_8px_24px_rgba(15,23,42,0.12)] group-hover:block group-focus-within:block">
+                      {item.hint}
+                    </div>
+                  </div>
+                ) : null}
+                <p className="pr-6 text-xs uppercase tracking-wide text-(--muted)">{item.label}</p>
                 <p className="mt-1.5 text-xl font-semibold">{item.value}</p>
                 <p className="mt-0.5 text-xs text-(--muted)">{item.meta}</p>
               </PanelCard>
@@ -459,31 +513,6 @@ export default function DashboardPage() {
               </tbody>
             </table>
           </PanelCard>
-
-          <TicketWatchSection
-            mode="admin"
-            view="payable"
-            title="Payable — last 2 days"
-            description="Won tickets that have not been paid yet. Dates use the day the ticket was settled. Defaults to yesterday and today."
-            amountLabel="Net payout"
-            timeLabel="Settled"
-          />
-          <TicketWatchSection
-            mode="admin"
-            view="high-potential"
-            title="High win potential"
-            description="Sold tickets with 1 or 2 selections still pending and no lost selection. A void leg does not count as remaining. Leave dates empty to include every open ticket."
-            amountLabel="Net potential"
-            timeLabel="Placed"
-          />
-          <TicketWatchSection
-            mode="admin"
-            view="paid"
-            title="Paid tickets"
-            description="Winning tickets already paid in the selected payout dates, highest net payout first. Cashback refunds are excluded."
-            amountLabel="Net payout"
-            timeLabel="Paid"
-          />
         </div>
       )}
     </AdminShell>

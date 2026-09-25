@@ -176,8 +176,9 @@ function DashboardContent() {
         </p>
       )}
 
-      {query.isSuccess && s && (
-        <div className="grid gap-3 sm:grid-cols-2">
+      <div className="grid gap-3 sm:grid-cols-2">
+        {query.isSuccess && s && (
+        <>
           <StatCard title="Total tickets sold" value={fmtCount(s.totalTicketsSold)} isCount />
           <StatCard title="Sold tickets price" value={fmtMoney(s.totalSoldPrice)} />
           <StatCard title="Total Deposit Amount" value={fmtMoney(s.totalDepositAmount)} />
@@ -191,28 +192,27 @@ function DashboardContent() {
           <div className="sm:col-span-2">
             <StatCard title="Grand Net" value={fmtMoney(s.grandNet)} />
           </div>
-        </div>
+        </>
       )}
-
-      <div className="no-print space-y-4 pt-2">
-        <TicketWatchSection
-          mode="cashier"
-          view="payable"
-          title="My payable — last 2 days"
-          description="Won tickets you booked that have not been paid yet. Dates use the day the ticket was settled."
-          amountLabel="Net payout"
-          timeLabel="Settled"
-        />
-        <TicketWatchSection
-          mode="cashier"
-          view="high-potential"
-          title="My high win potential"
-          description="Tickets you booked with 1 or 2 selections still pending and no lost selection. Leave dates empty to include every open ticket."
-          amountLabel="Net potential"
-          timeLabel="Placed"
-        />
+      <TicketWatchSection
+        embedInGrid
+        mode="cashier"
+        view="payable"
+        title="Two-Day Payable Report"
+        description="Won tickets you booked that have not been paid yet. Dates use the day the ticket was settled."
+        amountLabel="Net payout"
+        timeLabel="Settled"
+      />
+      <TicketWatchSection
+        embedInGrid
+        mode="cashier"
+        view="high-potential"
+        title="High Win Potential"
+        description="Tickets you booked with 1 or 2 selections still pending and no lost selection. Leave dates empty to include every open ticket."
+        amountLabel="Net potential"
+        timeLabel="Placed"
+      />
       </div>
-
     </div>
   );
 }

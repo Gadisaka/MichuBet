@@ -90,6 +90,37 @@ function parseEditableOptions(req) {
   };
 }
 
+function parseInstantQuery(value) {
+  if (value === undefined || value === null || String(value).trim() === "") {
+    return { ok: true, date: null };
+  }
+  const date = new Date(String(value).trim());
+  if (Number.isNaN(date.getTime())) return { ok: false, date: null };
+  return { ok: true, date };
+}
+
+function parseKickoffRange(query) {
+  const from = parseInstantQuery(query?.from);
+  const to = parseInstantQuery(query?.to);
+  if (!from.ok || !to.ok) return { error: "Invalid date range" };
+  return { from: from.date, to: to.date };
+}
+
+function startTimeWhere(from, to) {
+  if (!from && !to) return null;
+  const bound = {};
+  if (from) bound.gte = from;
+  if (to) bound.lte = to;
+  return { start_time: bound };
+}
+
+function withKickoffRange(baseWhere, from, to) {
+  const rangeWhere = startTimeWhere(from, to);
+  if (!rangeWhere) return baseWhere;
+  if (!baseWhere || !Object.keys(baseWhere).length) return rangeWhere;
+  return { AND: [baseWhere, rangeWhere] };
+}
+
 function mapFixtureRow(fixture, pendingLegs = 0, editableOptions = {}) {
   const editable = isFixtureEditable(fixture, editableOptions);
   const postponedWait = getPostponedWaitInfo(fixture);
@@ -126,7 +157,7 @@ function mapFixtureRow(fixture, pendingLegs = 0, editableOptions = {}) {
   };
 }
 
-function buildListWhere({ q, status, filter, editableOnly, editableOptions }) {
+function buildListWhere({ q, status, filter, editableOnly, editableOptions, from, to }) {
   const clauses = [];
 
   if (editableOnly) {
@@ -164,6 +195,9 @@ function buildListWhere({ q, status, filter, editableOnly, editableOptions }) {
     );
     clauses.push({ OR: or });
   }
+
+  const kickoff = startTimeWhere(from, to);
+  if (kickoff) clauses.push(kickoff);
 
   if (!clauses.length) return {};
   if (clauses.length === 1) return clauses[0];
@@ -217,7 +251,15 @@ export async function getAdminFixturesSummary(req, res) {
   try {
     const editableOnly = parseBoolQuery(req.query.editableOnly, true);
     const editableOptions = parseEditableOptions(req);
-    const baseWhere = editableOnly ? buildEditableFixtureWhere(editableOptions) : {};
+    const range = parseKickoffRange(req.query);
+    if (range.error) {
+      return res.status(400).json({ message: range.error });
+    }
+    const baseWhere = withKickoffRange(
+      editableOnly ? buildEditableFixtureWhere(editableOptions) : {},
+      range.from,
+      range.to,
+    );
 
     const [total, stuck, live] = await Promise.all([
       prisma.fixture.count({ where: baseWhere }),
@@ -269,12 +311,18 @@ export async function listAdminFixtures(req, res) {
     const filter = String(req.query.filter || "").trim().toLowerCase();
     const editableOnly = parseBoolQuery(req.query.editableOnly, true);
     const editableOptions = parseEditableOptions(req);
+    const range = parseKickoffRange(req.query);
+    if (range.error) {
+      return res.status(400).json({ message: range.error });
+    }
     const where = buildListWhere({
       q,
       status,
       filter,
       editableOnly,
       editableOptions,
+      from: range.from,
+      to: range.to,
     });
 
     const [total, fixtures] = await Promise.all([

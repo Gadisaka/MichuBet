@@ -2,6 +2,17 @@ import crypto from "crypto";
 
 export const SHOP_WITHDRAW_REF_PREFIX = "pending:shop-withdraw:";
 
+/** Credit that returns a held shop withdrawal to withdrawable balance. */
+export const SHOP_WITHDRAW_REFUND_REF_PREFIX = "shop-withdraw-refund:";
+
+/**
+ * @param {string} intentId
+ * @returns {string} reference written onto the pending row once the code expires
+ */
+export function shopWithdrawExpiredReference(intentId) {
+  return `expired:shop-withdraw:${intentId}`;
+}
+
 /** Default TTL for unredeemed shop codes (ms). */
 export const SHOP_WITHDRAW_TTL_MS = 30 * 60 * 1000;
 

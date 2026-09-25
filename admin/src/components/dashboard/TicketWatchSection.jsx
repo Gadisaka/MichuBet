@@ -78,6 +78,42 @@ function Field({ label, children }) {
   );
 }
 
+function countLabel(value) {
+  return Number(value || 0).toLocaleString(undefined, { maximumFractionDigits: 0 });
+}
+
+function summaryAmountTitle(view) {
+  if (view === "payable") return "Payable Amount";
+  if (view === "high-potential") return "Potential Amount";
+  return "Paid Amount";
+}
+
+function StatCard({ title, value, isCount }) {
+  return (
+    <div className="rounded-md border border-[var(--border)] bg-[var(--surface)] p-4 shadow-sm">
+      <p className="text-sm font-semibold text-[var(--text)]">{title}</p>
+      <p className="mt-2 text-sm font-normal text-[var(--muted)]">
+        {isCount ? (
+          <>
+            <span className="font-mono text-[var(--text)]"># </span>
+            <span className="font-mono">{value}</span>
+            <span className="ml-1">tickets</span>
+          </>
+        ) : (
+          <span className="inline-flex items-center gap-1">
+            <span
+              className="inline-block h-3.5 w-3.5 shrink-0 rounded-full bg-amber-500/90 ring-1 ring-amber-600/30"
+              aria-hidden
+            />
+            <span className="font-mono">{value}</span>
+            <span className="text-[var(--muted)]">ETB</span>
+          </span>
+        )}
+      </p>
+    </div>
+  );
+}
+
 export default function TicketWatchSection({
   mode,
   view,
@@ -85,6 +121,7 @@ export default function TicketWatchSection({
   description,
   amountLabel,
   timeLabel,
+  embedInGrid = false,
 }) {
   const isAdmin = mode === "admin";
   const [draft, setDraft] = useState(() => defaultTicketWatchFilters(view));
@@ -144,10 +181,17 @@ export default function TicketWatchSection({
     setExpandedId(null);
   }
 
-  return (
-    <PanelCard className="overflow-hidden">
+  const summaryCards = (
+    <>
+      <StatCard title="Bets" value={countLabel(summary.count)} isCount />
+      <StatCard title={summaryAmountTitle(view)} value={money(summary.netPayout)} />
+    </>
+  );
+
+  const details = (
+    <PanelCard className={`overflow-hidden ${embedInGrid ? "no-print sm:col-span-2" : ""}`}>
       <div className="border-b border-(--border) px-4 py-3">
-        <h3 className="text-base font-semibold">{title}</h3>
+        <h3 className="text-base font-semibold">Ticket details</h3>
         <p className="mt-1 text-xs text-(--muted)">{description}</p>
       </div>
 
@@ -433,6 +477,24 @@ export default function TicketWatchSection({
         </div>
       </div>
     </PanelCard>
+  );
+
+  if (embedInGrid) {
+    return (
+      <>
+        <h3 className="sm:col-span-2 pt-2 text-base font-semibold text-[var(--text)]">{title}</h3>
+        {summaryCards}
+        {details}
+      </>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      <h3 className="text-base font-semibold">{title}</h3>
+      <div className="grid gap-3 sm:grid-cols-2">{summaryCards}</div>
+      {details}
+    </div>
   );
 }
 

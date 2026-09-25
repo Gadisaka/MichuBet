@@ -16,6 +16,13 @@ const NAV_SECTIONS = [
         icon: DashboardIcon,
         permission: "dashboard:read",
       },
+      {
+        to: "/ticket-watch",
+        label: "Ticket Watch",
+        icon: TicketsIcon,
+        permission: "dashboard:read",
+        includeRoles: ["SUPER_ADMIN", "ADMIN"],
+      },
     ],
   },
   {

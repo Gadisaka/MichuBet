@@ -121,6 +121,7 @@ export async function getUsersMeta(_req, res) {
     const [roles, cashiers] = await Promise.all([
       prisma.role.findMany({ orderBy: { name: "asc" } }),
       prisma.cashier.findMany({
+        where: { deleted_at: null },
         orderBy: { branch_name: "asc" },
         include: {
           user: { select: { id: true, name: true } },

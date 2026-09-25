@@ -25,6 +25,7 @@ const store = {
   cashier: new Map(),
   user: new Map(),
   notification: new Map(),
+  shopWithdrawIntent: new Map(),
 };
 
 // Tracks which references have been written already. Simulates the
@@ -74,6 +75,10 @@ function matchesWhere(row, where) {
       if (row.id !== condition) return false;
       continue;
     }
+    if (condition === null) {
+      if (row[key] != null) return false;
+      continue;
+    }
     if (
       condition &&
       typeof condition === "object" &&
@@ -114,19 +119,29 @@ function matchesWhere(row, where) {
   return true;
 }
 
+function withIncludes(row, include) {
+  if (!row || !include) return row;
+  const out = clone(row);
+  if (include.user && out.user_id) {
+    const user = store.user.get(out.user_id);
+    if (user) out.user = clone(user);
+  }
+  return out;
+}
+
 function model(name) {
   const map = store[name];
   return {
-    async findUnique({ where }) {
-      if (where?.id) return clone(map.get(where.id) ?? null);
+    async findUnique({ where, include } = {}) {
+      if (where?.id) return withIncludes(clone(map.get(where.id) ?? null), include);
       for (const row of map.values()) {
-        if (matchesWhere(row, where)) return clone(row);
+        if (matchesWhere(row, where)) return withIncludes(clone(row), include);
       }
       return null;
     },
-    async findFirst({ where } = {}) {
+    async findFirst({ where, include } = {}) {
       for (const row of map.values()) {
-        if (matchesWhere(row, where)) return clone(row);
+        if (matchesWhere(row, where)) return withIncludes(clone(row), include);
       }
       return null;
     },
@@ -185,6 +200,19 @@ function model(name) {
       }
       return { count };
     },
+    async delete({ where }) {
+      const row = map.get(where.id);
+      if (!row) {
+        const err = new Error("Record not found");
+        err.code = "P2025";
+        throw err;
+      }
+      if (name === "transaction" && row.reference) {
+        uniqueReferences.delete(row.reference);
+      }
+      map.delete(where.id);
+      return clone(row);
+    },
     async create({ data }) {
       // Simulate `@unique` reference constraint on the transaction
       // model. Any duplicate write throws a Prisma-shaped P2002.
@@ -204,6 +232,14 @@ function model(name) {
       map.set(id, next);
       return clone(next);
     },
+    async createMany({ data }) {
+      const rows = Array.isArray(data) ? data : [];
+      for (const row of rows) {
+        const id = row.id || `auto-${Math.random().toString(36).slice(2, 10)}`;
+        map.set(id, { ...row, id });
+      }
+      return { count: rows.length };
+    },
   };
 }
 
@@ -220,6 +256,7 @@ export const prisma = {
   cashier: model("cashier"),
   user: model("user"),
   notification: model("notification"),
+  shopWithdrawIntent: model("shopWithdrawIntent"),
   async $transaction(callback) {
     // The in-memory stub doesn't snapshot/rollback; it's only used by
     // happy-path settlement tests where the service runs to completion.

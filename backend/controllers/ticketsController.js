@@ -4,7 +4,7 @@
  * Business rules (see docs/ticket-engine.md):
  * - Cancel: OPEN only, within admin-configured window (`settings` table + GET/PUT
  *   `/api/admin/settings/ticket-cancel-window`), no match started
- * - Payout: WON only, `ticket.cashier_id` must match body `cashierId` (selling cashier)
+ * - Payout: WON only; any cashier may pay, and the handling cashier's wallet is credited
  * - Void: admin; cannot void PAID
  *
  * Payout credits the cashier wallet and writes a PAYOUT transaction (per wallet-system.md).
@@ -2289,17 +2289,9 @@ export async function listTickets(req, res) {
 
     // Cashier view:
     // - normal lists (All Slips): own tickets confirmed printed by this cashier
-    // - coupon lookup: own sold tickets + unclaimed prebook tickets
-    if (req.user.role === "CASHIER") {
-      if (couponNumber) {
-        where.OR = [
-          { cashier_id: loggedInCashierId },
-          { cashier_id: null },
-          { cashier_id: { isSet: false } },
-        ];
-      } else {
-        where.cashier_id = loggedInCashierId;
-      }
+    // - coupon lookup: any cashier's ticket
+    if (req.user.role === "CASHIER" && !couponNumber) {
+      where.cashier_id = loggedInCashierId;
     }
 
     if (branchName) {
@@ -2396,18 +2388,6 @@ export async function getTicketById(req, res) {
       return res.status(404).json({ message: "Ticket not found" });
     }
 
-    if (req.user.role === "CASHIER") {
-      const cashier = await resolveCashierByUserId(req.user.sub);
-      if (!cashier) {
-        return res
-          .status(404)
-          .json({ message: CASHIER_PROFILE_MISSING_MESSAGE });
-      }
-      if (ticket.cashier_id && ticket.cashier_id !== cashier.id) {
-        return res.status(403).json({ message: "Access denied" });
-      }
-    }
-
     if (req.user.role === "AGENT") {
       if (!ticket.cashier_id) {
         return res.status(403).json({ message: "Access denied" });
@@ -2459,18 +2439,6 @@ export async function getTicketByReceipt(req, res) {
       return res.status(404).json({ message: "Ticket not found" });
     }
 
-    if (req.user.role === "CASHIER") {
-      const cashier = await resolveCashierByUserId(req.user.sub);
-      if (!cashier) {
-        return res
-          .status(404)
-          .json({ message: CASHIER_PROFILE_MISSING_MESSAGE });
-      }
-      if (ticket.cashier_id && ticket.cashier_id !== cashier.id) {
-        return res.status(403).json({ message: "Access denied" });
-      }
-    }
-
     if (req.user.role === "AGENT") {
       if (!ticket.cashier_id) {
         return res.status(403).json({ message: "Access denied" });
@@ -2499,9 +2467,9 @@ export async function getTicketByReceipt(req, res) {
 
 /**
  * GET /api/tickets/by-coupon?couponNumber=...&status=...
- * Single-call coupon lookup for cashier/agent flows — returns full ticket detail
- * for the most recent accessible ticket matching the coupon (legacy repeats may
- * share a coupon; cashiers only see own sold + unclaimed, ordered newest first).
+ * Single-call coupon lookup — returns full ticket detail for the most recent
+ * ticket matching the coupon (legacy repeats may share a coupon; newest wins).
+ * Cashiers may load any cashier's ticket. Agents only see assigned cashiers.
  */
 export async function getTicketByCoupon(req, res) {
   try {
@@ -2520,21 +2488,6 @@ export async function getTicketByCoupon(req, res) {
     };
     const where = { ...baseWhere };
 
-    if (req.user.role === "CASHIER") {
-      const cashier = await resolveCashierByUserId(req.user.sub);
-      if (!cashier) {
-        return res
-          .status(404)
-          .json({ message: CASHIER_PROFILE_MISSING_MESSAGE });
-      }
-      // Match listTickets coupon lookup: own sold + unclaimed prebook slips.
-      where.OR = [
-        { cashier_id: cashier.id },
-        { cashier_id: null },
-        { cashier_id: { isSet: false } },
-      ];
-    }
-
     if (req.user.role === "AGENT") {
       const agentCashiers = await prisma.agentCashier.findMany({
         where: { agent_id: req.user.sub },
@@ -2552,8 +2505,7 @@ export async function getTicketByCoupon(req, res) {
     });
 
     if (!ticket) {
-      // Ticket exists under another owner → keep the familiar Access denied.
-      if (req.user.role === "CASHIER" || req.user.role === "AGENT") {
+      if (req.user.role === "AGENT") {
         const foreign = await prisma.ticket.findFirst({
           where: baseWhere,
           select: { id: true },
@@ -2598,19 +2550,8 @@ export async function cancelTicket(req, res) {
       return res.status(404).json({ message: "Ticket not found" });
     }
 
-    if (req.user.role === "CASHIER") {
-      const cashier = await resolveCashierByUserId(req.user.sub);
-      if (!cashier) {
-        return res
-          .status(404)
-          .json({ message: CASHIER_PROFILE_MISSING_MESSAGE });
-      }
-      if (!ticket.cashier_id) {
-        return res.status(403).json({ message: "Ticket is not sold yet" });
-      }
-      if (ticket.cashier_id !== cashier.id) {
-        return res.status(403).json({ message: "Access denied" });
-      }
+    if (req.user.role === "CASHIER" && !ticket.cashier_id) {
+      return res.status(403).json({ message: "Ticket is not sold yet" });
     }
 
     if (ticket.status !== "OPEN" && ticket.status !== "PRINTED") {
@@ -2800,8 +2741,9 @@ export async function voidTicket(req, res) {
 
 /**
  * PATCH /api/tickets/:id/payout
- * Body: { cashierId } — must equal ticket.cashier_id (payout only at selling cashier).
- * Credits cashier wallet, records PAYOUT transaction, sets ticket PAID.
+ * Body: { cashierId } — required for non-cashier roles; cashiers use their profile.
+ * Any cashier may pay a WON ticket. Credits the handling cashier's wallet,
+ * records a PAYOUT transaction, and sets the ticket PAID.
  */
 export async function payoutTicket(req, res) {
   try {
@@ -2831,12 +2773,6 @@ export async function payoutTicket(req, res) {
     if (ticket.status !== "WON") {
       return res.status(400).json({
         message: "Only WON tickets can be paid out",
-      });
-    }
-
-    if (ticket.cashier_id !== effectiveCashierId) {
-      return res.status(403).json({
-        message: "Payout rejected: ticket must be paid by the selling cashier",
       });
     }
 
@@ -2992,8 +2928,8 @@ export async function payoutTicket(req, res) {
 /**
  * PATCH /api/tickets/:id/cashback-payout
  * Body: { cashierId?: string } — required for non-cashier roles; cashiers use their profile.
- * Redeems stored offline cashback on a REFUND ticket. Credits the selling cashier's
- * wallet (reimbursement) and records BONUS ref `cashback-payout:<ticketId>`.
+ * Redeems stored offline cashback on a REFUND ticket. Any cashier may pay.
+ * Credits the handling cashier's wallet and records BONUS ref `cashback-payout:<ticketId>`.
  * Ticket status becomes PAID (same as a WON payout).
  */
 export async function cashbackPayoutTicket(req, res) {
@@ -3024,13 +2960,6 @@ export async function cashbackPayoutTicket(req, res) {
     if (ticket.status !== "REFUND") {
       return res.status(400).json({
         message: "Only REFUND tickets can redeem cashback",
-      });
-    }
-
-    if (ticket.cashier_id !== effectiveCashierId) {
-      return res.status(403).json({
-        message:
-          "Cashback payout rejected: ticket must be paid by the selling cashier",
       });
     }
 
@@ -3238,18 +3167,6 @@ export async function updateTicketStake(req, res) {
       });
     }
 
-    if (req.user.role === "CASHIER") {
-      const cashier = await resolveCashierByUserId(req.user.sub);
-      if (!cashier) {
-        return res
-          .status(404)
-          .json({ message: CASHIER_PROFILE_MISSING_MESSAGE });
-      }
-      if (ticket.cashier_id && ticket.cashier_id !== cashier.id) {
-        return res.status(403).json({ message: "Access denied" });
-      }
-    }
-
     // Don't allow stake edits after cashier wallet has already been debited
     const printReference = `ticket-print:${ticket.id}`;
     const existingPrint = await prisma.transaction.findFirst({
@@ -3333,7 +3250,8 @@ async function clearUnpaidPrintReservation(ticketId) {
  * for an OPEN ticket in one round trip before physical print (no wallet debit).
  * Balance is checked before receipt assignment because receipt_number is what
  * marks a ticket as paid/settleable in reports and coupon check.
- * Cashier and branch are not saved here. Confirm-print persists them in the
+ * Cashier and branch are not saved here. Confirm-print persists the printing
+ * cashier (even if another cashier previously claimed the unpaid slip) in the
  * same transaction that charges the wallet and sets PRINTED.
  */
 export async function preparePrintTicket(req, res) {
@@ -3357,9 +3275,6 @@ export async function preparePrintTicket(req, res) {
     );
     if (!cashier) {
       return res.status(404).json({ message: CASHIER_PROFILE_MISSING_MESSAGE });
-    }
-    if (ticket.cashier_id && ticket.cashier_id !== cashier.id) {
-      return res.status(403).json({ message: "Access denied" });
     }
     const expiredNow = await expireTicketIfDue(prisma, ticket);
     if (expiredNow.status === "EXPIRED") {
@@ -3446,14 +3361,16 @@ export async function preparePrintTicket(req, res) {
     let mappedTicket = preparedTicket
       ? mapTicket(preparedTicket, { printed: printedSet.has(ticket.id) })
       : undefined;
-    // Slip text for the printer only. cashierId stays unset until confirm-print.
-    if (mappedTicket && preparedTicket && !preparedTicket.cashier_id) {
+    // Slip text only. Confirm-print persists cashier/branch when it charges
+    // this cashier, including when another cashier previously claimed the slip.
+    if (mappedTicket) {
       const cashierUser = await prisma.user.findUnique({
         where: { id: cashier.user_id },
         select: { name: true },
       });
       mappedTicket = {
         ...mappedTicket,
+        cashierId: cashier.id,
         branchName: cashier.branch_name || "",
         branchLocation: cashier.branch_location || "",
         cashierName: cashierUser?.name ?? null,
@@ -3491,9 +3408,6 @@ export async function confirmPrintTicket(req, res) {
     const cashier = await resolveCashierByUserId(req.user.sub);
     if (!cashier) {
       return res.status(404).json({ message: CASHIER_PROFILE_MISSING_MESSAGE });
-    }
-    if (ticket.cashier_id && ticket.cashier_id !== cashier.id) {
-      return res.status(403).json({ message: "Access denied" });
     }
     const expiredNow = await expireTicketIfDue(prisma, ticket);
     if (expiredNow.status === "EXPIRED") {
@@ -3634,17 +3548,16 @@ export async function confirmPrintTicket(req, res) {
 
     const result = await withWalletLock(cashier.wallet_id, {}, async () =>
       prisma.$transaction(async (tx) => {
-        let effectiveTicket = ticket;
-        if (!ticket.cashier_id) {
-          effectiveTicket = await tx.ticket.update({
-            where: { id: ticket.id },
-            data: {
-              cashier_id: cashier.id,
-              branch_name: cashier.branch_name,
-              branch_location: cashier.branch_location,
-            },
-          });
-        }
+        // Unpaid slips can be printed by any cashier. Attribute the sale to
+        // whoever is charged, even if another cashier claimed it earlier.
+        const effectiveTicket = await tx.ticket.update({
+          where: { id: ticket.id },
+          data: {
+            cashier_id: cashier.id,
+            branch_name: cashier.branch_name,
+            branch_location: cashier.branch_location,
+          },
+        });
 
         const wallet = await tx.wallet.findUnique({
           where: { id: cashier.wallet_id },
@@ -3809,18 +3722,6 @@ export async function repeatTicket(req, res) {
       return res.status(404).json({ message: "Ticket not found" });
     }
 
-    if (req.user.role === "CASHIER") {
-      const cashier = await resolveCashierByUserId(req.user.sub);
-      if (!cashier) {
-        return res
-          .status(404)
-          .json({ message: CASHIER_PROFILE_MISSING_MESSAGE });
-      }
-      if (source.cashier_id && source.cashier_id !== cashier.id) {
-        return res.status(403).json({ message: "Access denied" });
-      }
-    }
-
     const snapshot = Array.isArray(source.selection_snapshot)
       ? source.selection_snapshot
       : [];
@@ -3881,18 +3782,6 @@ async function assertOpenTicketEditableBeforePrint(req, res, ticket) {
       message: "Ticket already has a receipt number and cannot be edited",
     });
     return false;
-  }
-
-  if (req.user.role === "CASHIER") {
-    const cashier = await resolveCashierByUserId(req.user.sub);
-    if (!cashier) {
-      res.status(404).json({ message: CASHIER_PROFILE_MISSING_MESSAGE });
-      return false;
-    }
-    if (ticket.cashier_id && ticket.cashier_id !== cashier.id) {
-      res.status(403).json({ message: "Access denied" });
-      return false;
-    }
   }
 
   const printReference = `ticket-print:${ticket.id}`;
@@ -4142,18 +4031,6 @@ export async function removeTicketSelection(req, res) {
       return res.status(400).json({
         message: "Only OPEN tickets can have selections removed",
       });
-    }
-
-    if (req.user.role === "CASHIER") {
-      const cashier = await resolveCashierByUserId(req.user.sub);
-      if (!cashier) {
-        return res
-          .status(404)
-          .json({ message: CASHIER_PROFILE_MISSING_MESSAGE });
-      }
-      if (ticket.cashier_id && ticket.cashier_id !== cashier.id) {
-        return res.status(403).json({ message: "Access denied" });
-      }
     }
 
     const printReference = `ticket-print:${ticket.id}`;

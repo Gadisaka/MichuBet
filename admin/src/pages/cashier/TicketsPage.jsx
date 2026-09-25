@@ -259,6 +259,12 @@ function TicketSummary({
         <span className="font-semibold">Status:</span>{" "}
         <TicketStatusBadge status={ticket.status} />
       </p>
+      {ticket.cashierName || ticket.branchName ? (
+        <p>
+          <span className="font-semibold">Sold by:</span>{" "}
+          {[ticket.cashierName, ticket.branchName].filter(Boolean).join(" · ")}
+        </p>
+      ) : null}
     </div>
   );
 }
@@ -651,6 +657,8 @@ export default function CashierTicketsPage() {
   const [sellError, setSellError] = useState("");
   const [payoutError, setPayoutError] = useState("");
   const [sellConfirmed, setSellConfirmed] = useState(false);
+  const [sellPrinting, setSellPrinting] = useState(false);
+  const [sellIsRepeat, setSellIsRepeat] = useState(false);
   const [ticketPreviewOpen, setTicketPreviewOpen] = useState(false);
   const [payoutReceiptPreviewOpen, setPayoutReceiptPreviewOpen] = useState(false);
   const [actionSuccess, setActionSuccess] = useState("");
@@ -714,6 +722,8 @@ export default function CashierTicketsPage() {
   const playerInfoPagesQuery = usePlayerInfoPagesQuery();
   const payoutContactEntries =
     playerInfoPagesQuery.data?.pages?.["contact-us"]?.entries ?? [];
+
+  const sellPrinted = Boolean(sellTicket) && !isFirstSaleTicket(sellTicket);
 
   const sellStakeNum = Number(sellStakeInput);
   const sellAccPct = toNumber(sellTicket?.accumulatorBonusPercent);
@@ -901,6 +911,8 @@ export default function CashierTicketsPage() {
     if (isSell) {
       setSellError("");
       setSellConfirmed(false);
+      setSellPrinting(false);
+      setSellIsRepeat(false);
       setTicketPreviewOpen(false);
     } else {
       setPayoutError("");
@@ -980,9 +992,10 @@ export default function CashierTicketsPage() {
     setActionSuccess("Ticket confirmed. You can print now.");
   };
 
-  const handleSellRepeat = async () => {
+  const handleSellRepeatConfirm = async () => {
     if (!sellTicket) return;
     setSellError("");
+    setSellPrinting(false);
 
     const parsedStake = Number(sellStakeInput);
     if (!Number.isFinite(parsedStake) || parsedStake <= 0) {
@@ -1001,9 +1014,18 @@ export default function CashierTicketsPage() {
       }
       setSellTicket(newTicket);
       setSellCouponInput(formatCouponNumberInput(newTicket.couponNumber || ""));
+      setSellStakeInput(String(toNumber(newTicket.stake)));
+      setSellIsRepeat(true);
       setSellConfirmed(false);
-      setActionSuccess("New ticket ready. Review selections and confirm.");
-      await pruneStartedSellSelections(newTicket);
+      const beforeCount = (newTicket.selections || []).length;
+      const pruned = await pruneStartedSellSelections(newTicket);
+      const selectionsRemoved =
+        (pruned?.selections || []).length < beforeCount;
+      const allStarted = getStartedSelectionIds(newTicket).length > 0;
+      if (!selectionsRemoved && !allStarted) {
+        setSellConfirmed(true);
+        setActionSuccess("Copy ready. Click Reprint to print it.");
+      }
     } catch (error) {
       setSellError(error?.message || "Failed to repeat ticket");
     }
@@ -1226,34 +1248,43 @@ export default function CashierTicketsPage() {
   };
 
   const handlePrint = async () => {
-    if (!sellTicket || printInFlightRef.current) return;
+    if (!sellTicket || printInFlightRef.current || sellPrinting) return;
     setSellError("");
-    const result = await printTicketToPrinter(sellTicket, {
-      promptStartedRemoval: true,
-      onTicketUpdate: setSellTicket,
-    });
-    if (result.cancelled) return;
-    setTicketPreviewOpen(false);
-    if (!result.ok) {
-      setSellError(result.error);
-      setActionSuccess("");
-      if (result.insufficient && result.ticket?.id) {
-        try {
-          const refreshed = await loadTicketById.mutateAsync(result.ticket.id);
-          setSellTicket(refreshed);
-        } catch {
-          /* keep current ticket if refresh fails */
+    setSellPrinting(true);
+    try {
+      const result = await printTicketToPrinter(sellTicket, {
+        promptStartedRemoval: true,
+        onTicketUpdate: setSellTicket,
+      });
+      if (result.cancelled) return;
+      setTicketPreviewOpen(false);
+      if (!result.ok) {
+        setSellError(result.error);
+        setActionSuccess("");
+        if (result.insufficient && result.ticket?.id) {
+          try {
+            const refreshed = await loadTicketById.mutateAsync(
+              result.ticket.id,
+            );
+            setSellTicket(refreshed);
+          } catch {
+            /* keep current ticket if refresh fails */
+          }
+          Promise.all([slipsQuery.refetch(), walletQuery.refetch()]).catch(
+            () => {},
+          );
         }
-        Promise.all([slipsQuery.refetch(), walletQuery.refetch()]).catch(
-          () => {},
-        );
+        return;
       }
-      return;
+      const walletMessage = result.alreadyPrinted
+        ? "Ticket already confirmed; wallet was not deducted again."
+        : `Wallet deducted by ${formatCurrency(result.deductedAmount)}.`;
+      setActionSuccess(`${walletMessage} Ticket printed successfully.`);
+      setSellConfirmed(false);
+      setSellIsRepeat(false);
+    } finally {
+      setSellPrinting(false);
     }
-    const walletMessage = result.alreadyPrinted
-      ? "Ticket already confirmed; wallet was not deducted again."
-      : `Wallet deducted by ${formatCurrency(result.deductedAmount)}.`;
-    setActionSuccess(`${walletMessage} Ticket printed successfully.`);
   };
 
   const refreshPayoutTicket = async (ticket) => {
@@ -1331,6 +1362,8 @@ export default function CashierTicketsPage() {
       void (async () => {
         setSellError("");
         setSellConfirmed(false);
+        setSellPrinting(false);
+        setSellIsRepeat(false);
         try {
           const detail = await loadTicketById.mutateAsync(ticket.id);
           setSellTicket(detail);
@@ -1374,6 +1407,8 @@ export default function CashierTicketsPage() {
     setSellCouponInput(formatCouponNumberInput(ticket?.couponNumber || ""));
     setSellStakeInput(String(toNumber(ticket?.stake)));
     setSellConfirmed(false);
+    setSellPrinting(false);
+    setSellIsRepeat(false);
     setTicketPreviewOpen(false);
     setSellError(errorMessage || "Failed to print ticket");
     setActionSuccess("");
@@ -1727,37 +1762,36 @@ export default function CashierTicketsPage() {
                 </form>
 
                 <div className="mt-3 flex flex-wrap items-center gap-2">
-                  {sellTicket && isFirstSaleTicket(sellTicket) ? (
+                  {sellTicket && !sellConfirmed ? (
                     <button
                       type="button"
-                      onClick={handleSellConfirm}
-                      disabled={!sellTicket || isBusy || sellConfirmed}
+                      onClick={
+                        sellPrinted ? handleSellRepeatConfirm : handleSellConfirm
+                      }
+                      disabled={isBusy}
                       className="rounded-sm bg-[var(--accent)] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
                     >
-                      {updateStake.isPending ? "Saving..." : "Confirm"}
-                    </button>
-                  ) : sellTicket ? (
-                    <button
-                      type="button"
-                      onClick={handleSellRepeat}
-                      disabled={!sellTicket || isBusy || sellConfirmed}
-                      className="rounded-sm bg-[var(--accent)] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
-                    >
-                      {repeatTicket.isPending
-                        ? "Repeating..."
+                      {sellPrinted
+                        ? repeatTicket.isPending
+                          ? "Repeating..."
+                          : updateStake.isPending
+                            ? "Saving..."
+                            : "Confirm"
                         : updateStake.isPending
                           ? "Saving..."
-                          : "Repeat"}
+                          : "Confirm"}
                     </button>
                   ) : null}
-                  <button
-                    type="button"
-                    onClick={handlePrint}
-                    disabled={!sellTicket || !sellConfirmed || isBusy}
-                    className="rounded-sm bg-[var(--accent)] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60 disabled:cursor-not-allowed"
-                  >
-                    Print Ticket
-                  </button>
+                  {sellTicket && sellConfirmed && !sellPrinting ? (
+                    <button
+                      type="button"
+                      onClick={handlePrint}
+                      disabled={isBusy}
+                      className="rounded-sm bg-[var(--accent)] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60 disabled:cursor-not-allowed"
+                    >
+                      {sellIsRepeat ? "Reprint" : "Print Ticket"}
+                    </button>
+                  ) : null}
                 </div>
 
                 <div className="mt-3 flex flex-wrap items-end gap-2">
@@ -1783,6 +1817,8 @@ export default function CashierTicketsPage() {
                       setSellTicket(null);
                       setSellStakeInput("");
                       setSellConfirmed(false);
+                      setSellPrinting(false);
+                      setSellIsRepeat(false);
                       setTicketPreviewOpen(false);
                       setFixturesPanelOpen(false);
                       setAddSelectionError("");

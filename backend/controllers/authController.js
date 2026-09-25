@@ -25,7 +25,7 @@ function publicUserShape(user) {
 }
 
 const JWT_SECRET = process.env.JWT_SECRET;
-const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || "1d";
+const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || "7d";
 
 if (!JWT_SECRET) {
   throw new Error("JWT_SECRET is not set. Add it to your .env file.");

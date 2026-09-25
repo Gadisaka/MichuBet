@@ -28,6 +28,7 @@ import CmsPage from "./pages/admin/CmsPage";
 import CasinoPage from "./pages/admin/CasinoPage";
 import ValidationOpsPage from "./pages/admin/ValidationOpsPage";
 import FixtureOpsPage from "./pages/admin/FixtureOpsPage";
+import TicketWatchPage from "./pages/admin/TicketWatchPage";
 import CashierDevicesPage from "./pages/admin/CashierDevicesPage";
 import UnauthorizedPage from "./pages/UnauthorizedPage";
 import ProfilePage from "./pages/ProfilePage";
@@ -140,6 +141,14 @@ export default function App() {
             element={
               <ProtectedRoute allowedRoles={ADMIN_ALLOWED_ROLES}>
                 <ProfilePage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/ticket-watch"
+            element={
+              <ProtectedRoute allowedRoles={ADMIN_UP}>
+                <TicketWatchPage />
               </ProtectedRoute>
             }
           />

@@ -18,6 +18,7 @@ export const QUEUE_NAMES = {
   EXPIRE_UNPAID_TICKETS: "expire-unpaid-tickets",
   HOLD_REAPER: "hold-reaper",
   EXPIRE_ONLINE_WITHDRAWALS: "expire-online-withdrawals",
+  EXPIRE_SHOP_WITHDRAWALS: "expire-shop-withdrawals",
 };
 
 export const REPEATABLE_JOB_NAMES = {
@@ -32,6 +33,7 @@ export const REPEATABLE_JOB_NAMES = {
   EXPIRE_UNPAID_TICKETS: "tickets:expire-unpaid",
   HOLD_REAPER_TICK: "hold-reaper:tick",
   EXPIRE_ONLINE_WITHDRAWALS: "online-withdraw:expire",
+  EXPIRE_SHOP_WITHDRAWALS: "shop-withdraw:expire",
 };
 
 const DEFAULT_JOB_OPTIONS = {

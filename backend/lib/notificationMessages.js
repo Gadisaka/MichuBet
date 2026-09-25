@@ -91,6 +91,18 @@ export function onlineWithdrawCompletedNotification({ amount, netAmount }) {
   };
 }
 
+export function shopWithdrawExpiredNotification({ amount }) {
+  return {
+    kind: "WITHDRAW_REJECTED",
+    title: "Shop withdrawal refunded",
+    body: `${formatEtb(amount)} ETB has been returned to your withdrawable balance. Your shop withdrawal code expired unused.`,
+    metadata: {
+      amount: Number(amount),
+      channel: "shop",
+    },
+  };
+}
+
 export function onlineWithdrawRejectedNotification({ amount, reason }) {
   const extra = reason ? ` Reason: ${reason}` : "";
   return {

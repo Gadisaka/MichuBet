@@ -372,7 +372,7 @@ export async function approveWithdrawRequest(req, res) {
 export async function previewShopWithdraw(req, res) {
   try {
     const { phone, code } = req.body ?? {};
-    const normalizedPhone = String(phone ?? "").trim();
+    const normalizedPhone = normalizeEthiopiaPhone(phone);
     const normalizedCode = normalizeSixDigitWithdrawCode(code);
 
     if (!normalizedPhone || !normalizedCode) {
@@ -402,7 +402,7 @@ export async function previewShopWithdraw(req, res) {
       return res.status(400).json({ message: "Invalid withdrawal" });
     }
 
-    if (String(player.phone ?? "").trim() !== normalizedPhone) {
+    if (normalizeEthiopiaPhone(player.phone) !== normalizedPhone) {
       return res.status(400).json({ message: "Phone number does not match this code" });
     }
 
@@ -425,7 +425,7 @@ export async function previewShopWithdraw(req, res) {
 export async function redeemShopWithdraw(req, res) {
   try {
     const { phone, amount, code } = req.body ?? {};
-    const normalizedPhone = String(phone ?? "").trim();
+    const normalizedPhone = normalizeEthiopiaPhone(phone);
     const normalizedCode = normalizeSixDigitWithdrawCode(code);
 
     if (!normalizedPhone || !normalizedCode) {
@@ -455,7 +455,7 @@ export async function redeemShopWithdraw(req, res) {
       return res.status(400).json({ message: "Invalid withdrawal" });
     }
 
-    if (String(player.phone ?? "").trim() !== normalizedPhone) {
+    if (normalizeEthiopiaPhone(player.phone) !== normalizedPhone) {
       return res.status(400).json({ message: "Phone number does not match this code" });
     }
 
@@ -489,6 +489,7 @@ export async function redeemShopWithdraw(req, res) {
         pendingTransactionId: intent.transaction_id,
         cashierWalletId: cashierWallet.id,
         approverUserId: req.user.sub,
+        alreadyDebited: true,
       });
 
       await tx.shopWithdrawIntent.update({

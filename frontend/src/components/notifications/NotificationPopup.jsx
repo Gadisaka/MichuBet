@@ -1,6 +1,9 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import AppIcon from "../common/AppIcon";
 import { useTranslation } from "../../i18n/LanguageContext.jsx";
+
+/** Above page chrome and the casino frame, below bet-receipt modals. */
+const POPUP_Z_INDEX = 2147483000;
 
 function formatWhen(iso) {
   if (!iso) return "";
@@ -19,28 +22,40 @@ function formatWhen(iso) {
 
 export default function NotificationPopup({ notification, onDismiss }) {
   const { t } = useTranslation();
+  const okRef = useRef(null);
 
   useEffect(() => {
     if (!notification) return undefined;
+    const previouslyFocused = document.activeElement;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    okRef.current?.focus();
     const onKey = (e) => {
       if (e.key === "Escape") onDismiss();
     };
     document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prevOverflow;
+      if (previouslyFocused instanceof HTMLElement) {
+        previouslyFocused.focus();
+      }
+    };
   }, [notification, onDismiss]);
 
   if (!notification) return null;
 
   return (
     <div
-      className="fixed inset-0 z-[190] flex items-center justify-center bg-black/55 p-4"
+      className="fixed inset-0 flex items-center justify-center bg-black/55 p-4 pb-24 sm:pb-4"
+      style={{ zIndex: POPUP_Z_INDEX }}
       role="presentation"
     >
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="notification-popup-title"
-        className="w-full max-w-md overflow-hidden rounded-2xl border border-transparent bg-[#000000] shadow-xl"
+        className="max-h-[85vh] w-full max-w-md overflow-y-auto rounded-2xl border border-transparent bg-[#000000] shadow-xl"
       >
         <div className="flex items-center justify-between border-b border-white/8 px-4 py-3">
           <h2
@@ -75,6 +90,7 @@ export default function NotificationPopup({ notification, onDismiss }) {
 
         <div className="flex justify-end border-t border-white/8 px-4 py-3">
           <button
+            ref={okRef}
             type="button"
             onClick={onDismiss}
             className="cursor-pointer rounded-xl bg-(--sb-accent-fill) px-4 py-2 text-xs font-bold uppercase tracking-wide text-[#000000] hover:bg-(--sb-accent-fill-hover)"

@@ -156,6 +156,7 @@ export async function listPlayerCashiers(_req, res) {
     const cashiers = await prisma.cashier.findMany({
       where: {
         status: true,
+        deleted_at: null,
         online_withdraw_enabled: true,
         online_withdraw_available: true,
       },
@@ -823,6 +824,7 @@ export async function listAdminRequests(req, res) {
 export async function listAdminCashiers(_req, res) {
   try {
     const cashiers = await prisma.cashier.findMany({
+      where: { deleted_at: null },
       include: {
         user: { select: { id: true, name: true, phone: true, status: true } },
         wallet: { select: { id: true, balance: true } },

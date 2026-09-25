@@ -61,14 +61,6 @@ async function resolveCashoutContext(req, { forPlayerRoute = false } = {}) {
         },
       };
     }
-    if (ticket.cashier_id !== cashier.id) {
-      return {
-        error: {
-          status: 403,
-          body: { message: "Cashout rejected: ticket belongs to another cashier" },
-        },
-      };
-    }
     return { ticket, processorUserId: req.user.sub };
   }
 

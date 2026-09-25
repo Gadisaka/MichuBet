@@ -15,6 +15,7 @@
  *
  * Withdrawable DEPOSIT:
  *   - online-withdraw-refund:*     (rejected/expired online withdraw)
+ *   - shop-withdraw-refund:*       (expired shop withdrawal code)
  *
  * Debits:
  *   - BET      — stake: burn non-withdrawable first, then withdrawable
@@ -43,8 +44,12 @@ export function isWithdrawableLedgerCredit(type, reference) {
     return true;
   }
 
-  // Online-withdraw reject/expiry restores the original withdrawable debit.
-  if (t === "DEPOSIT" && ref.startsWith("online-withdraw-refund:")) {
+  // Rejected/expired withdraws restore the original withdrawable debit.
+  if (
+    t === "DEPOSIT" &&
+    (ref.startsWith("online-withdraw-refund:") ||
+      ref.startsWith("shop-withdraw-refund:"))
+  ) {
     return true;
   }
 

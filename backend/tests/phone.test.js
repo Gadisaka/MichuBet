@@ -37,6 +37,15 @@ test("the reported bug case: local and international forms are equal", () => {
   );
 });
 
+test("shop withdraw accepts 09 and 251 as the same phone", () => {
+  const local = "0912345678";
+  const international = "251912345678";
+  assert.equal(normalizeEthiopiaPhone(local), "251912345678");
+  assert.equal(normalizeEthiopiaPhone(international), "251912345678");
+  // Stored 09 vs typed 251, and the reverse, both match.
+  assert.equal(normalizeEthiopiaPhone(local), normalizeEthiopiaPhone(international));
+});
+
 test("whitespace and punctuation are stripped", () => {
   assert.equal(normalizeEthiopiaPhone("09 11 22 33 44"), CANON_9);
   assert.equal(normalizeEthiopiaPhone(" +251-911-22-33-44 "), CANON_9);

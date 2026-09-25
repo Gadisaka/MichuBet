@@ -1,6 +1,8 @@
 import { prisma } from "../Config/db.js";
+import { publishUserEvent } from "./socketHub.js";
 
 const BATCH_SIZE = 100;
+const NOTIFICATION_EVENT = "notification:new";
 
 /**
  * @param {object} params
@@ -19,7 +21,7 @@ export async function createNotification({
   metadata,
   senderId,
 }) {
-  return prisma.notification.create({
+  const row = await prisma.notification.create({
     data: {
       user_id: userId,
       kind,
@@ -29,6 +31,8 @@ export async function createNotification({
       sender_id: senderId ?? undefined,
     },
   });
+  void publishUserEvent({ userId, event: NOTIFICATION_EVENT });
+  return row;
 }
 
 /**
@@ -45,8 +49,13 @@ export async function notifyUserSafe(params) {
 /**
  * @param {string[]} userIds
  * @param {Omit<Parameters<typeof createNotification>[0], "userId">} payload
+ * @param {(event: { userId: string, event: string }) => unknown} [publish]
  */
-export async function createNotificationsForUsers(userIds, payload) {
+export async function createNotificationsForUsers(
+  userIds,
+  payload,
+  publish = publishUserEvent,
+) {
   const uniqueIds = [...new Set(userIds.filter(Boolean))];
   if (uniqueIds.length === 0) return { count: 0 };
 
@@ -64,6 +73,9 @@ export async function createNotificationsForUsers(userIds, payload) {
       })),
     });
     count += result.count;
+    for (const userId of chunk) {
+      void publish({ userId, event: NOTIFICATION_EVENT });
+    }
   }
   return { count };
 }

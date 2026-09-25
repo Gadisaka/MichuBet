@@ -30,6 +30,9 @@ describe("NotificationPopup", () => {
     expect(html).toContain("Deposit received");
     expect(html).toContain("50 ETB added");
     expect(html).toContain("OK");
+    expect(html).toContain("2147483000");
+    expect(html).toContain("pb-24");
+    expect(html).toContain("max-h-[85vh]");
   });
 
   it("renders nothing when there is no notification", () => {

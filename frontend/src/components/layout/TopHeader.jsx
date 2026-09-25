@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { createPortal } from "react-dom";
 import { Link } from "react-router-dom";
 import AppIcon from "../common/AppIcon";
 import DesktopUserSidebar from "./DesktopUserSidebar";
@@ -12,6 +13,7 @@ import { dismissPopupNotification } from "../notifications/dismissPopupNotificat
 import NotificationPopup from "../notifications/NotificationPopup";
 import NotificationsDialog from "../notifications/NotificationsDialog";
 import { pickPopupNotification } from "../notifications/pickPopupNotification";
+import { useNotificationStream } from "../../hooks/useNotificationStream";
 import { usePlayerSiteBranding } from "../../hooks/usePlayerSiteBranding";
 import { useLanguage, useTranslation } from "../../i18n/LanguageContext.jsx";
 
@@ -79,8 +81,7 @@ function TopHeader() {
       setUnreadCount(Number(data?.total) || 0);
       setUnreadItems(Array.isArray(data.items) ? data.items : []);
     } catch {
-      setUnreadCount(0);
-      setUnreadItems([]);
+      // Keep the last good list so a blip does not dismiss a visible popup.
     }
   }, [isLoggedIn]);
 
@@ -124,6 +125,8 @@ function TopHeader() {
     return () => window.removeEventListener("balanceUpdated", handler);
   }, [refreshUnread]);
 
+  useNotificationStream(refreshUnread);
+
   useEffect(() => {
     if (!isLoggedIn) {
       setUnreadCount(0);
@@ -131,8 +134,15 @@ function TopHeader() {
       return undefined;
     }
     void refreshUnread();
-    const id = setInterval(() => void refreshUnread(), 15_000);
-    return () => clearInterval(id);
+    const id = setInterval(() => void refreshUnread(), 30_000);
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void refreshUnread();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      clearInterval(id);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
   }, [isLoggedIn, refreshUnread]);
 
   useEffect(() => {
@@ -221,7 +231,7 @@ function TopHeader() {
                   ? `${t("header.notifications")} (${unreadCount})`
                   : t("header.notifications")
               }
-              className="relative inline-flex h-7 w-7 cursor-pointer items-center justify-center rounded-full bg-[#000000] text-[rgba(255,255,255,0.72)] hover:bg-[#111111] hover:text-white max-lg:hidden"
+              className="relative inline-flex h-7 w-7 cursor-pointer items-center justify-center rounded-full bg-[#000000] text-[rgba(255,255,255,0.72)] hover:bg-[#111111] hover:text-white max-lg:size-8"
             >
               <AppIcon name="bell" size={16} />
               {unreadCount > 0 ? (
@@ -382,12 +392,15 @@ function TopHeader() {
         />
       ) : null}
 
-      {isLoggedIn && !notificationsOpen ? (
-        <NotificationPopup
-          notification={popupNotification}
-          onDismiss={() => void handlePopupDismiss()}
-        />
-      ) : null}
+      {isLoggedIn && !notificationsOpen && popupNotification
+        ? createPortal(
+            <NotificationPopup
+              notification={popupNotification}
+              onDismiss={() => void handlePopupDismiss()}
+            />,
+            document.body,
+          )
+        : null}
     </>
   );
 }
