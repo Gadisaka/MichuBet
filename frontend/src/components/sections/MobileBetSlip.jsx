@@ -873,7 +873,7 @@ function MobileBetSlip({
       )}
       {couponCheckTickets && couponCheckTickets.length > 0 &&
         createPortal(
-          <div className={modalBackdrop} style={{ zIndex: 2147483646 }}>
+          <div className={modalBackdrop} style={{ zIndex: 2147483500 }}>
             <div className={modalPanel}>
               <ModalClose
                 onClick={() => setCouponCheckTickets(null)}
@@ -888,7 +888,7 @@ function MobileBetSlip({
         )}
       {placedBet &&
         createPortal(
-          <div className={modalBackdrop} style={{ zIndex: 2147483647 }}>
+          <div className={modalBackdrop} style={{ zIndex: 2147483600 }}>
             <div className={`${modalPanelMd} px-5 pb-5 pt-10`}>
               <ModalClose
                 onClick={() => setPlacedBet(null)}

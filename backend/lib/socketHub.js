@@ -24,17 +24,45 @@ export async function publishMarketEvent(event) {
   }
 }
 
+function emitUserEvent(userId, event, data) {
+  const io = getSocketHub();
+  if (!io) return;
+  io.to(userRoom(userId)).emit(event, data ?? {});
+}
+
 /** Room-scoped user event. Never throws — callers fire this and continue. */
 export async function publishUserEvent({ userId, event, data }) {
   if (!userId || !event) return;
+  const payload = data ?? {};
+  try {
+    emitUserEvent(userId, event, payload);
+  } catch (error) {
+    console.error("publishUserEvent local error:", error?.message || error);
+  }
   try {
     const redis = getRedisClient();
     await redis.publish(
       USER_CHANNEL,
-      JSON.stringify(buildUserEvent(userId, event, data)),
+      JSON.stringify(buildUserEvent(userId, event, payload)),
     );
   } catch (error) {
     console.error("publishUserEvent error:", error?.message || error);
+  }
+}
+
+function dispatchMarketEvent(io, message) {
+  try {
+    const payload = JSON.parse(message);
+    const fixtureId = Number.parseInt(payload?.apiFixtureId, 10);
+    const eventName = payload?.event || "market:event";
+    if (Number.isFinite(fixtureId)) {
+      io.emit(eventName, payload);
+      io.to(`fixture:${fixtureId}`).emit(eventName, payload);
+    } else {
+      io.emit(eventName, payload);
+    }
+  } catch {
+    // ignore malformed payload
   }
 }
 
@@ -84,25 +112,13 @@ export async function initSocketHub(httpServer) {
     const base = getRedisClient();
     subscriber = base.duplicate();
     await subscriber.connect();
-    await subscriber.subscribe(CHANNEL, (message) => {
-      try {
-        const payload = JSON.parse(message);
-        const fixtureId = Number.parseInt(payload?.apiFixtureId, 10);
-        if (Number.isFinite(fixtureId)) {
-          io.emit(payload.event || "market:event", payload);
-          io.to(`fixture:${fixtureId}`).emit(payload.event || "market:event", payload);
-        } else {
-          io.emit(payload.event || "market:event", payload);
-        }
-      } catch {
-        // ignore malformed payload
-      }
-    });
+    // ioredis delivers pub/sub payloads on "message". A function passed to
+    // subscribe() is only the command callback, not the payload listener.
     subscriber.on("message", (channel, message) => {
-      if (channel !== USER_CHANNEL) return;
-      dispatchUserEvent(io, message);
+      if (channel === USER_CHANNEL) dispatchUserEvent(io, message);
+      else if (channel === CHANNEL) dispatchMarketEvent(io, message);
     });
-    await subscriber.subscribe(USER_CHANNEL);
+    await subscriber.subscribe(CHANNEL, USER_CHANNEL);
   } catch (error) {
     console.error("initSocketHub subscribe error:", error?.message || error);
   }

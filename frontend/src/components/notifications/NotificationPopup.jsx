@@ -2,8 +2,8 @@ import { useEffect, useRef } from "react";
 import AppIcon from "../common/AppIcon";
 import { useTranslation } from "../../i18n/LanguageContext.jsx";
 
-/** Above page chrome and the casino frame, below bet-receipt modals. */
-const POPUP_Z_INDEX = 2147483000;
+/** Above the bet receipt (2147483600) and every other page layer. */
+const POPUP_Z_INDEX = 2147483647;
 
 function formatWhen(iso) {
   if (!iso) return "";

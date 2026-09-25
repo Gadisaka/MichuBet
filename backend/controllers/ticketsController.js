@@ -2088,7 +2088,7 @@ export async function createPrebookTicket(req, res) {
         receiptNumber: created.receipt_number,
         potentialWin: created.potential_win,
       });
-      void notifyUserSafe({
+      await notifyUserSafe({
         userId: authenticatedUserId,
         ...msg,
       });
