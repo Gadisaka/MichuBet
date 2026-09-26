@@ -123,6 +123,7 @@ export default function TicketWatchSection({
   timeLabel,
   embedInGrid = false,
   essentialFilters = false,
+  cardsOnly = false,
 }) {
   const isAdmin = mode === "admin";
   const [draft, setDraft] = useState(() => defaultTicketWatchFilters(view));
@@ -495,7 +496,7 @@ export default function TicketWatchSection({
       <>
         <h3 className="sm:col-span-2 pt-2 text-base font-semibold text-[var(--text)]">{title}</h3>
         {summaryCards}
-        {details}
+        {cardsOnly ? null : details}
       </>
     );
   }
