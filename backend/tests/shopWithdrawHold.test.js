@@ -160,6 +160,33 @@ test("redeem credits the cashier without debiting the player again", async () =>
   assert.match(pending.reference, /^approved:/);
 });
 
+test("a second withdrawal for the same cashier and player settles with its own reference", async () => {
+  seed({ playerBalance: 200, playerWithdrawable: 200, cashierBalance: 0 });
+
+  const first = await requestCode(40);
+  assert.equal(first.statusCode, 201);
+  const firstRedeem = await redeem("0912345678", first.body.code);
+  assert.equal(firstRedeem.statusCode, 200, firstRedeem.body?.message);
+
+  const second = await requestCode(60);
+  assert.equal(second.statusCode, 201);
+  const secondRedeem = await redeem("0912345678", second.body.code);
+  assert.equal(secondRedeem.statusCode, 200, secondRedeem.body?.message);
+  assert.equal(secondRedeem.body.playerBalance, 100);
+  assert.equal(secondRedeem.body.cashierBalance, 100);
+  assert.equal(playerWallet().balance, 100);
+  assert.equal(cashierWallet().balance, 100);
+
+  const credits = [...getStore().transaction.values()].filter((tx) =>
+    String(tx.reference).startsWith("cashier-withdraw-approve:"),
+  );
+  assert.equal(credits.length, 2);
+  assert.notEqual(credits[0].reference, credits[1].reference);
+  for (const credit of credits) {
+    assert.match(credit.reference, /:tx:/);
+  }
+});
+
 test("an expired unused code returns funds and a second sweep is a no-op", async () => {
   seed();
   const created = await requestCode(80);

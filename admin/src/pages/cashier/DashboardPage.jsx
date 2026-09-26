@@ -4,7 +4,6 @@ import AdminShell from "../../components/layout/AdminShell";
 import PanelCard from "../../components/ui/PanelCard";
 import { useVerifyPasswordMutation } from "../../hook/useVerifyPasswordMutation";
 import { useCashierDashboardStatsQuery } from "../../hook/useCashierDashboardStats";
-import TicketWatchSection from "../../components/dashboard/TicketWatchSection";
 import {
   buildSalesReportBarcodePayload,
   encodeSalesReportAsync,
@@ -194,26 +193,6 @@ function DashboardContent() {
           </div>
         </>
       )}
-      <TicketWatchSection
-        embedInGrid
-        essentialFilters
-        mode="cashier"
-        view="payable"
-        title="Two-Day Payable Report"
-        description="Won tickets you booked that have not been paid yet. Dates use the day the ticket was settled."
-        amountLabel="Net payout"
-        timeLabel="Settled"
-      />
-      <TicketWatchSection
-        embedInGrid
-        essentialFilters
-        mode="cashier"
-        view="high-potential"
-        title="High Win Potential"
-        description="Tickets you booked with 1 or 2 selections still pending and no lost selection. Leave dates empty to include every open ticket."
-        amountLabel="Net potential"
-        timeLabel="Placed"
-      />
       </div>
     </div>
   );

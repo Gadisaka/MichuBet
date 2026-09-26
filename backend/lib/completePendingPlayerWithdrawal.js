@@ -71,6 +71,8 @@ export async function completePendingPlayerWithdrawal(tx, {
     },
   });
 
+  // `Transaction.reference` is unique across all wallets. Include the pending
+  // transaction id so the same cashier can pay the same player more than once.
   await tx.transaction.create({
     data: {
       wallet_id: cWallet.id,
@@ -78,7 +80,7 @@ export async function completePendingPlayerWithdrawal(tx, {
       amount,
       balance_before: cashierBefore,
       balance_after: cashierAfter,
-      reference: `cashier-withdraw-approve:${approverUserId}:from:${pWallet.user_id}`,
+      reference: `cashier-withdraw-approve:${approverUserId}:from:${pWallet.user_id}:tx:${pendingTransactionId}`,
     },
   });
 

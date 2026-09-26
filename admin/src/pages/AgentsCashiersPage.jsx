@@ -349,42 +349,50 @@ function CashierDetail({ cashier, onClose }) {
           <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
             Assigned agent
           </p>
-          {cashier.agent ? (
-            <div className="flex items-center justify-between">
-              <Tag>{cashier.agent.name}</Tag>
-              <button
-                type="button"
-                onClick={handleUnassign}
-                disabled={unassignMutation.isPending}
-                className="text-xs font-semibold text-[var(--danger)]"
-              >
-                {unassignMutation.isPending ? "Removing..." : "Remove"}
-              </button>
-            </div>
+          {cashier.cashierProfileId ? (
+            <>
+              {cashier.agent ? (
+                <div className="flex items-center justify-between">
+                  <Tag>{cashier.agent.name}</Tag>
+                  <button
+                    type="button"
+                    onClick={handleUnassign}
+                    disabled={unassignMutation.isPending}
+                    className="text-xs font-semibold text-[var(--danger)]"
+                  >
+                    {unassignMutation.isPending ? "Removing..." : "Remove"}
+                  </button>
+                </div>
+              ) : (
+                <p className="mb-2 text-sm text-[var(--muted)]">
+                  No agent assigned.
+                </p>
+              )}
+              <div className="mt-3 flex items-end w-full gap-2">
+                <div className="flex w-1/2 ">
+                  <SelectInput
+                    label={cashier.agent ? "Reassign to" : "Assign agent"}
+                    value={selectedAgentId}
+                    onChange={(e) => setSelectedAgentId(e.target.value)}
+                    options={agentOptions}
+                    placeholder="Select agent..."
+                    className="w-full"
+                  />
+                </div>
+                <PrimaryButton
+                  onClick={handleAssign}
+                  disabled={!selectedAgentId || assignMutation.isPending}
+                  className="w-1/2"
+                >
+                  {assignMutation.isPending ? "..." : "Assign"}
+                </PrimaryButton>
+              </div>
+            </>
           ) : (
-            <p className="mb-2 text-sm text-[var(--muted)]">
-              No agent assigned.
+            <p className="text-sm text-[var(--muted)]">
+              This cashier has no branch profile, so an agent cannot be assigned.
             </p>
           )}
-          <div className="mt-3 flex items-end w-full gap-2">
-            <div className="flex w-1/2 ">
-              <SelectInput
-                label={cashier.agent ? "Reassign to" : "Assign agent"}
-                value={selectedAgentId}
-                onChange={(e) => setSelectedAgentId(e.target.value)}
-                options={agentOptions}
-                placeholder="Select agent..."
-                className="w-full"
-              />
-            </div>
-            <PrimaryButton
-              onClick={handleAssign}
-              disabled={!selectedAgentId || assignMutation.isPending}
-              className="w-1/2"
-            >
-              {assignMutation.isPending ? "..." : "Assign"}
-            </PrimaryButton>
-          </div>
           {feedback && (
             <p className="mt-2 text-xs font-medium text-[var(--accent)]">
               {feedback}

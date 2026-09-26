@@ -23,7 +23,8 @@ export default function UsersPage() {
   const [roleFilter, setRoleFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
 
-  const effectiveRoleFilter = activeTab === "players" ? "PLAYER" : roleFilter;
+  const effectiveRoleFilter =
+    activeTab === "players" ? "PLAYER" : roleFilter || "STAFF";
 
   const usersQuery = useUsersQuery({
     page,
@@ -66,8 +67,6 @@ export default function UsersPage() {
   }
 
   const { items = [], total = 0, totalPages = 1 } = usersQuery.data ?? {};
-  const visibleItems =
-    activeTab === "staff" && !roleFilter ? items.filter((u) => u.role !== "PLAYER") : items;
 
   const roleFilterOptions = (metaQuery.data?.roles ?? [])
     .filter((r) => r.name !== "PLAYER")
@@ -116,7 +115,7 @@ export default function UsersPage() {
           <p className="mt-1 text-sm text-[var(--muted)]">
             {activeTab === "players"
               ? `${total} player${total !== 1 ? "s" : ""} total`
-              : `${visibleItems.length} user${visibleItems.length !== 1 ? "s" : ""} on this page`}
+              : `${total} user${total !== 1 ? "s" : ""} total`}
           </p>
         </div>
         {activeTab === "staff" && (
@@ -170,7 +169,7 @@ export default function UsersPage() {
           <p className="px-6 py-12 text-center text-sm text-[var(--danger)]">
             {usersQuery.error?.message || "Failed to load users"}
           </p>
-        ) : visibleItems.length === 0 ? (
+        ) : items.length === 0 ? (
           <p className="px-6 py-12 text-center text-sm text-[var(--muted)]">No users found.</p>
         ) : (
           <table className="w-full text-left text-sm">
@@ -184,7 +183,7 @@ export default function UsersPage() {
               </tr>
             </thead>
             <tbody>
-              {visibleItems.map((u) => (
+              {items.map((u) => (
                 <tr
                   key={u.id}
                   className="border-b border-[var(--border)] last:border-0 hover:bg-[var(--surfaceMuted)]"

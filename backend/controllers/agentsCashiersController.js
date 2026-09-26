@@ -19,6 +19,17 @@ function toPositiveInt(value, fallback) {
   return Number.isFinite(n) && n > 0 ? n : fallback;
 }
 
+/**
+ * Cashiers created before `deleted_at` existed have no field at all. Prisma's
+ * `{ deleted_at: null }` only matches an explicit null, so those rows vanish
+ * from listings. Match both shapes, and still exclude a real deletion date.
+ */
+function notSoftDeletedCashier() {
+  return {
+    OR: [{ deleted_at: null }, { deleted_at: { isSet: false } }],
+  };
+}
+
 function mapCashierBranch(cashierProfile) {
   if (!cashierProfile) return null;
   return {
@@ -43,7 +54,7 @@ export async function listCashiers(req, res) {
 
     const where = {
       role: { name: "CASHIER" },
-      cashier_profile: { is: { deleted_at: null } },
+      cashier_profile: { is: notSoftDeletedCashier() },
     };
 
     if (search) {
@@ -849,7 +860,7 @@ export async function unassignAgentFromCashier(req, res) {
 export async function listAssignableCashiers(_req, res) {
   try {
     const cashiers = await prisma.cashier.findMany({
-      where: { deleted_at: null },
+      where: notSoftDeletedCashier(),
       orderBy: { branch_name: "asc" },
       include: {
         user: { select: { id: true, name: true, phone: true } },

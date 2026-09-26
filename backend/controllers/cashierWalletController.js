@@ -360,7 +360,10 @@ export async function approveWithdrawRequest(req, res) {
     if (error.message === "CASHIER_WALLET_NOT_FOUND") {
       return res.status(404).json({ message: "Cashier wallet not found" });
     }
-    console.error("approveWithdrawRequest error:", error);
+    if (error?.code === "P2002") {
+      return res.status(409).json({ message: "This withdrawal has already been settled" });
+    }
+    console.error("approveWithdrawRequest error:", error?.code, error?.meta, error);
     return res.status(500).json({ message: "Failed to approve withdrawal" });
   }
 }
@@ -552,7 +555,10 @@ export async function redeemShopWithdraw(req, res) {
     if (error.message === "CASHIER_WALLET_NOT_FOUND") {
       return res.status(404).json({ message: "Cashier wallet not found" });
     }
-    console.error("redeemShopWithdraw error:", error);
+    if (error?.code === "P2002") {
+      return res.status(409).json({ message: "This withdrawal has already been settled" });
+    }
+    console.error("redeemShopWithdraw error:", error?.code, error?.meta, error);
     return res.status(500).json({ message: "Failed to complete withdrawal" });
   }
 }

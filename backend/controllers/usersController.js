@@ -52,7 +52,7 @@ function mapUser(user) {
 
 /**
  * GET /api/admin/users
- * Query: page, limit, search (name/phone/email), role (RoleName), status (active|disabled)
+ * Query: page, limit, search (name/phone/email), role (RoleName or STAFF for all non-players), status (active|disabled)
  */
 export async function listUsers(req, res) {
   try {
@@ -74,7 +74,11 @@ export async function listUsers(req, res) {
       ];
     }
 
-    if (role) {
+    // STAFF is a sentinel for the admin Users page "All staff roles" filter.
+    // It must be applied server-side so pagination and totals exclude players.
+    if (role === "STAFF") {
+      where.role = { name: { not: "PLAYER" } };
+    } else if (role) {
       where.role = { name: role };
     }
 
